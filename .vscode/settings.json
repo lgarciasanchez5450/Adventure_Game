@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "limits.h": "c",
+        "string.h": "c"
+    },
+    "python.analysis.typeCheckingMode": "off"
+}
