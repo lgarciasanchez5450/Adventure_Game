@@ -21,7 +21,7 @@ BLOCK_SIZE = 2
 OCTAVES = 6
 MAPWIDTH  = 700
 MAPHEIGHT = 700
-SCALE     = .01
+SCALE     = .1
 ISLAND_BLEND         = 0
 
 _:object
