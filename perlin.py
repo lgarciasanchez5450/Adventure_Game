@@ -187,13 +187,13 @@ def set_seed(seed):
   SEED = seed
   perm = _init(seed)
     
-def noise2a(xs,ys,scale):
+def noise2a(xs,ys,scale):  #noise 2 array
     return _noise2a(xs * scale,ys * scale,perm)
 
-def noise2al(xs,ys,frequencies = 1,scale = 1):
+def noise2al(xs,ys,frequencies = 1,scale = 1): #noise 2 array layered
     return _noise2al(xs,ys,frequencies,scale,perm)
 
-def noise2ali(xs:np.ndarray,ys:np.ndarray,freq:int,scale:float,t:float,d_func,mapwidth,mapheight):
+def noise2ali(xs:np.ndarray,ys:np.ndarray,freq:int,scale:float,t:float,d_func,mapwidth,mapheight): #noise 2 array layered island
   map = _noise2al(xs,ys,freq,scale,perm)
   #normalize to range [0,1]
   map += 1 #
@@ -236,7 +236,7 @@ def make_island(data,xs:np.ndarray,ys:np.ndarray,t,d_func,mapwidth,mapheight):
   if t == 1: return result
   return result * t + data * (1-t)
 @njit(fastmath = True)
-def _noise2al(xs,ys,octaves,scale,perm):
+def _noise2al(xs,ys,octaves,scale,perm): # TODO : make this run in parallel using parallel = True
   data = _noise2a(xs*scale,ys*scale,perm)
   double = 2
   total = 1
@@ -285,8 +285,7 @@ def _sigmoid_dist(x:float,vertical_squish,vertical_shift,horizontal_shift) -> fl
 @njit(cache = False)
 def sigmoid_dist(x,y):
   return _sigmoid_dist(hypot(x,y),0.64,-0.07,2.5)
-if __name__ == '__main__':
-   print(sigmoid_dist(.5,.5))
+
    
    
 @njit(cache = True)
@@ -491,6 +490,12 @@ class SpacedObject:
     return False
 
         
+
+import Perlin
+
+
+for x in range(100):
+  print(Perlin.noise2(x/100,0))
 
 
 #checked = set()

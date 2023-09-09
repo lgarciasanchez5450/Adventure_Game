@@ -1060,9 +1060,9 @@ _DEBUG_ = True
 def noise_to_ground(n):
   if n > 1 or n < 0: 
     return None
-  if n > .77:
+  if n > .73:
     return getGround(GROUND_STONE)
-  if n > .30:
+  if n > .43:
     return getGround(GROUND_GRASS)
   
   return getGround(GROUND_WATER) 

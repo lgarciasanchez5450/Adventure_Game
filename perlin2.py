@@ -1,4 +1,5 @@
 
+from numba import njit
 PRIME_X = 0x5205402B9270C86F
 PRIME_Y = 0x598CD327003817B5
 
@@ -55,8 +56,8 @@ def noise2_ImproveX( seed,  x:float, y:float):
 def noise2_UnskewedBase( seed, xs:float, ys:float):
 
     # Get base points and offsets.
-    xsb:int = fastFloor(xs)
-    ysb:int = fastFloor(ys)
+    xsb:int = floor(xs)
+    ysb:int = floor(ys)
     xi:float = float(xs - xsb)
     yi:float = float(ys - ysb)
 
@@ -159,31 +160,38 @@ def noise2_UnskewedBase( seed, xs:float, ys:float):
     * Utility
 '''
 
-def correct(value, bits, signed) -> int:
+'''def correct(value, bits, signed) -> int:
     base = 1 << bits
     value %= base
     return value - base if signed and value.bit_length() == bits else value
 
 
-ubyte, sbyte, uinteger, sinteger, ulong, slong = (
+ubyte, sbyte, uinteger,  ulong = (
     lambda v: correct(v, 8, False), lambda v: correct(v, 8, True),
-    lambda v: correct(v, 32, False), lambda v: correct(v, 32, True),
-    lambda v: correct(v, 64, False), lambda v: correct(v, 64, True)
-)
+    lambda v: correct(v, 32, False), 
+    lambda v: correct(v, 64, False)
+)'''
+def slong(value:int) -> int:
+    base = 18446744073709551616 # 1<<64
+    value %= base
+    #return value - base if value.bit_length() == 64 else value
+    return value - base if value >= 9223372036854775808 else value
+ 
+@njit
+def sinteger(value:int):
+    base = 4294967296
+    value %= base
+    #value &= base-1
+    return value - base if value >=2147483648 else value
+sinteger(139)
 
 def grad( seed,  xsvp,  ysvp,  dx:float,  dy:float) -> float:
-    hash = seed ^ xsvp ^ ysvp
-    hash *= HASH_MULTIPLIER
-    hash = slong(hash)
-    hash ^= hash >> (64 - N_GRADS_2D_EXPONENT + 1)
-    gi:int = sinteger(hash) & ((N_GRADS_2D - 1) << 1)
+    hash = slong((seed ^ xsvp ^ ysvp) * HASH_MULTIPLIER)
+    hash ^= hash >> 58
+    gi:int = sinteger(hash) & 0b11111110
     return GRADIENTS_2D[gi | 0] * dx + GRADIENTS_2D[gi | 1] * dy
 
-
-def fastFloor( x:float):
-    xi:int = int(x)
-    return xi-1 if x < xi else xi
-
+H = 0b11111110
 
 '''
     * Lookup Tables & Gradients
@@ -226,4 +234,70 @@ for i in range(len(GRADIENTS_2D)):
     GRADIENTS_2D[i] = grad2[j]
     j+=1
     
+def list_is_close_to(list1,list2):
+    return max([abs(a-b) for a,b in zip(list1,list2)]) < .000001    
 
+def run_tests():
+    from time import perf_counter
+    import random
+    test1_answers = {
+                    1745:[-3.1138848356295195, -10.898877791019576, 3.1138848356295195, -11.225507697251212, -10.898877791019576, -3.1138848356295195, 10.787137804943775, 9.613642297817508, 3.1138848356295195, 10.787137804943775, -3.1138848356295195, 10.787137804943775, -11.225507697251212, 9.613642297817508, 10.787137804943775, -3.1138848356295195],
+                    -9277:[5.425809208361919, 10.787137804943775, 10.787137804943775, -5.425809208361919, 10.787137804943775, 5.425809208361919, 10.787137804943775, -2.696865530357586, 10.787137804943775, 10.787137804943775, 5.425809208361919, 2.696865530357586, -5.425809208361919, -2.696865530357586, 2.696865530357586, 5.425809208361919],
+                    -11291:[8.090272274586173, -2.696865530357586, -3.1138848356295195, -5.7996984888892955, -2.696865530357586, 8.090272274586173, 0.21586507675959954, 5.7996984888892955, -3.1138848356295195, 0.21586507675959954, 8.090272274586173, -10.787137804943775, -5.7996984888892955, 5.7996984888892955, -10.787137804943775, 8.090272274586173]
+    }
+    test2_answers = {
+        1745:[0.10169742685383955, 0.34245590984126584, 0.07967682133056074, -0.02601645285787879, -0.08116975446510796, 0.149982080275581, -0.1186148982678273, -0.26280066008231967, 0.3284636267621121, 0.02612887445251281, -0.04093236322213979, -0.2673131491297672, 0.074535562825414, -0.1065087523931904, 0.6459546333150622, 0.2547685779146876],
+        -9277:[0.48583832990251646, -0.310529829448389, -0.2957073644916285, 0.0755160913757486, 0.24375129912254737, 0.5393221770443897, 0.19356900603677038, 0.23030277129515317, 0.02939208117752142, -0.07498508020919241, 0.22606171163680483, 0.06871075034664653, 0.11970053463238242, 0.10958593092381776, 0.11306738461405622, 0.6343860412649428],
+        -11291:[0.34299197417187843, 0.6625108211201022, -0.22597725464668145, -0.15586245281349032, 0.17985950231462391, -0.40435908152950295, 0.07454636640264611, -0.039062495221131026, 0.1694337399502514, -0.15539020601234055, 0.036185886657968486, 0.5319550237142369, -0.024920192350453965, -0.1134193248250248, 0.16457385472763136, 0.49623199869186324]
+    }
+    start = perf_counter()
+    seeds = [1745, -9277, -11291]
+    failed = False
+    for seed in seeds:
+        test1 = [grad(seed,x,y,0.384,.481) for x in range(1,50,15) for y in range(1,50,15) ]
+        if list_is_close_to(test1_answers[seed],test1):
+            print('Test Passed')
+        else:
+            print(f'Test1 failed with seed: {seed}')
+            failed = True
+        test2 = [noise2(seed,x/3,y/3) for x in range(1,50,15) for y in range(1,50,15) ]
+        if list_is_close_to(test2_answers[seed], test2):
+            print('Test Passed')
+        else:
+            print(f'Test2 failed with seed: {seed}') 
+            failed = True  
+    if failed:
+        print(f'Test Failed in {perf_counter() - start} seconds')
+    else:
+        print(f'Test Passed in {perf_counter() - start} seconds')
+    print("Starting Stress Test")
+    start = perf_counter()
+    cycles = 1_000
+    [noise2(123,x,y)for x in range(cycles) for y in range(cycles)]
+    time = perf_counter()-start
+    cycles_per_second = cycles*cycles / time
+    print("Rating:",cycles_per_second.__trunc__()/1000)
+    if cycles_per_second >500000:#above a rating of 500
+        print(f'Stress Test Passed in {time} seconds')
+    else:
+        print(f'Stress Test Failed in {time} seconds')
+
+
+import debug
+
+@debug.profile
+def testCustom():
+    a = 0
+    for i in range(1000):
+        a += floor(i/3)
+    return a
+from math import floor
+@debug.profile
+def testBuiltin():
+    a = 0
+    for i in range(1000):
+        a += floor(i/3)
+    return a
+if __name__ == '__main__':
+    run_tests()
+    

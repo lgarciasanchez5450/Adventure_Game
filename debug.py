@@ -26,7 +26,7 @@ def profile(func):
         value = func(*args,**kwargs)
         end = time()
         times[str(func.__name__)].append(end-start)
-        #print(f"{func.__name__} took {end - start} seconds")
+        print(f"{func.__name__} took {end - start} seconds")
         return value
     return inner
 
