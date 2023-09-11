@@ -1097,10 +1097,8 @@ class Chunk:
             chunk.pos = Vector2(pos[0] * CHUNK_SIZE,pos[1] * CHUNK_SIZE)
 
             chunk.blocks = []
-            #chunk.items = []
             chunk.onCreationFinish = []
-            #chunk.items_sub = [[],[],[],[]]
-            #chunk.subdivision_lengths = [0,0,0,0]
+
             surf = Surface((CHUNK_SIZE*BLOCK_SIZE,CHUNK_SIZE*BLOCK_SIZE))
             chunk.csurf = CSurface(surf ,chunk.pos,(0,0))
             chunk.collider = Collider(pos[0]*CHUNK_SIZE,pos[1]*CHUNK_SIZE,CHUNK_SIZE,CHUNK_SIZE)
@@ -1126,7 +1124,7 @@ class Chunk:
         self.collider:Collider
         
         self.id:int = hash(self.chunk_pos)
-        self.data:list #numpy.ndarray
+        self.data:np.ndarray #numpy.ndarray
         self.blocks:list[Block]
       
         self.biome:int

@@ -55,13 +55,14 @@ APPEARANCE_BY_SPECIES = {
     'bunny' : (.5,.3,.5),
     'item'  : (0.0,.1,.5),
     'arrow' : (0.0,.1,1.0),
+    'tnt'   : (0.0,1,.5)
 }
-STATS_BY_SPECIES = {'human':{'constitution': 5,'energy':5,'attack': 5,'defense':0,'speed': 80, 'strength':5,'stamina':5,'attack_range':.3},
+STATS_BY_SPECIES = {'human':{'constitution': 5,'energy':5,'attack': 5,'defense':0,'speed': 10, 'strength':5,'stamina':5,'attack_range':.3},
                     'spirit':{'constitution': 7, 'energy':8,'attack':3,'defense':5,'speed':9,'strength':1,'stamina':3,'attack_range':.3}, #Reasons: Spirits are by definition ethereal creatures therefore are physically weaker in the real world
                     'bunny':{'constitution': 3, 'energy':11,'attack':1,'defense':2,'speed':3,'strength':1,'stamina':6,'attack_range':.3}, #Reasons: bunnies are by very small yet very energetic a fast, so therefore they are lightweight
                     
                     }
-MAX_SPEED_BY_SPECIES = {'human':200,
+MAX_SPEED_BY_SPECIES = {'human':15,
                         'spirit':15,
                         'bunny':30
                         } # in blocks per second

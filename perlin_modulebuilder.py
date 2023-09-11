@@ -5,4 +5,4 @@ module1 = Extension('Perlin',
             #libraries = [''],
             sources = ['perlin.c'])
 
-setup(name = 'Perlin', version = '0.4',description = 'hehehehaw', author='hithere32123',url='https://www.example.com',ext_modules=[module1])
+setup(name = 'Perlin', version = '0.21',description = 'hehehehaw', author='hithere32123',url='https://www.example.com',ext_modules=[module1])

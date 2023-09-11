@@ -1,7 +1,7 @@
 #Any constants needed for any scripts should go here
 #variables here should not change (eg. be Final) so it is safe to do from Constants import *
 #there should not be ANY imports in this module as it contains only pure python constants
-FPS = 60 #Target Framerate
+FPS = 0 #Target Framerate
 DEBUG = True
 
 _:object = object()
@@ -17,11 +17,11 @@ _:object
 '''Chunk Generation Variables'''
 CHUNK_SIZE = 64 #must be divisible by 2
 HALF_CHUNK_SIZE = CHUNK_SIZE//2 # cause of this
-BLOCK_SIZE = 2
+BLOCK_SIZE = 4
 OCTAVES = 6
 MAPWIDTH  = 700
 MAPHEIGHT = 700
-SCALE     = .05
+SCALE     = .06
 ISLAND_BLEND         = 0
 
 _:object

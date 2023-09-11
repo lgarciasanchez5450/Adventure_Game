@@ -1,5 +1,12 @@
 #define PY_SSIZE_T_CLEAN 
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <C:\Users\Leo\AppData\Local\Programs\Python\Python310\include\Python.h>
+// Steps 
+// 1) Open Python IDLE
+// 2) import numpy
+// 3) Run numpy.get_include()
+//#include <C:\Users\Leo\AppData\Local\Programs\Python\Python310\Lib\site-packages\numpy\core\include\numpy\arrayobject.h>
+
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +27,7 @@ static const int32_t N_GRADS_2D_EXPONENT = 7;
 static const int32_t N_GRADS_2D = 128;
 static const double NORMALIZER_2D = 0.05481866495625118;
 static const float RSQUARED_2D = 2.0f / 3.0f;
-static const int32_t seed = 3;
+static int32_t seed = 3;
 
 static float GRADIENTS_2D[256];
 
@@ -63,7 +70,7 @@ void init(void) {
         GRADIENTS_2D[i] = grad2[j];
     }
 }
-static int32_t fastFloor(double x) {
+static inline int32_t fastFloor(double x) {
     int32_t xi = (int32_t)x;
     return x < xi ? xi - 1 : xi;
 }
@@ -194,6 +201,38 @@ static float noise2(int64_t seed, double x, double y) {
     return noise2_UnskewedBase(seed, xs, ys);
 }
 
+static float noise2_layered(int64_t seed, double x, double y,int octaves ,double scale) {
+  const double mul_factor = 2.0; // can be tuned
+  const float div_factor = 1.4f; // can be tuned
+  float data = 0.0f;
+
+  double a = scale; // Must be double b/c it operates on input
+  float sum = 0.0f; // Can be float b/c it operates on output
+  float b = (float)scale; // Can be float b/c it operates on output-
+  for (int i = 0; i < octaves ; i++) {
+    data += noise2(seed,x*a,y*a) * b;// TODO: add offset    
+    sum += b;
+    a *= mul_factor;
+    b /= div_factor;
+  }
+  return data/sum;
+}
+static inline unsigned int index(unsigned int x, unsigned int y, unsigned int y_size) { // helper function for noise2_array_layered
+    return y * y_size + x;
+}
+static float* noise2_array_layered(int64_t seed, double xs[],const unsigned int xs_size, double ys[],const unsigned int ys_size, const int octaves, double scale) {
+
+    double *result = malloc(ys_size*xs_size*sizeof(double));
+
+    for (unsigned int y =0; y < ys_size; y++) {
+        for (unsigned int x = 0; x < xs_size; x++) {
+            result[index(x,y,ys_size)] = noise2_layered(seed,xs[x],ys[y],octaves,scale);
+        }
+    }
+    return result;
+}
+
+
 static PyObject* PyNoise2(PyObject* self, PyObject* args) {
     double x,y;
     if (!PyArg_ParseTuple(args,"dd",&x,&y)) {
@@ -202,15 +241,121 @@ static PyObject* PyNoise2(PyObject* self, PyObject* args) {
     float noise = noise2(seed,x,y);
 
     return Py_BuildValue("f",noise);
+}
 
+static PyObject* PyNoise2Layered(PyObject* self, PyObject* args) {
+    double x,y,scale;
+    int octaves;
+    if (!PyArg_ParseTuple(args,"dddi",&x,&y,&scale,&octaves)){
+        return NULL;
+    }
+    float noise = noise2_layered(seed,x,y,octaves,scale);
+    return Py_BuildValue("f",noise);
+}
+static PyObject* PySetSeed(PyObject* self, PyObject* args) {
+    int32_t newSeed;
+    if (!PyArg_ParseTuple(args,"i",&newSeed)) {
+        return NULL;
+    }
+    seed = newSeed;
+    Py_RETURN_NONE;
+}
+static PyObject* PyCreateNumpyArray(PyObject* self,PyObject* args) {
+    PyArrayObject *arr; // represents a numpy array
+    if (!PyArg_ParseTuple(args,"O",&arr)) {
+        return NULL;
+    }
+    if (!PyArray_Check(arr) || PyArray_TYPE(arr) != NPY_DOUBLE ) { // make sure that the arguement is a np array and is dtype double
+        PyErr_SetString(PyExc_TypeError,"Argument must be a numpy array of type double");
+        return NULL;
+    }
+    double *data; // = PyArray_DATA(arr); // This would only work with the type interpreted and we would have to check against it explicitely earlier
+    int64_t size  = PyArray_SIZE(arr); // equivalent to len(arr)
+    npy_intp dims[] = {[0] = size};
+    PyArray_AsCArray((PyObject**)&arr,&data,dims,1,PyArray_DescrFromType(NPY_DOUBLE)); 
+    if (PyErr_Occurred()) { // we cant simply check if(!PyArray...) {return NULL;} because it simply doesn't work
+        PyErr_SetString(PyExc_RuntimeError,"Argument numpy array could not be read from, make sure that you are not putting in array slices");
+        return NULL;
+    }
+
+    PyObject* new_arr = PyArray_SimpleNew(1,dims,NPY_DOUBLE); // Could be PyArrayObject* 
+    double *new_data = PyArray_DATA((PyArrayObject * )new_arr);
+
+    
+    for (int i = 0; i < size; i++) {
+        new_data[i] = 2 * data[i];
+    }
+    return new_arr;
+}
+
+static PyObject* PyNumpyTest(PyObject* self,PyObject* args) {
+    PyArrayObject *arr; // represents a numpy array
+    if (!PyArg_ParseTuple(args,"O",&arr)) {
+        return NULL;
+    }
+    if (!PyArray_Check(arr) || PyArray_TYPE(arr) != NPY_DOUBLE ) { // make sure that the arguement is a np array and is dtype double
+        PyErr_SetString(PyExc_TypeError,"Argument must be a numpy array of type double");
+        return NULL;
+    }
+    double *data; // = PyArray_DATA(arr); // This would only work with the type interpreted and we would have to check against it explicitely earlier
+    int64_t size  = PyArray_SIZE(arr); // equivalent to len(arr)
+    npy_intp dims[] = {[0] = size};
+    PyArray_AsCArray((PyObject**)&arr,&data,dims,1,PyArray_DescrFromType(NPY_DOUBLE));
+    if (PyErr_Occurred()) {
+        PyErr_SetString(PyExc_RuntimeError,"Argument numpy array could not be read from");
+        return NULL;
+    }
+
+    double total = 0;
+    for (unsigned int i = 0; i < size; i++) {
+        total += data[i];
+    }
+    return PyFloat_FromDouble( total);
+
+
+}
+
+static PyObject* PyCreateNoiseArray(PyObject* self, PyObject* args) { // xs, ys 
+    PyArrayObject *xs,*ys;
+    if (!PyArg_ParseTuple(args,"OO",&xs,&ys)) {
+        return NULL;
+    }
+    if (!(PyArray_Check(xs) && PyArray_Check(ys))) { // Make sure that both xs, and ys are Numpy.ndarray
+        PyErr_SetString(PyExc_TypeError,"Arguments must be numpy arrays");
+        return NULL;
+    }
+    if (PyArray_TYPE(xs) != NPY_FLOAT || PyArray_TYPE(ys) != NPY_FLOAT) { // make sure that both are NPY_FLOAT type
+        PyErr_SetString(PyExc_TypeError,"Numpy arrays must be of type <float>");
+        return NULL;
+    }
+    if (!PyArray_IS_C_CONTIGUOUS(xs) || !PyArray_IS_C_CONTIGUOUS(ys)) {
+        PyErr_SetString(PyExc_TypeError,"Numpy Arrays must be C-Contiguous, i.e. cannot be slices of an array");
+        return NULL;
+    }
+
+    int64_t xs_size = PyArray_SIZE(xs);
+    int64_t ys_size = PyArray_SIZE(ys);
+    float *xs_data, *ys_data;
+    xs_data = PyArray_DATA(xs);
+    ys_data = PyArray_DATA(ys);
+    npy_intp dims[] = {[0] = ys_size, [1] = xs_size};
+    PyObject* result = PyArray_SimpleNew(2,dims,NPY_FLOAT);
+    float* data = PyArray_DATA((PyArrayObject*)result);
+    for (int y =0; y < ys_size; y++) {
+        for (int x = 0; x <xs_size;x++) {
+            data[y* ys_size + x] = noise2(seed,xs_data[x],ys_data[y]);
+        }
+    }
+    return result;
 }
 
 static PyMethodDef functions[] = {
   //"Python Name"          C-Function Name     argument presentation      description
 
     {"noise2", (PyCFunction) PyNoise2, METH_VARARGS, "add a new value to the hash table"},
-    //{"ht_get", (PyCFunction) Pyht_get, METH_VARARGS, "get a value from the hash table"},
-    //{"ht_del", (PyCFunction) Pyht_del, METH_VARARGS, "delete a value from the hash table"},
+    {"set_seed", (PyCFunction) PySetSeed, METH_O, "Set the seed value for opensimplex noise"},
+    {"noise2_array", (PyCFunction) PyCreateNoiseArray, METH_VARARGS, "Create a 2d ndarray filled with noise"},
+    {"npsum",(PyCFunction) PyCreateNumpyArray,METH_VARARGS,"np.sum"},
     {"init", (PyCFunction) init, METH_NOARGS, "initiate the module"},
 
     {NULL,NULL,0,NULL}  /* Sentinel */
@@ -219,6 +364,8 @@ static struct PyModuleDef module = { PyModuleDef_HEAD_INIT,"helper_functions","m
 
 PyMODINIT_FUNC PyInit_Perlin(void) {
     init();
-    return PyModule_Create(&module);
+    PyObject* return_val =  PyModule_Create(&module);
+    import_array();
+    return return_val;
 }
 

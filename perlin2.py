@@ -299,5 +299,38 @@ def testBuiltin():
         a += floor(i/3)
     return a
 if __name__ == '__main__':
-    run_tests()
+    import Perlin,numpy
+    from debug import profile
+
+    @profile
+    def dostuff(xs,ys,scale,octaves) :
+        data = Perlin.noise2_array(xs*scale,ys*scale)
+        double = 2
+        total = 1.0
+        half = .5
+        for i in range(octaves-1):
+            data += Perlin.noise2_array(xs*double*scale,ys*double*scale) * half
+            total += half
+            double *= 2
+            half /= 2
+        data /= total
+        return data
+    xs = numpy.arange(500,dtype = numpy.float32)/10
+    ys = numpy.arange(500,dtype = numpy.float32)/10
+    import pygame
+    from pygame import surfarray
+    screen = pygame.display.set_mode((500,500))
+    from perlin import noise2al
+    noise2al(xs,ys,7,.1)
+    noise2al(xs,ys,7,.1)
+    dostuff(xs,ys,.1,7)
+    arr = (dostuff(xs,ys,.1,7)+1)/2
+    
+    surfarray.blit_array(screen,arr*255)
+    pygame.display.flip()
+    while True:
+        pygame.event.pump()
+    
+
+    #run_tests()
     

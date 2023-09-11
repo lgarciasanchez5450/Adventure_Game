@@ -189,7 +189,8 @@ def set_seed(seed):
     
 def noise2a(xs,ys,scale):  #noise 2 array
     return _noise2a(xs * scale,ys * scale,perm)
-
+from debug import profile
+@profile
 def noise2al(xs,ys,frequencies = 1,scale = 1): #noise 2 array layered
     return _noise2al(xs,ys,frequencies,scale,perm)
 
@@ -235,6 +236,7 @@ def make_island(data,xs:np.ndarray,ys:np.ndarray,t,d_func,mapwidth,mapheight):
       result[y,x] = i_point(xs[x],ys[y],d_func,mapwidth,mapheight)
   if t == 1: return result
   return result * t + data * (1-t)
+
 @njit(fastmath = True)
 def _noise2al(xs,ys,octaves,scale,perm): # TODO : make this run in parallel using parallel = True
   data = _noise2a(xs*scale,ys*scale,perm)
@@ -324,7 +326,7 @@ def min(x,y):
   else: return y
 @njit(cache = True)
 def lerp(a, b, t):  return a * (1-t) + b * t; 
-@njit(cache=True,parallel = True)
+@njit(cache=True,parallel = False)
 def _noise2a(x: np.ndarray, y: np.ndarray, perm: np.ndarray):
     noise = np.empty((y.size, x.size), dtype=np.double)
     for y_i in prange(y.size):
@@ -482,7 +484,7 @@ class SpacedObject:
     if _noise2(x*3,y*3,self._perm) > self.dot_difficulty and _noise2(y*2,x*2,self._perm2) < -self.dot_difficulty:
       for ax,ay in self.to_check:
         if (ax+cx,ay+cy) in self._map:
-          if distance(*self._map[(ax+cx,ay+cy)],x,y) < self.spacing:
+          if distance(*self._map[(ax+cx,ay+cy)],x2=x,y2=y) < self.spacing:
             return False
 
       self._map[(cx,cy)] = x,y
@@ -490,13 +492,6 @@ class SpacedObject:
     return False
 
         
-
-import Perlin
-
-
-for x in range(100):
-  print(Perlin.noise2(x/100,0))
-
 
 #checked = set()
 #for y in range(500):
