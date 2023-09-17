@@ -2,7 +2,7 @@
 from memory_profiler import profile
 @profile
 def _():pass
-import gc
+import gc 
 gc.disable()
 from Constants import *
 import pygame
@@ -20,7 +20,7 @@ import Camera
 Camera.init(screen)
 import Time
 
-import Input
+import Input 
 import debug
 import general_manager #should take care of everything that chunk/entity manager used to do
 

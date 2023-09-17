@@ -5,7 +5,7 @@
 // 1) Open Python IDLE
 // 2) import numpy
 // 3) Run numpy.get_include()
-//#include <C:\Users\Leo\AppData\Local\Programs\Python\Python310\Lib\site-packages\numpy\core\include\numpy\arrayobject.h>
+#include <C:\Users\Leo\AppData\Local\Programs\Python\Python310\Lib\site-packages\numpy\core\include\numpy\arrayobject.h>
 
 #include <limits.h>
 #include <stdio.h>
@@ -70,7 +70,7 @@ void init(void) {
         GRADIENTS_2D[i] = grad2[j];
     }
 }
-static inline int32_t fastFloor(double x) {
+static inline int32_t fastFloor(double x) { // check if this is actually faster than builtin floor
     int32_t xi = (int32_t)x;
     return x < xi ? xi - 1 : xi;
 }
@@ -217,12 +217,12 @@ static float noise2_layered(int64_t seed, double x, double y,int octaves ,double
   }
   return data/sum;
 }
-static inline unsigned int index(unsigned int x, unsigned int y, unsigned int y_size) { // helper function for noise2_array_layered
+static inline uint64_t index(unsigned int x, unsigned int y, uint64_t y_size) { // helper function for noise2_array_layered
     return y * y_size + x;
 }
-static float* noise2_array_layered(int64_t seed, double xs[],const unsigned int xs_size, double ys[],const unsigned int ys_size, const int octaves, double scale) {
+static float* noise2_array_layered(int64_t seed, double xs[],const uint64_t xs_size, double ys[],const uint64_t ys_size, const int octaves, double scale) { 
 
-    double *result = malloc(ys_size*xs_size*sizeof(double));
+    float *result = malloc(ys_size*xs_size*sizeof(float));
 
     for (unsigned int y =0; y < ys_size; y++) {
         for (unsigned int x = 0; x < xs_size; x++) {
@@ -261,6 +261,7 @@ static PyObject* PySetSeed(PyObject* self, PyObject* args) {
     Py_RETURN_NONE;
 }
 static PyObject* PyCreateNumpyArray(PyObject* self,PyObject* args) {
+
     PyArrayObject *arr; // represents a numpy array
     if (!PyArg_ParseTuple(args,"O",&arr)) {
         return NULL;
@@ -324,7 +325,7 @@ static PyObject* PyCreateNoiseArray(PyObject* self, PyObject* args) { // xs, ys
         PyErr_SetString(PyExc_TypeError,"Arguments must be numpy arrays");
         return NULL;
     }
-    if (PyArray_TYPE(xs) != NPY_FLOAT || PyArray_TYPE(ys) != NPY_FLOAT) { // make sure that both are NPY_FLOAT type
+    if (PyArray_TYPE(xs) != NPY_DOUBLE || PyArray_TYPE(ys) != NPY_DOUBLE) { // make sure that both are NPY_FLOAT type
         PyErr_SetString(PyExc_TypeError,"Numpy arrays must be of type <float>");
         return NULL;
     }
@@ -335,7 +336,7 @@ static PyObject* PyCreateNoiseArray(PyObject* self, PyObject* args) { // xs, ys
 
     int64_t xs_size = PyArray_SIZE(xs);
     int64_t ys_size = PyArray_SIZE(ys);
-    float *xs_data, *ys_data;
+    double *xs_data, *ys_data;
     xs_data = PyArray_DATA(xs);
     ys_data = PyArray_DATA(ys);
     npy_intp dims[] = {[0] = ys_size, [1] = xs_size};
@@ -349,10 +350,47 @@ static PyObject* PyCreateNoiseArray(PyObject* self, PyObject* args) { // xs, ys
     return result;
 }
 
+static PyObject* PyCreateNoiseArrayLayered(PyObject* self, PyObject* args) { // xs, ys 
+    PyArrayObject *xs,*ys;
+    int octaves;
+    double scale;
+    if (!PyArg_ParseTuple(args,"OOid",&xs,&ys,&octaves,&scale)) {
+        return NULL;
+    }
+    if (!(PyArray_Check(xs) && PyArray_Check(ys))) { // Make sure that both xs, and ys are Numpy.ndarray
+        PyErr_SetString(PyExc_TypeError,"Arguments must be numpy arrays");
+        return NULL;
+    }
+    if (PyArray_TYPE(xs) != NPY_DOUBLE || PyArray_TYPE(ys) != NPY_DOUBLE) { // make sure that both are NPY_FLOAT type
+        PyErr_SetString(PyExc_TypeError,"Numpy arrays must be of type <double>");
+        return NULL;
+    }
+    if (!PyArray_IS_C_CONTIGUOUS(xs) || !PyArray_IS_C_CONTIGUOUS(ys)) {
+        PyErr_SetString(PyExc_TypeError,"Numpy Arrays must be C-Contiguous, i.e. cannot be slices of an array");
+        return NULL;
+    }
+
+    int64_t xs_size = PyArray_SIZE(xs);
+    int64_t ys_size = PyArray_SIZE(ys);
+    double *xs_data, *ys_data;
+    xs_data = PyArray_DATA(xs);
+    ys_data = PyArray_DATA(ys);
+    npy_intp dims[] = {[0] = ys_size, [1] = xs_size};
+    PyObject* result = PyArray_SimpleNew(2,dims,NPY_FLOAT);
+    float* data = PyArray_DATA((PyArrayObject*)result);
+    float ** to_data = &data;
+    data = noise2_array_layered(seed,xs_data,xs_size,ys_data,ys_size,octaves,scale);
+    for (int y =0; y < ys_size; y++) {
+        for (int x = 0; x <xs_size;x++) {
+            data[y* ys_size + x] = noise2(seed,xs_data[x],ys_data[y]);
+        }
+    }
+    return result;
+}
 static PyMethodDef functions[] = {
   //"Python Name"          C-Function Name     argument presentation      description
 
-    {"noise2", (PyCFunction) PyNoise2, METH_VARARGS, "add a new value to the hash table"},
+    {"noise2", (PyCFunction) PyNoise2, METH_VARARGS, "get the noise value at a specific x,y location"},
     {"set_seed", (PyCFunction) PySetSeed, METH_O, "Set the seed value for opensimplex noise"},
     {"noise2_array", (PyCFunction) PyCreateNoiseArray, METH_VARARGS, "Create a 2d ndarray filled with noise"},
     {"npsum",(PyCFunction) PyCreateNumpyArray,METH_VARARGS,"np.sum"},

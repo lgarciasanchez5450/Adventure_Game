@@ -1060,18 +1060,13 @@ _DEBUG_ = True
 def noise_to_ground(n):
   if n > 1 or n < 0: 
     return None
-  if n > .73:
+  if n > .85:
     return getGround(GROUND_STONE)
-  if n > .43:
+  if n > .45:
     return getGround(GROUND_GRASS)
   
   return getGround(GROUND_WATER) 
-if __name__ == "__main__":
-    mylist = [noise1(x*3) for x in range(1000)]
-    mylist.sort()
-    from matplotlib import pyplot
-    pyplot.plot(mylist)
-    pyplot.show()
+
 
 class Chunk:  
     _insts:dict = {}
@@ -1218,14 +1213,34 @@ class Chunk:
             block.onLeave()
 
 chunks:dict[tuple,Chunk] = {}
+from perlin2 import LayeredNoiseMap,rescale,unit_smoothstep
+from Worley import WorleyNoise
+ContinentNP = LayeredNoiseMap(
+    (1.0 * SCALE, 2.0 * SCALE, 4.0 * SCALE, 8.0 * SCALE),
+    (1.0, 0.5, 0.25, 0.125)
+)
+NormalNP = LayeredNoiseMap(
+    (.1 * SCALE, .2 * SCALE),
+    (1.0,0.5)
+)
+
+ExperimentalNP = WorleyNoise(2,SCALE*.4)
+if __name__ == '__main__':
+    from matplotlib import pyplot
+    #height = [(ExperimentalNP.getAt(x/1000,13.3)) for x in range(1000)]
+    #pyplot.plot(height)
+    #pyplot.show()
 def _create(chunk:Chunk):
 
     ## PHASE 1 ##
     #generate layered noisemap
     xs = np.arange(CHUNK_SIZE)+chunk.chunk_pos[0]*CHUNK_SIZE
     ys = np.arange(CHUNK_SIZE)+chunk.chunk_pos[1]*CHUNK_SIZE
-    chunk.data = noise2ali(xs,ys,OCTAVES,SCALE,ISLAND_BLEND,sigmoid_dist,MAPWIDTH,MAPHEIGHT)  
+    a = ExperimentalNP.getArrShifted(xs,ys)
 
+    chunk.data = rescale(unit_smoothstep(ContinentNP.getArrShifted(xs,ys))) + np.power(a,1.5)#noise2ali(xs,ys,OCTAVES,SCALE,ISLAND_BLEND,sigmoid_dist,MAPWIDTH,MAPHEIGHT)  
+    chunk.data /= 2
+    
     yield  
     chunk.ground = make2dlist(CHUNK_SIZE)
     #draw layered noisemap onto surface
@@ -1249,7 +1264,7 @@ def _create(chunk:Chunk):
     for chunk_pos in surrounding_chunks:
         if chunk_pos in chunks:
             existing_surrounding_chunks.append(chunk_pos)
-            
+    yield     
     def isValid(x,y):
         for chunk_pos in existing_surrounding_chunks:
             o_chunk:Chunk = chunks[chunk_pos]
@@ -1271,7 +1286,7 @@ def _create(chunk:Chunk):
         g = chunk._get_ground(x,y)
         if Tree.spawnable_on(g) and isValid(x,y):
             chunk.blocks.append(Tree((x,y),g))
-
+    yield
     chunks[chunk.chunk_pos] = chunk
     for cmd in chunk.onCreationFinish:
         cmd()

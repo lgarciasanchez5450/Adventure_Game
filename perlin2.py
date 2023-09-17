@@ -1,5 +1,7 @@
-
+import Perlin
+from typing import Any
 from numba import njit
+import numpy
 PRIME_X = 0x5205402B9270C86F
 PRIME_Y = 0x598CD327003817B5
 
@@ -282,51 +284,74 @@ def run_tests():
     else:
         print(f'Stress Test Failed in {time} seconds')
 
-
+from array import array
 import debug
+class LayeredNoiseMap:
+    def __init__(self,noise_scales,noise_strengths):
+        assert len(noise_scales) == len(noise_strengths), "all arguments must be of the same length"
 
-@debug.profile
-def testCustom():
-    a = 0
-    for i in range(1000):
-        a += floor(i/3)
-    return a
-from math import floor
-@debug.profile
-def testBuiltin():
-    a = 0
-    for i in range(1000):
-        a += floor(i/3)
-    return a
+        self.noise_scales = array('d',noise_scales)
+        self.noise_strengths = array('f',noise_strengths)
+        self.noise_counts = tuple(range(len(self.noise_scales)))
+
+        self.noise_normalizer = sum(noise_strengths)
+    
+    def getAt(self,x,y):
+        data = 0
+        for scale,strength in zip(self.noise_scales,self.noise_strengths):
+            data += Perlin.noise2(x*scale,y*scale) * strength
+        data /= self.noise_normalizer
+        return data
+    
+    def getArr(self,xs:numpy.ndarray,ys:numpy.ndarray):
+        data = numpy.zeros(shape=(ys.size,xs.size))
+        for scale,strength in zip(self.noise_scales,self.noise_strengths):
+            data += Perlin.noise2_array(xs*scale,ys*scale) * strength
+        data /= self.noise_normalizer
+        return data
+    
+
+    def getArrShifted(self,xs:numpy.ndarray,ys:numpy.ndarray):
+        xshift = 3.141
+        yshift = 2.718
+        data = numpy.zeros(shape=(ys.size,xs.size),dtype = numpy.float32)
+        for scale,strength,i in zip(self.noise_scales,self.noise_strengths,self.noise_counts):
+            data += Perlin.noise2_array((xs+xshift*i)*scale,(ys+yshift*i)*scale) * strength
+        data /= self.noise_normalizer
+        return data
+
+from math import floor,dist, hypot,prod
+from perlin import manhattan_dist
+from Worley import WorleyNoise
+
+
+def unit_smoothstep(i:numpy.ndarray):
+    return i * (-i*i+3) / 2
+def rescale(i:numpy.ndarray):
+    return (i + 1) / 2
 if __name__ == '__main__':
     import Perlin,numpy
     from debug import profile
-
-    @profile
-    def dostuff(xs,ys,scale,octaves) :
-        data = Perlin.noise2_array(xs*scale,ys*scale)
-        double = 2
-        total = 1.0
-        half = .5
-        for i in range(octaves-1):
-            data += Perlin.noise2_array(xs*double*scale,ys*double*scale) * half
-            total += half
-            double *= 2
-            half /= 2
-        data /= total
-        return data
-    xs = numpy.arange(500,dtype = numpy.float32)/10
-    ys = numpy.arange(500,dtype = numpy.float32)/10
+    
+    noisemap = WorleyNoise(3,1)
+    
+    xs = numpy.arange(500,dtype = numpy.double)/100-2.5
+    ys = numpy.arange(500,dtype = numpy.double)/100-2.5
     import pygame
     from pygame import surfarray
     screen = pygame.display.set_mode((500,500))
-    from perlin import noise2al
-    noise2al(xs,ys,7,.1)
-    noise2al(xs,ys,7,.1)
-    dostuff(xs,ys,.1,7)
-    arr = (dostuff(xs,ys,.1,7)+1)/2
+    from perlin import noise2a,smoothstep
+    import numpy as np
+    noise = noisemap.getArrShifted(xs,ys)
+
+
+    arr:numpy.ndarray = ((noise))   
+
     
-    surfarray.blit_array(screen,arr*255)
+    d1 = pygame.Surface((500,500))
+    surfarray.blit_array(d1,rescale(unit_smoothstep(arr))*255)
+
+    screen.blit(d1,(0,0))
     pygame.display.flip()
     while True:
         pygame.event.pump()

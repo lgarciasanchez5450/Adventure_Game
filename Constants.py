@@ -15,13 +15,13 @@ HALFHEIGHT = HEIGHT//2
 
 _:object
 '''Chunk Generation Variables'''
-CHUNK_SIZE = 64 #must be divisible by 2
+CHUNK_SIZE = 8 #must be divisible by 2
 HALF_CHUNK_SIZE = CHUNK_SIZE//2 # cause of this
-BLOCK_SIZE = 4
+BLOCK_SIZE = 64
 OCTAVES = 6
 MAPWIDTH  = 700
 MAPHEIGHT = 700
-SCALE     = .06
+SCALE     = .1
 ISLAND_BLEND         = 0
 
 _:object

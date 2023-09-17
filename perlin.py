@@ -186,10 +186,10 @@ def set_seed(seed):
   global SEED,perm
   SEED = seed
   perm = _init(seed)
-    
+from debug import profile
+@profile
 def noise2a(xs,ys,scale):  #noise 2 array
     return _noise2a(xs * scale,ys * scale,perm)
-from debug import profile
 @profile
 def noise2al(xs,ys,frequencies = 1,scale = 1): #noise 2 array layered
     return _noise2al(xs,ys,frequencies,scale,perm)
@@ -237,13 +237,13 @@ def make_island(data,xs:np.ndarray,ys:np.ndarray,t,d_func,mapwidth,mapheight):
   if t == 1: return result
   return result * t + data * (1-t)
 
-@njit(fastmath = True)
+@njit(cache = False, fastmath = True,parallel = False)
 def _noise2al(xs,ys,octaves,scale,perm): # TODO : make this run in parallel using parallel = True
   data = _noise2a(xs*scale,ys*scale,perm)
   double = 2
   total = 1
   half = .5
-  for i in range(octaves-1):
+  for i in prange(octaves-1):
     data += _noise2a(xs*double*scale,ys*double*scale,perm) * half
     double *= 2
     total += half
@@ -315,7 +315,7 @@ def squircle_dist(x,y):
   return sqrt(x**4 + y**4)
 @njit (cache = True)
 def manhattan_dist(x,y):
-  return 1-(abs(x)+abs(y))/2
+  return abs(x)+abs(y)
 @njit(cache = True)
 def max(x,y):
   if x > y: return x
@@ -326,7 +326,7 @@ def min(x,y):
   else: return y
 @njit(cache = True)
 def lerp(a, b, t):  return a * (1-t) + b * t; 
-@njit(cache=True,parallel = False)
+@njit(cache=True,parallel = True)
 def _noise2a(x: np.ndarray, y: np.ndarray, perm: np.ndarray):
     noise = np.empty((y.size, x.size), dtype=np.double)
     for y_i in prange(y.size):
