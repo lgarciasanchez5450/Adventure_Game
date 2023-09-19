@@ -1,9 +1,10 @@
-from memory_profiler import profile
 from Constants import *
 from collections import deque
 from typing import final
 from pygame import Surface,draw
 from game_math import Collider,is_collider,Has_Collider, Vector2,hypot,inclusive_range, cap_magnitude,log2,make2dlist,ones,abssin,abscos,cache
+from perlin2 import LayeredNoiseMap,rescale,unit_smoothstep
+from Worley import WorleyNoise
 import Textures
 if __name__ == '__main__':
     import pygame
@@ -11,7 +12,7 @@ if __name__ == '__main__':
     screen = pygame.Surface((WIDTH,HEIGHT))
     Textures.init()
     import Camera
-    Camera.init(screen)
+    Camera.init(screen)                                     
 
 
 from perlin import *
@@ -1213,8 +1214,7 @@ class Chunk:
             block.onLeave()
 
 chunks:dict[tuple,Chunk] = {}
-from perlin2 import LayeredNoiseMap,rescale,unit_smoothstep
-from Worley import WorleyNoise
+
 ContinentNP = LayeredNoiseMap(
     (1.0 * SCALE, 2.0 * SCALE, 4.0 * SCALE, 8.0 * SCALE),
     (1.0, 0.5, 0.25, 0.125)
@@ -1280,7 +1280,7 @@ def _create(chunk:Chunk):
                     return False  
         return True
 
-    for _ in range(10):
+    for _ in range(CHUNK_SIZE*CHUNK_SIZE//6):
         x = random.randint(chunk.pos.x, chunk.pos.x + CHUNK_SIZE - 1)
         y = random.randint(chunk.pos.y, chunk.pos.y + CHUNK_SIZE - 1)
         g = chunk._get_ground(x,y)

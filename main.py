@@ -1,7 +1,9 @@
+import types
+def imports():
+    for val in list(globals().values()):
+        if isinstance(val, types.ModuleType):
+            yield val.__name__
 
-from memory_profiler import profile
-@profile
-def _():pass
 import gc 
 gc.disable()
 from Constants import *
@@ -70,8 +72,9 @@ while True:
         #Input
         Input.update()
         
-        if Input.rctrl:
-            print(gc.collect())
+        if Input.space_d:
+            for imp in imports():
+                print(imp)
         #Main Game Loop
         general_manager.step()
         general_manager.update()

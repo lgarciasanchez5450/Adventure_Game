@@ -2,7 +2,6 @@
 import pygame,game_math,Time
 from typing import Literal, Callable
 from Constants import *
-from memory_profiler import profile
 from Input import m_pos_normalized
 import moderngl
 from array import array

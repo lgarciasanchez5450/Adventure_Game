@@ -50,7 +50,6 @@ def import_folder(path,alpha=True,size:None|tuple = None,return_flipped_too:bool
 	
 
 from Constants import BLOCK_SIZE,PARTICLE_SIZE,WIDTH,HEIGHT,HALFHEIGHT,HALFWIDTH,ITEM_SIZE
-import memory_profiler
 def init():
 	import_folder('Images/objects')
 	import_folder('Images/items',True,(ITEM_SIZE,ITEM_SIZE))

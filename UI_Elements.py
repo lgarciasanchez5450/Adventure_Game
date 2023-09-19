@@ -2,7 +2,6 @@ from Constants import *
 from Inventory import Inventory
 from game_math import *
 from Camera import CSurface
-import Input
 from pygame import Surface,font
 from Animation import SimpleAnimation
 class Item(UnInstantiable):

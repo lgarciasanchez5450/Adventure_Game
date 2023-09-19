@@ -1,4 +1,4 @@
-import pygame
+from pygame.time import Clock
 from time import perf_counter as _getTime # can switch to normal time 
 import time as _time
 from Constants import *
@@ -64,13 +64,15 @@ fixedTime:float = 0.0
 #misc
 _prev_time:float = 0
 _start_time:float = 0
-_clock = pygame.time.Clock()
+_clock = Clock()
 
 
 def get_frameRate() -> float:
+    global deltaTime
     return 1/deltaTime
 
 def get_frameRateInt() -> int:
+    global deltaTime
     return (1/deltaTime).__trunc__()
 
 def set_fixedDeltaTime(fdt:float):
@@ -84,9 +86,9 @@ def init():
     _prev_time = _start_time
 
 def update():
-    global frameCount,deltaTime,time,fixedDeltaTime,fixedTime,_prev_time,_start_time
+    global frameCount,deltaTime,time,fixedDeltaTime,fixedTime,_prev_time,_start_time,_clock
     frameCount += 1
-    if FPS is not ZERO: # may or may not be faster than checking for truthy value of <FPS>
+    if FPS: # may or may not be faster than checking for truthy value of <FPS>
       _clock.tick(FPS) #can be changed to .tick_busy_loop for MUCH more accurate timing 
     #update dynamic time
     current_time = _getTime()

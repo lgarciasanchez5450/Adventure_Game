@@ -1,6 +1,0 @@
-build_emmodule.py
-entitymanagermodule.c
-entity_manager.egg-info/PKG-INFO
-entity_manager.egg-info/SOURCES.txt
-entity_manager.egg-info/dependency_links.txt
-entity_manager.egg-info/top_level.txt

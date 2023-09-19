@@ -22,7 +22,7 @@ OCTAVES = 6
 MAPWIDTH  = 700
 MAPHEIGHT = 700
 SCALE     = .1
-ISLAND_BLEND         = 0
+
 
 _:object
 '''Miscalleneous Variables'''

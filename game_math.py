@@ -438,5 +438,63 @@ def cache(func):
 			return inputs[tuple(args)]
 	return wrapper
 
+def arccos(x:float):
+	return 180/pi * x
+
+def rgb_to_hsv(r,g,b): 
+  M = max(r, g, b)
+  m = min(r, g, b)
+
+  #And then V and S are defined by the equations
+
+  V = M/255
+  S = 1 - m/M  if M > 0 else 0
+
+  #As in the HSI and HSL color schemes, the hue H is defined by the equations
+  d = sqrt(r*r+g*g+b*b-r*g-r*b-g*b)
+  H = arccos((r - g/2 - b/2)/d)  if g >= b else 360 - arccos( (r - g/2 - b/2)/d)  
+  return H/360,S,V
+
+def hsv_to_rgb(h,s,v): 
+  h *= 360
+  M = 255*v
+  m = M*(1-s)
+
+  #Now compute another number, z, defined by the equation
+
+  z = (M-m)*(1-abs((h/60)%2-1))
+
+  #Now you can compute R, G, and B according to the angle measure of H. There are six cases. 
+  if 0 <= h < 60:
+    R = M
+    G = z + m
+    B = m
+
+  elif 60 <= h < 120:
+    R = z + m
+    G = M
+    B = m
+
+  elif 120 <= h < 180:
+    R = m
+    G = M
+    B = z + m
+
+  elif 180 <= h < 240:
+    R = m
+    G = z + m
+    B = M
+
+  elif 240 <= h < 300:
+    R = z + m
+    G = m
+    B = M
+
+  elif 300 <= h <= 360:
+    R = M
+    G = m
+    B = z + m
+  return round(R),round(G),round(B)
+
 if __name__ == '__main__':
 	pass
