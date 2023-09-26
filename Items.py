@@ -12,6 +12,8 @@ from math import floor
 from pygame.transform import smoothscale as image_scale
 from game_random import generate_point_from
 import Animation
+from typing import Callable,TypeVar
+
 
 _DEBUG_ = True
 @cache
@@ -45,10 +47,29 @@ class DurabilityStats:
     def hashcode(self):
         '''Should return 4 bytes as an int '''
         return ((self.max_durability + 53) * self.durability + 53 ) & 0xFFFFFFFF
-INF = float('inf')
+
+
 nullFrame:pygame.Surface= Textures.texture['null.png']
 class Item:
-    __slots__ = ('name', 'max_stack_count', 'count', 'durability_stats', 'armour_stats', 'block', 'damage', 'mining_speed', 'fps', 'animation','frames','hashcode')
+
+    def build(self):
+        self.hashcode = 0  
+        if self.armour_stats is not None:
+            self.hashcode |= self.armour_stats.hashcode() << 32
+        if self.durability_stats is not None:
+            self.hashcode |= self.durability_stats.hashcode()
+        
+        self.hashcode <<= 16
+        generic_code = ((get_most_sig_bits(self.damage,2)<<2)|(self.damage&0b11))
+        generic_code <<=4
+        generic_code |= ((get_most_sig_bits(self.max_stack_count,2)<<2)|(self.max_stack_count&0b11))
+        generic_code <<=4
+        generic_code |= ((get_most_sig_bits(self.mining_speed,2)<<2)|(self.mining_speed&0b11))
+        self.hashcode |= generic_code
+
+        return self
+
+    __slots__ = ('name', 'max_stack_count', 'count', 'durability_stats', 'armour_stats', 'block', 'damage', 'mining_speed', 'fps', 'animation','frames','hashcode','left_click','right_click','left_hold','right_hold')
     def __init__(self,name:str,block:str|None=None):
         self.hashcode =None
         self.block = block# if this is not None then it needs to be a key <string> to the block that it should place  
@@ -63,41 +84,11 @@ class Item:
         self.frames:list[pygame.Surface]  = [Textures.texture.get(name+'.png',nullFrame)] # at most 60 frames 
         #self.path = f'{Textures.PATH()}Images\\items\\{name}'
         self.animation = Animation.SimpleAnimation(NullCSurface,self.fps,self.frames)
+        self.left_click:Callable[[Item],None] = lambda : None
+        self.right_click:Callable[[Item],None] = lambda : None
+        self.left_hold:Callable[[Item],None] = lambda : None
+        self.right_hold:Callable[[Item],None] = lambda : None
 
-    def setBreakable(self,max_d:int,d:int):
-        if self.durability_stats is None:
-            self.durability_stats = DurabilityStats(max_d,d)
-        else:
-            self.durability_stats.max_durability = max_d
-            self.durability_stats.durability = d
-        return self
-    
-    def setWearable(self,type:str,defense:int):
-        if self.armour_stats is None:
-            self.armour_stats = ArmourStats(type,defense)
-        else:
-            self.armour_stats.type = type
-            self.armour_stats.defense = defense
-        return self
-    
-    def setDamage(self,damage:int):
-        self.damage = damage
-        return self
-    
-    def setCount(self,count:int):
-        if count > self.max_stack_count:
-            raise RuntimeError('Tried to create an item whose count was > max_stack_count')
-        self.count = count
-        return self
-    
-    def setMaxCount(self,max_count):
-        self.max_stack_count = max_count
-        return self
-
-    def setMiningSpeed(self,mining_speed:int):
-        self.mining_speed = mining_speed
-        return self
- 
     def take_one(self):
         '''Splits an instance of a specific item (that has a count > 1) in two, one that it returns that has a count of 1 and it decrements the count of this item by 1'''
         if _DEBUG_ and self.count == 1: raise RuntimeError("Cannot split an item that has a count of one!")
@@ -128,31 +119,34 @@ class Item:
         inst.fps = self.fps
         inst.damage = self.damage
         return inst
+    
+    def remove_one(self):
+        self.count -= 1
+        if self.count == 0:
+            return True
+        return False
         
+    def setMaxCount(self,max_count):
+        self.max_stack_count = max_count
+        return self
+
+    def setWearable(self,type,armour):
+        self.armour_stats = ArmourStats(type,armour)
+        return self
+    
+    def setBreakable(self,max,curr):
+        self.durability_stats = DurabilityStats(max,curr)
+        return self
+    
+    def setLeftClick(self,leftClick):
+        self.left_click = leftClick
+        return self
+
     @property
     def wearable(self) -> bool:
         return self.armour_stats is not None
 
-    def build(self):
-        self.hashcode = 0
-        
-        if self.armour_stats is not None:
-            self.hashcode |= self.armour_stats.hashcode() << 32
-        if self.durability_stats is not None:
-            self.hashcode |= self.durability_stats.hashcode()
-
-        #self.hashcode = (self.armour_stats.hashcode() << 32) | self.durability_stats.hashcode()
-        
-        self.hashcode <<= 16
-        generic_code = ((get_most_sig_bits(self.damage,2)<<2)|(self.damage&0b11))
-        generic_code <<=4
-        generic_code |= ((get_most_sig_bits(self.max_stack_count,2)<<2)|(self.max_stack_count&0b11))
-        generic_code <<=4
-        generic_code |= ((get_most_sig_bits(self.mining_speed,2)<<2)|(self.mining_speed&0b11))
-        self.hashcode |= generic_code
-
-        return self
-
+   
     def canStack(self,other):
         '''Items can only stack with each other if they share the same name and hashcode method'''
         if other is None:
@@ -180,7 +174,7 @@ def registerItem(itemFactory:ItemFactory,name):
     testItem:Item = itemFactory()
     if testItem.hashcode is not None:
         print(registeringError)
-        return
+        raise RuntimeError()
     if testItem.name is not name:
         print(registeringError)
         return
@@ -196,9 +190,4 @@ def delItem(item:Item):
     import gc
     print("All references to item:",gc.get_referrers)
 
-
-
-registerItem(lambda : Item(DIRT,'dirt').setMaxCount(64).setWearable('chest',30_000) ,DIRT)
-
-registerItem(lambda : Item(HAT).setWearable(HEADWEAR,3).setBreakable(20,20),HAT)
-
+ 

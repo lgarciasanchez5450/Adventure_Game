@@ -1,6 +1,6 @@
 from Constants import *
 from collections import deque
-from typing import final
+from typing import final, Generator
 from pygame import Surface,draw
 from game_math import Collider,is_collider,Has_Collider, Vector2,hypot,inclusive_range, cap_magnitude,log2,make2dlist,ones,abssin,abscos,cache
 from perlin2 import LayeredNoiseMap,rescale,unit_smoothstep
@@ -40,6 +40,11 @@ village_creater = SpacedObject(25,4,.92)
 dead_entities = []
 half_sqrt_2 = sqrt(2)/2
 
+
+
+
+
+
 @cache
 def get_tnt_list():
     return Textures.import_folder('Images/particles/Explosion',True,(BLOCK_SIZE,BLOCK_SIZE))
@@ -72,7 +77,6 @@ class Appearance:
     
 #####
 class Block:
-    
     @staticmethod
     def spawnable_on(ground):
       return True
@@ -166,6 +170,11 @@ class WoodenPlank(Block):
         super().__init__(pos,'woodenplank')
         self.surf = Textures.texture['15.png']
         self.csurface.surf = self.surf
+
+class BunnySpawn(Block):
+    def __init__(self,pos:Vector2):
+        spawn_entity(Bunny(pos))
+        self.onDeath()
 
 class Entity:
     def __init__(self,pos,species):
@@ -324,6 +333,17 @@ class AliveEntity(Entity):
 
         self.direction = 'right'
 
+    @property
+    def selected_item(self) -> Item|None:
+        if self.inventory.spaces == 0 :return None
+        return self.inventory.inventory[0]
+
+    def left_click_item(self):
+        item  = self.selected_item
+        if item is None:
+            return
+        item.left_click()
+
     def depleteEnergy(self,action):
         assert action in self.actions, f'{self.species} has tried to do actions: {action}, which is not in its list of actions!'
         self.energy -= Settings.ACTION_ENERGY_CONSUMPTION[action]
@@ -396,7 +416,7 @@ class AliveEntity(Entity):
         damage_reduction = damage * defense/ (defense+100) 
         return damage_reduction.__trunc__()
     
-    def take_damage(self,damage:int,type:str,appearance:Appearance = None) -> None:
+    def take_damage(self,damage:int,type:str,appearance:Appearance|None = None) -> None:
             
         if self.time_til_vulnerable < 0 or type is INTERNAL_DAMAGE: 
             damage -= self.get_damage_resisted(damage,type)
@@ -566,7 +586,7 @@ class Player(AliveEntity):
         elif self.direction == 'left':
             c = Collider(self.pos.x-.7,self.pos.y-.5,.5,1)
 
-    def take_damage(self, damage: int, type: str,appearance:Appearance = None) -> None:
+    def take_damage(self, damage: int, type: str,appearance:Appearance|None = None) -> None:
         
         super().take_damage(damage, type,appearance)
     
@@ -576,10 +596,8 @@ class Player(AliveEntity):
             if self.showingInventory:
                 self.vel.reset()
                 UI.current_ui = self.ui
-                UI.ui_on = True
                 
             else:
-                UI.ui_on = False
                 UI.current_ui = UI.Null
                 item  = self.ui.in_hand
                 if item is not None:
@@ -593,6 +611,11 @@ class Player(AliveEntity):
             #use_item(self.inventory.)
             pass
         
+        if Input.m_d1:
+            item = self.hotbar.get_selected()
+            if item is not None:
+                item.left_click(item)
+
         if 'r' in Input.KDQueue:
             #print('position is ',self.pos)
             place_block(TNT(Camera.world_position_from_normalized(Input.m_pos_normalized).floored()))
@@ -606,7 +629,7 @@ class Player(AliveEntity):
                 velocity = Vector2.randdir
             spawn_entity(FireArrow(self.pos + velocity/2,velocity*3+self.vel,self))
         if Input.space_d:
-            spawn_item(Items.getItem(HAT),self.pos,Vector2.randdir)
+            spawn_item(Items.getItem(BUNNY_EGG),self.pos,Vector2.randdir)
         if self.animation.state != 'attack':
             x,y=  set_mag(Input.d-Input.a,Input.s-Input.w,self.speed * self.ground.surface_friction)
             self.accelerate(x,y)
@@ -658,11 +681,12 @@ class Player(AliveEntity):
     def update_inventory_ui(self):
         self.ui.update()
 
-    def collect_items(self):
+    def collect_items(self): ## TODO : Make it so that in order to pick up items you click on them instead of just getting close to them
         for item in collide_entities_in_range(self.pos,self.pickup_range):
-            item:ItemWrapper
-            if item.species == 'item' and item.pickup_time < 0 and (self.hotbar.add_item(item.item) or self.inventory.add_item(item.item) ): #this will never add the same object to both hotbar and inventory becasue the or will only try to add to inventory if the item couldn't be added to the hotbar
-                item.onDeath()
+            if item.species == 'item':
+                item:ItemWrapper
+                if item.pickup_time < 0 and (self.hotbar.add_item(item.item) or self.inventory.add_item(item.item) ): #this will never add the same object to both hotbar and inventory becasue the or will only try to add to inventory if the item couldn't be added to the hotbar
+                    item.onDeath()
 
     def update(self):
         Camera.program['danger'] = 1-(self.health / self.total_health)
@@ -939,7 +963,7 @@ class InventoryUI(UI.UI):
         self.hb_slots_center = Vector2(0,150)
 
         self.recalc_slots()
-        self.in_hand = None
+        self.in_hand:Item|None = None
 
     def recalc_slots(self):
         slots_size = Vector2(self.slots_width * self.slot_spacing, self.inventory_size//self.slots_width * self.slot_spacing)
@@ -967,7 +991,7 @@ class InventoryUI(UI.UI):
             for slot in self.slots:
                 slot.update(self.rel_mouse_pos)
                 if slot.state == slot.HOVER:
-                    if Input.m_d1:
+                    if Input.m_d1 and self.inventory is not None:
                         self.in_hand = self.inventory.set_item(self.in_hand,slot.index)
             if self.has_hotbar:
                 for slot in self.hb_slots:
@@ -995,12 +1019,10 @@ class InventoryUI(UI.UI):
             for slot in self.hb_slots:
                 slot.draw(self.surface)
         if self.in_hand is not None:
-            self.in_hand:Item
             self.surface.blit(self.in_hand.animation.surf,(self.rel_mouse_pos.x-ITEM_SIZE//2,self.rel_mouse_pos.y-ITEM_SIZE//2))
         entity = pygame.transform.scale_by(self.entity.image.surf,2)
         draw.rect(self.surface,(70,70,70),entity.get_rect().move(self.screen_center.x-100,10))
         self.surface.blit(entity,(self.screen_center.x-100,10))
-
         super().draw()
 
 class HotBarUI:
@@ -1048,6 +1070,23 @@ class HotBarUI:
         #    self.in_hand:Item
         #    self.surface.blit(self.in_hand.animation.surf,(self.rel_mouse_pos.x-ITEM_SIZE//2,self.rel_mouse_pos.y-ITEM_SIZE//2))
 
+'''class Item:
+    __slots__ = ('name', 'max_stack_count', 'count', 'durability_stats', 'armour_stats', 'block', 'damage', 'mining_speed', 'fps', 'animation','frames','hashcode','left_click','right_click','left_hold','right_hold')
+    def __init__(self,name:str):
+        self.hashcode =None
+        self.name = name
+        self.max_stack_count = 1
+        self.count = 1
+        self.durability_stats:Items.DurabilityStats|None = None
+        self.armour_stats:Items.ArmourStats|None = None
+        self.damage = 0 
+        self.mining_speed = 0 
+        self.fps = 0 #this is for when the ItemWrapper <Entity> needs to create the animation. 
+        self.frames:list[pygame.Surface]  = [Textures.texture.get(name+'.png',Textures.texture['null.png'])] # at most 60 frames 
+        #self.path = f'{Textures.PATH()}Images\\items\\{name}'
+        self.right_hold:Callable[[Item],None] = lambda : None
+
+'''
 #######################################
 ########### BLOCK_CHUNKS ##############
 #######################################
@@ -1077,13 +1116,13 @@ class Chunk:
         return chunk_pos in cls._insts
     
     @classmethod
-    def get_ground_at(cls,x,y) -> Ground|None:
+    def get_ground_at(cls,x,y) -> Ground:
         global chunks
         c_pos = (x//CHUNK_SIZE,y//CHUNK_SIZE)
         if c_pos in chunks:
             chunk = chunks[c_pos]
             return chunk._get_ground(x,y)
-        return None
+        return NullGround
         
     def __new__(cls,pos:tuple[int,int]):
         if pos in cls._insts:
@@ -1386,7 +1425,9 @@ def get_nearest_block(pos:Vector2):
 def spawn_entity(entity:Entity):
     chunk_pos = (entity.pos//CHUNK_SIZE).tuple
     chunk = entity_chunks.get(chunk_pos) #try to get the chunk its in, if not found then create a new chunk(list)
+
     if chunk_pos in active_chunks:
+
         #print('Entity spawned is being shown!')
         entity.onLoad()
     if chunk is None: #
@@ -1448,7 +1489,7 @@ def collide_entities(collider:Collider):
                         yield entity
             checked.add(cpos)
     
-def collide_entities_in_range(pos:Vector2,range:float):
+def collide_entities_in_range(pos:Vector2,range:float) -> Generator[Entity,None,None]:
     range_sqrd = range*range
     checked = set()
     for y in inclusive_range(floor(pos.y-range),ceil(pos.y+range),CHUNK_SIZE):
@@ -1757,6 +1798,20 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
             return True
         raylen = dist_to_closest(x,y)
     return False
+
+def registerItems():
+    def spawn_bunny(self:Item):
+        spawn_entity(Bunny(Camera.world_position_from_normalized(Input.m_pos_normalized)))
+        return self.remove_one()
+                     
+
+    Items.registerItem(lambda : Item(DIRT,'dirt').setMaxCount(64).setWearable('chest',30_000) ,DIRT)
+
+    Items.registerItem(lambda : Item(HAT).setWearable(HEADWEAR,3).setBreakable(20,20),HAT)
+
+    Items.registerItem(lambda : Item(BOW).setBreakable(10,10),BOW)
+
+    Items.registerItem(lambda : Item(BUNNY_EGG).setMaxCount(64).setLeftClick(spawn_bunny),BUNNY_EGG)
 
 
 if __name__ == '__main__':

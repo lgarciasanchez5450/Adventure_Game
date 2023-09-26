@@ -127,7 +127,7 @@ class ArmorInventory:
         for space in spaces:
             self.inventory[space] = None
 
-    def set_armour(self,armour:Item|None,body_space:str) -> object|None:
+    def set_armour(self,armour:Item|None,body_space:str) -> Item|None:
         '''
         Should return the armour that is left in the hand of the player when tried to put on
         First argument is the Armour <Item> that needs to be equipped, and the next is where 

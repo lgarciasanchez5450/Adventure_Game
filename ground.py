@@ -25,6 +25,8 @@ class Ground:
         self.is_solid = isSolid
         return self
     
+
+    
     def __repr__(self):
         return f"Ground: {self.name}, "
 GroundFactory = Callable[[],Ground]
@@ -33,6 +35,8 @@ GroundRegistry:dict[int,GroundFactory] = {}
 def registerGround(ReturnsGround:GroundFactory,id:int,game_name:str):
     registeringError = "Error in Registering Item: "+game_name
     global GroundRegistry
+    if id <= 0 :
+        raise RuntimeError("Block ID must be >0")
     if id in GroundRegistry:
         print("Cannot override a previous ground registered in GroundRegistry")
         raise RuntimeError()
@@ -64,4 +68,4 @@ registerGround(lambda : Ground(GROUND_GRASS).setFriction(9),GROUND_GRASS,'Grass'
 
 
 
-Null = None
+NullGround = Ground(-1)

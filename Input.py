@@ -39,7 +39,7 @@ m_pos_normalized:game_math.Vector2 = game_math.Vector2.zero
 m_rel:game_math.Vector2 = game_math.Vector2.zero
 
 def _update_mouse():
-    global wheel,m_1,m_2,m_3,m_x,m_y,m_pos
+    global wheel,m_1,m_2,m_3,m_x,m_y,m_pos,m_pos_normalized
     m_1,m_2,m_3 = pygame.mouse.get_pressed()
     m_pos.x,m_pos.y = pygame.mouse.get_pos()
     m_rel.x,m_rel.y = pygame.mouse.get_rel()

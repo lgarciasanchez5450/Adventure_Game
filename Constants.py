@@ -62,6 +62,8 @@ _:object
 WOODEN_SWORD = 'wood sword'
 HAT= 'hat'
 DIRT = 'Dirt'
+BOW = 'Bow'
+BUNNY_EGG = 'bunny egg'
 
 
 _:object

@@ -52,7 +52,7 @@ def _getAt(x:float,y:float,global_hash):
         if d < shortest:
             shortest = d
     return shortest
-@profile
+
 @njit(parallel = True,boundscheck = False)
 def _getArr(xs:numpy.ndarray,ys:numpy.ndarray,scale,global_hash,island_mod):
     xs = xs * scale

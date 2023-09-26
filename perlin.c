@@ -5,7 +5,7 @@
 // 1) Open Python IDLE
 // 2) import numpy
 // 3) Run numpy.get_include()
-#include <C:\Users\Leo\AppData\Local\Programs\Python\Python310\Lib\site-packages\numpy\core\include\numpy\arrayobject.h>
+#include <C:\Users\Leo\AppData\Local\Programs\Python\Python310\Lib\site-packages\numpy\core\include\numpy\arrayobject.h> // You have to check where yours is
 
 #include <limits.h>
 #include <stdio.h>

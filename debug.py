@@ -2,7 +2,6 @@ import pygame,ctypes,sys
 from time import perf_counter as time
 from collections import deque
 from game_math import *
-from pympler.asizeof import asizeof
 import gc
 gc.disable()
 pygame.init()

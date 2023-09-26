@@ -25,7 +25,7 @@ import Time
 import Input 
 import debug
 import general_manager #should take care of everything that chunk/entity manager used to do
-
+general_manager.registerItems()
 import Particles
 
 import Game_Time
@@ -72,9 +72,6 @@ while True:
         #Input
         Input.update()
         
-        if Input.space_d:
-            for imp in imports():
-                print(imp)
         #Main Game Loop
         general_manager.step()
         general_manager.update()

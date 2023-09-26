@@ -301,7 +301,7 @@ class Collider:
 		return self.y + self.height/2
 	
 	@property
-	def center(self) -> tuple:
+	def center(self) -> tuple[float,float]:
 		return ((self.left + self.right)/2, (self.top + self.bottom)/2)
 
 	@property
