@@ -6,7 +6,7 @@ if __name__ == "__main__":
 import Camera
 from Constants import HEIGHT, WIDTH
 import Time
-from game_math import cache,Vector2, Collider,ones
+from game_math import cache,Vector2, Collider,ones,deque
 import Input
 
 
@@ -84,27 +84,7 @@ class Fake_Inventory:
 
 Null = EmtpyUI()
 
+showingUIs:deque[UI] = deque([Null],maxlen=1)
 
 current_ui = Null
-
-'''
-def open_inventory(inv:Fake_Inventory):
-    global current_ui,ui_on
-    if ui_on: print('another ui is already showing!');return
-    ui_on = True
-    current_ui = get_inventory(inv.spaces)
-    current_ui.set_inventory(inv)
-
-def close_inventory(inv):
-    global current_ui,ui_on
-    if not ui_on:return
-    if isinstance(current_ui,InventoryUI) and current_ui.inventory is inv:
-        item_to_return = current_ui.in_hand
-        current_ui.in_hand = None
-        ui_on = False
-        current_ui = None
-        return item_to_return
-    else:
-        print('Cannot close an inventory that was not open!')
-        '''
 

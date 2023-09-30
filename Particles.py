@@ -4,7 +4,7 @@ import Camera
 import pygame
 import Textures
 import Time
-from Animation import Animation
+from Animation import SimpleAnimation
 
 class Cheap_Animation:
     def __init__(self,pos,images:list[pygame.Surface]|tuple,fps:int,onDone):
@@ -63,7 +63,7 @@ def spawn_hit_particles(pos:game_math.Vector2,time:float,amount:int = 5):
     for x in range(amount):
         spawn(pos+game_math.Vector2.random/10,game_math.Vector2.random,Textures.texture['death.png'],time,(0,0),True)
 
-def update_list(myList):
+def update_list(myList:list):
     to_remove = []
     for index,particle in enumerate(myList):
         particle[2] -= Time.deltaTime

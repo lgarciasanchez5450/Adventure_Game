@@ -43,7 +43,7 @@ def skipSong():
 
 
 if __name__ == "__main__":
-    print('Running Tests on Module Textures')
+    print('Running Tests on Module Music')
     import Sounds,time,pygame
     pygame.mixer.init()
     play_forever('Sweden.mp3')

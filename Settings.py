@@ -89,11 +89,11 @@ STACK_COUNT_BY_TAG = {
     ITAG_WOODEN_SWORD:64,
     ITAG_BOW:1,
     ITAG_HAT:1,
-    ITAG_BUNNY_EGG:1,
+    ITAG_BUNNY_EGG:64,
 }
 
 #Variables that can change
-RenderDistance = 6
+RenderDistance = 3
  
 GenerationDistance = 10 # Should be larger than RenderDistance
 

@@ -25,7 +25,6 @@ import Time
 import Input 
 import debug
 import general_manager #should take care of everything that chunk/entity manager used to do
-general_manager.registerItems()
 import Particles
 
 import Game_Time
@@ -63,9 +62,7 @@ t = gc.collect()
 print(t)
 while True:
     if Settings.game_state is RUNNING:
-
         #update each module in order
-
         #Time
         Time.update() #should be updated before anything else
         Game_Time.update()
@@ -78,9 +75,7 @@ while True:
         general_manager.update_entities()
         general_manager.manage_chunks()
 
-
         Particles.update()
-
 
         #Cameras
         Camera.update()
@@ -95,7 +90,7 @@ while True:
         Camera.program['light'] = Game_Time.light
 
         Camera.translate_to_opengl()
-        UI.current_ui.draw()
+        UI.showingUIs[0].draw()
         Camera.flip()
 
 

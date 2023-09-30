@@ -1,7 +1,8 @@
 from typing import final
 from numba import njit,prange
-from math import cos, sin,pi,hypot,sqrt,atan2,floor,log2
-from random import random 
+from math import cos, sin,pi,hypot,sqrt,atan2,floor,log2,ceil,acos
+from random import random,randint
+from collections import deque
 import entity_manager
 
 scalar = int|float
@@ -72,6 +73,7 @@ class Vector2:
 	@classmethod
 	@property
 	def randdir(cls):
+		'''Random Unit Vector'''
 		angle = 2*pi*random()
 		return Vector2(cos(angle),sin(angle))
 	
@@ -102,7 +104,7 @@ class Vector2:
 		return Vector2(self.x // __object, self.y // __object)
 	
 	def dot(self,__object):
-		return Vector2(self.x*__object.x,self.y*__object.y)
+		self.x*__object.x+self.y*__object.y
 	
 	def vector_mul(self,__object):
 		return Vector2(self.x*__object.x,self.y*__object.y)
@@ -205,7 +207,6 @@ class Vector2:
 			self.y = -magnitude
 		return self
 	
-
 
 ones= Vector2(1,1)
 
@@ -420,13 +421,11 @@ def normalize(x,y) -> tuple[float,float]:
 
 @njit(cache = True)
 def set_mag(x,y,mag:int|float) -> tuple[float,float]:
-  if hypot(x,y) == 0: return (0,0)
+  if x*x+y*y == 0: return (0,0)
   ux,uy = normalize(x,y)
 
   return  (ux*mag,uy*mag)
 
-normalize(1,1)
-set_mag(1,1,1)
 
 def cache(func):
 	inputs = {}
@@ -437,9 +436,11 @@ def cache(func):
 			inputs[tuple(args)] = func(*args)
 			return inputs[tuple(args)]
 	return wrapper
-
+@njit
 def arccos(x:float):
-	return 180/pi * x
+	'''Uses degrees'''
+	return 180/pi * acos(x)
+
 
 def rgb_to_hsv(r,g,b): 
   M = max(r, g, b)
@@ -455,6 +456,7 @@ def rgb_to_hsv(r,g,b):
   H = arccos((r - g/2 - b/2)/d)  if g >= b else 360 - arccos( (r - g/2 - b/2)/d)  
   return H/360,S,V
 
+@njit
 def hsv_to_rgb(h,s,v): 
   h *= 360
   M = 255*v
@@ -494,7 +496,7 @@ def hsv_to_rgb(h,s,v):
     R = M
     G = m
     B = z + m
-  return round(R),round(G),round(B)
+  return R,G,B
 
 if __name__ == '__main__':
 	pass

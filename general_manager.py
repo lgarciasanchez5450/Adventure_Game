@@ -1,8 +1,7 @@
 from Constants import *
-from collections import deque
 from typing import final, Generator
 from pygame import Surface,draw
-from game_math import Collider,is_collider,Has_Collider, Vector2,hypot,inclusive_range, cap_magnitude,log2,make2dlist,ones,abssin,abscos,cache
+from game_math import *
 from perlin2 import LayeredNoiseMap,rescale,unit_smoothstep
 from Worley import WorleyNoise
 import Textures
@@ -14,34 +13,22 @@ if __name__ == '__main__':
     import Camera
     Camera.init(screen)                                     
 
+import numpy as np
 
-from perlin import *
 #from debug import profile
 from ground import *
-from pygame import font
 import Settings
 import Input
 import Time
 import Events
-from debug import getrefcount
 from UI import *
-import UI
-from Items import Item
-import Items
 import Animation
 from Camera import CSurface
 import Particles
 from Inventory import Inventory,ArmorInventory,HotbarInventory
 from UI_Elements import ItemSlot
-#entity_manager.init(CHUNK_SIZE)
-#from pygame import font
-#myfont = font.SysFont("Arial",10)
-village_creater = SpacedObject(25,4,.92)
 dead_entities = []
-half_sqrt_2 = sqrt(2)/2
-
-
-
+half_sqrt_2 = (2**(1/2))/2
 
 
 
@@ -74,8 +61,82 @@ class Appearance:
 
     def copy(self):
         return Appearance(self.color,self.size,self.shape,self.species)
+
+
+#### ITEMS ####
+class ArmourStats:
+    wearable:bool = True
+    __slots__ = 'type','defense'
+    def __init__(self,type:str,defense:int) -> None:
+        self.type = type
+        self.defense = defense
+
+
+class DurabilityStats:
+    breakable = True
+    __slots__ = 'max_durability','durability'
+    def __init__(self,max_durability:int,durability:int):
+        self.max_durability = max_durability
+        self.durability = durability
+
+    def remove_durability(self,amount:int) -> bool:
+        self.durability -= amount
+        if self.durability <= 0:
+            self.durability = 0
+            return True
+        return False
+
+
+class Item:
+    __slots__ = 'tag', 'name',  'count', 'durability_stats', 'armour_stats', 'damage', 'mining_speed', 'fps', 'animation','frames'
+    def __init__(self,tag:str):
+        self.tag = tag #all the same types of items should have the same tag
+        self.name = tag # display name should start as default tag
+        self.count = 1
+        self.durability_stats:DurabilityStats|None = None
+        self.armour_stats:ArmourStats|None = None
+        self.damage:int = 0 
+        self.mining_speed:int = 0 
+        self.fps = 0 #this is for when the ItemWrapper <Entity> needs to create the animation. 
+        self.frames:list[pygame.Surface]  = [Textures.texture.get(self.tag+'.png',Textures.texture['null.png'])] # at most 60 frames 
+
+        #self.path = f'{Textures.PATH()}Images\\items\\{name}'
+        self.animation = Animation.SimpleAnimation(Camera.CSurface(self.frames[0],Vector2.zero,(0,0)),self.fps,self.frames)
+
+
+    @property
+    def max_stack_count(self):
+        return Settings.STACK_COUNT_BY_TAG[self.tag]
+
+    def getAttack(self) -> int:
+        return self.damage
     
-#####
+    #this method is called on right click down
+    def startUse(self) -> None:
+        return
+    
+    #This function will also be called when the item stops being in main hand or on right click up
+    def stopUse(self) -> None:
+        return
+    
+    def stackCompatible(self,other) -> bool:
+        '''
+        Returns whether the items can possibly be stacked
+        with no regard if the item is fully stacked
+        '''
+        if other is None: return False
+        assert isinstance(other,Item) 
+        return self.tag is other.tag and self.name == other.name
+    
+    def canStack(self,other) -> bool:
+        return self.stackCompatible(other) and (self.count +other.count >= self.max_stack_count)
+
+
+    def __eq__(self,other):
+        raise RuntimeError("For what purpose?!?!")
+
+
+#### BLOCKS ####
 class Block:
     @staticmethod
     def spawnable_on(ground):
@@ -117,6 +178,7 @@ class Block:
 
     def update(self) -> None: ...
 
+
 class Tree(Block):
     oak_tex = '03.png'
     @staticmethod
@@ -132,6 +194,7 @@ class Tree(Block):
 
     def update(self):
         pass
+
 
 class TNT(Block):
     tnt_tex = 'tnt.png'
@@ -161,6 +224,7 @@ class TNT(Block):
         spawn_entity(LiveTNT(self.pos,4,15))
         return super().onDeath()
 
+
 class WoodenPlank(Block):
     @staticmethod
     def spawnable_on(ground:Ground):
@@ -171,11 +235,14 @@ class WoodenPlank(Block):
         self.surf = Textures.texture['15.png']
         self.csurface.surf = self.surf
 
+
 class BunnySpawn(Block):
     def __init__(self,pos:Vector2):
         spawn_entity(Bunny(pos))
         self.onDeath()
 
+
+#### ENTITIES ####
 class Entity:
     def __init__(self,pos,species):
         self.pos = Vector2(*pos)
@@ -239,7 +306,6 @@ class ItemWrapper(Entity):
         self.animation = item.animation
         self.alive_time = ENTITY_MAX_LIFESPAN
         
-
     def update(self):
         self.pickup_time -= Time.deltaTime
         self.alive_time -= Time.deltaTime
@@ -337,12 +403,6 @@ class AliveEntity(Entity):
     def selected_item(self) -> Item|None:
         if self.inventory.spaces == 0 :return None
         return self.inventory.inventory[0]
-
-    def left_click_item(self):
-        item  = self.selected_item
-        if item is None:
-            return
-        item.left_click()
 
     def depleteEnergy(self,action):
         assert action in self.actions, f'{self.species} has tried to do actions: {action}, which is not in its list of actions!'
@@ -595,10 +655,10 @@ class Player(AliveEntity):
             self.showingInventory = not self.showingInventory  
             if self.showingInventory:
                 self.vel.reset()
-                UI.current_ui = self.ui
+                showingUIs.append(self.ui) 
                 
             else:
-                UI.current_ui = UI.Null
+                showingUIs.append(Null) 
                 item  = self.ui.in_hand
                 if item is not None:
                     item:Item
@@ -613,8 +673,10 @@ class Player(AliveEntity):
         
         if Input.m_d1:
             item = self.hotbar.get_selected()
-            if item is not None:
-                item.left_click(item)
+            print('attacked with item',item)
+        if Input.m_d3:
+            item = self.hotbar.get_selected()
+            print('used item',item)
 
         if 'r' in Input.KDQueue:
             #print('position is ',self.pos)
@@ -629,7 +691,7 @@ class Player(AliveEntity):
                 velocity = Vector2.randdir
             spawn_entity(FireArrow(self.pos + velocity/2,velocity*3+self.vel,self))
         if Input.space_d:
-            spawn_item(Items.getItem(ITAG_BUNNY_EGG),self.pos,Vector2.randdir)
+            spawn_item(Item(ITAG_BUNNY_EGG),self.pos,Vector2.randdir)
         if self.animation.state != 'attack':
             x,y=  set_mag(Input.d-Input.a,Input.s-Input.w,self.speed * self.ground.surface_friction)
             self.accelerate(x,y)
@@ -939,7 +1001,7 @@ class Bunny(AliveEntity):
         return super().onLoad()
 
 #### UI ####
-class InventoryUI(UI.UI):
+class InventoryUI(UI):
     def __init__(self,entity:AliveEntity, surface_size:tuple|list = (WIDTH, HEIGHT)):
         screen_size = (surface_size[0]/WIDTH,surface_size[1]/HEIGHT)
         super().__init__(surface_size, (0,0), screen_size)
@@ -1070,46 +1132,6 @@ class HotBarUI:
         #    self.in_hand:Item
         #    self.surface.blit(self.in_hand.animation.surf,(self.rel_mouse_pos.x-ITEM_SIZE//2,self.rel_mouse_pos.y-ITEM_SIZE//2))
 
-class Item:
-
-    __slots__ = ('tag', 'name', 'max_stack_count', 'count', 'durability_stats', 'armour_stats', 'damage', 'mining_speed', 'fps', 'animation','frames','hashcode','left_click','right_click','left_hold','right_hold')
-    def __init__(self,tag:str):
-        self.tag = tag #all the same types of items should have the same tag
-        self.name = tag # display name should start as default tag
-        self.count = 1
-        self.durability_stats:Items.DurabilityStats|None = None
-        self.armour_stats:Items.ArmourStats|None = None
-        self.damage:int = 0 
-        self.mining_speed:int = 0 
-        self.fps = 0 #this is for when the ItemWrapper <Entity> needs to create the animation. 
-        self.frames:list[pygame.Surface]  = [Textures.texture.get(self.tag+'.png',Textures.texture['null.png'])] # at most 60 frames 
-        #self.path = f'{Textures.PATH()}Images\\items\\{name}'
-
-
-    def getAttack(self) -> int:
-        return self.damage
-    
-    #this method is called on right click down
-    def startUse(self) -> None:
-        return
-    
-    #This function will also be called when the item stops being in main hand or on right click up
-    def stopUse(self) -> None:
-        return
-    
-    def stackCompatible(self,other) -> bool:
-        '''
-        returns whether the items can possibly be stacked
-        with no regard to the max_stack_count
-        '''
-        if other is None: return False
-        assert isinstance(other,Item) 
-        return self.tag is other.tag and self.name == other.name
-    
-    def __eq__(self,other):
-        raise RuntimeError("For what purpose?!?!")
-    
-    
 
 #######################################
 ########### BLOCK_CHUNKS ##############
@@ -1163,7 +1185,6 @@ class Chunk:
             chunk.collider = Collider(pos[0]*CHUNK_SIZE,pos[1]*CHUNK_SIZE,CHUNK_SIZE,CHUNK_SIZE)
             
             x,y = pos
-            chunk.subdivision_colliders = (Collider(x,y,HALF_CHUNK_SIZE,HALF_CHUNK_SIZE),Collider(x+HALF_CHUNK_SIZE,y,HALF_CHUNK_SIZE,HALF_CHUNK_SIZE),Collider(x,y+HALF_CHUNK_SIZE,HALF_CHUNK_SIZE,HALF_CHUNK_SIZE),Collider(x+HALF_CHUNK_SIZE,y+HALF_CHUNK_SIZE,HALF_CHUNK_SIZE,HALF_CHUNK_SIZE))
             chunk.biome = PLAINS #prefferably call a function <get_biome(chunk_pos)> 
             chunk.active = False
             chunk.dead_blocks = []
@@ -1171,12 +1192,13 @@ class Chunk:
 
             return cls._insts[pos]
         
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         return f"Chunk: {self.chunk_pos}"
-    __slots__ = ('chunk_pos','pos','collider','id','data','blocks','biome','active','ground','subdivision_colliders','onCreationFinish','csurf','dead_blocks')
+
+    __slots__ = ('chunk_pos','pos','collider','id','data','blocks','biome','active','ground','onCreationFinish','csurf','dead_blocks')
     # removed slots 'x','y','subdivision_lengths','items','items_sub',
     def __init__(self,pos:tuple[int,int]):
-        self.chunk_pos = (pos[0].__trunc__(),pos[1].__trunc__())
+        self.chunk_pos = (floor(pos[0]),floor(pos[1]))
         #for drawing to screen
         #self.x,self.y = pos[0] * CHUNK_SIZE, pos[1] * CHUNK_SIZE 
         self.pos:Vector2# = Vector2(pos[0] * CHUNK_SIZE,pos[1] * CHUNK_SIZE)
@@ -1189,7 +1211,6 @@ class Chunk:
         self.biome:int
         self.active:bool
         self.ground:list
-        self.subdivision_colliders:tuple[Collider,Collider,Collider,Collider]
         self.onCreationFinish:list
         self.csurf:CSurface 
         self.dead_blocks:list[Block]
@@ -1212,8 +1233,6 @@ class Chunk:
         assert (x//CHUNK_SIZE, y//CHUNK_SIZE) == self.chunk_pos, 'that block is not in this chunk'
         assert self.chunk_pos in chunks, 'this chunk is not fully loaded yet meaning it may not have all ground existing yet'
         return self._get_ground(x,y)
-    
-  
 
     def update(self):
         #we are being loaded and all of our blocks and items are being loaded
@@ -1324,22 +1343,20 @@ def _create(chunk:Chunk):
     yield     
     def isValid(x,y):
         for chunk_pos in existing_surrounding_chunks:
-            o_chunk:Chunk = chunks[chunk_pos]
+            o_chunk = chunks[chunk_pos]
             for block in o_chunk.blocks:
-                block:Block
                 if block.type == 'tree':
                     if hypot(block.pos.x-x,block.pos.y-y) <= Settings.TREE_SPACING_BY_BIOME[chunk.biome]:
                         return False
         for block in chunk.blocks: #check own chunk
-            block:Block
             if block.type == 'tree':
                 if hypot(block.pos.x-x,block.pos.y-y) <= Settings.TREE_SPACING_BY_BIOME[chunk.biome]:
                     return False  
         return True
 
     for _ in range(CHUNK_SIZE*CHUNK_SIZE//6):
-        x = random.randint(chunk.pos.x, chunk.pos.x + CHUNK_SIZE - 1)
-        y = random.randint(chunk.pos.y, chunk.pos.y + CHUNK_SIZE - 1)
+        x = randint(chunk.pos.x, chunk.pos.x + CHUNK_SIZE - 1)
+        y = randint(chunk.pos.y, chunk.pos.y + CHUNK_SIZE - 1)
         g = chunk._get_ground(x,y)
         if Tree.spawnable_on(g) and isValid(x,y):
             chunk.blocks.append(Tree((x,y),g))
@@ -1351,7 +1368,6 @@ def _create(chunk:Chunk):
 
     yield 'able to add'
     #returns a StopIteration exception
-    yield 
     #if village_creater.isObject(cx,cy):
         #chunk.ground[4][4] = Village
         #surf.blit(Textures.texture[Village.tex],(4*BLOCK_SIZE,4*BLOCK_SIZE))
@@ -1581,7 +1597,6 @@ def collision_vertical(collider:Collider,vy:float|int):
     hit_smthng = False
     for chunk in get_chunks_collided(collider):
         for obstacle in chunk.blocks:
-            obstacle:Has_Collider
             if collider.collide_collider(obstacle.collider):
                 if vy > 0: # moving down
                     collider.setBottom(obstacle.collider.top)
@@ -1674,7 +1689,6 @@ def raycast(pos:Vector2,direction:Vector2):
         chunk:Chunk = chunks.get((x,y))
         if chunk is not None:
             for obstacle in chunk.blocks:
-                obstacle:Has_Collider
                 d = signed_distance_to_box(px,py,obstacle.collider)
                 if d < dist:
                     dist = d
@@ -1684,7 +1698,6 @@ def raycast(pos:Vector2,direction:Vector2):
         chunk:Chunk = chunks.get((x,y))
         if chunk is not None: 
             for obstacle in chunk.blocks:
-                obstacle:Has_Collider
                 d = signed_distance_to_box(px,py,obstacle.collider)
                 if d < dist:
                     dist = d
@@ -1694,7 +1707,6 @@ def raycast(pos:Vector2,direction:Vector2):
         chunk:Chunk = chunks.get((x,y))
         if chunk is not None:
             for obstacle in chunk.blocks:
-                obstacle:Has_Collider
                 d = signed_distance_to_box(px,py,obstacle.collider)
                 if d < dist:
                     dist = d
@@ -1704,7 +1716,6 @@ def raycast(pos:Vector2,direction:Vector2):
         chunk:Chunk = chunks.get((x,y))
         if chunk is not None:
             for obstacle in chunk.blocks:
-                obstacle:Has_Collider
                 d = signed_distance_to_box(px,py,obstacle.collider)
                 if d < dist:
                     dist = d
@@ -1752,7 +1763,6 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
         chunk:Chunk = chunks.get((x,y))
         if chunk is not None:
             for obstacle in chunk.blocks:
-                obstacle:Has_Collider
                 d = signed_distance_to_box(px,py,obstacle.collider)
                 if d < dist:
                     dist = d
@@ -1762,7 +1772,6 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
         chunk:Chunk = chunks.get((x,y))
         if chunk is not None: 
             for obstacle in chunk.blocks:
-                obstacle:Has_Collider
                 d = signed_distance_to_box(px,py,obstacle.collider)
                 if d < dist:
                     dist = d
@@ -1772,7 +1781,6 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
         chunk:Chunk = chunks.get((x,y))
         if chunk is not None:
             for obstacle in chunk.blocks:
-                obstacle:Has_Collider
                 d = signed_distance_to_box(px,py,obstacle.collider)
                 if d < dist:
                     dist = d
@@ -1782,7 +1790,6 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
         chunk:Chunk = chunks.get((x,y))
         if chunk is not None:
             for obstacle in chunk.blocks:
-                obstacle:Has_Collider
                 d = signed_distance_to_box(px,py,obstacle.collider)
                 if d < dist:
                     dist = d
