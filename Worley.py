@@ -1,10 +1,8 @@
 from numba import njit,prange
 from math import floor,hypot, sqrt
-from debug import profile
 import numpy
 import random
 class WorleyNoise:
-
     def __init__(self,seed:int, scale):
         self.global_hash = hash(seed.__repr__()) # for each cell hashing
         self.scale = scale
@@ -39,7 +37,6 @@ def _get_surrounding_cells(x:int,y:int):
 @njit
 def modifier(i,island_mod):
     return island_mod**(-i*i)
-
 
 @njit
 def _getAt(x:float,y:float,global_hash):

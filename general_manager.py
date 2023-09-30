@@ -1070,23 +1070,43 @@ class HotBarUI:
         #    self.in_hand:Item
         #    self.surface.blit(self.in_hand.animation.surf,(self.rel_mouse_pos.x-ITEM_SIZE//2,self.rel_mouse_pos.y-ITEM_SIZE//2))
 
-'''class Item:
-    __slots__ = ('name', 'max_stack_count', 'count', 'durability_stats', 'armour_stats', 'block', 'damage', 'mining_speed', 'fps', 'animation','frames','hashcode','left_click','right_click','left_hold','right_hold')
-    def __init__(self,name:str):
-        self.hashcode =None
-        self.name = name
-        self.max_stack_count = 1
+class Item:
+
+    __slots__ = ('tag', 'name', 'max_stack_count', 'count', 'durability_stats', 'armour_stats', 'damage', 'mining_speed', 'fps', 'animation','frames','hashcode','left_click','right_click','left_hold','right_hold')
+    def __init__(self,tag:str):
+        self.tag = tag #all the same types of items should have the same tag
+        self.name = tag # display name should start as default tag
         self.count = 1
         self.durability_stats:Items.DurabilityStats|None = None
         self.armour_stats:Items.ArmourStats|None = None
-        self.damage = 0 
-        self.mining_speed = 0 
+        self.damage:int = 0 
+        self.mining_speed:int = 0 
         self.fps = 0 #this is for when the ItemWrapper <Entity> needs to create the animation. 
-        self.frames:list[pygame.Surface]  = [Textures.texture.get(name+'.png',Textures.texture['null.png'])] # at most 60 frames 
+        self.frames:list[pygame.Surface]  = [Textures.texture.get(self.tag+'.png',Textures.texture['null.png'])] # at most 60 frames 
         #self.path = f'{Textures.PATH()}Images\\items\\{name}'
-        self.right_hold:Callable[[Item],None] = lambda : None
 
-'''
+
+    def getAttack(self) -> int:
+        return self.damage
+    
+    #this method is called on right click down
+    def startUse(self) -> None:
+        return
+    
+    #This function will also be called when the item stops being in main hand or on right click up
+    def stopUse(self) -> None:
+        return
+    
+    def canStack(self,other) -> bool:
+        if other is None: return False
+        assert isinstance(other,Item) 
+        return self.tag is other.tag and self.name == other.name 
+    
+    def __eq__(self,other):
+        raise RuntimeError("For what purpose?!?!")
+    
+    
+
 #######################################
 ########### BLOCK_CHUNKS ##############
 #######################################
@@ -1519,6 +1539,7 @@ def get_chunk(cx,cy) -> Chunk:
 def get_around_chunk(cx,cy,xbuffer = 1):
     #returns perfect square
     return [(cx+x,cy + y) for x in range(-Settings.RenderDistance,Settings.RenderDistance+1,1) for y in range(-Settings.RenderDistance,Settings.RenderDistance+1,1)] 
+
 
 def get_loaded_chunks_collided(collider:Collider):
     if _DEBUG_ and not is_collider(collider): raise RuntimeError("<collider> argument must be of type<settings.Collider>")

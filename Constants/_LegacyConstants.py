@@ -1,7 +1,6 @@
 #Any constants needed for any scripts should go here
 #variables here should not change (eg. be Final) so it is safe to do from Constants import *
 #there should not be ANY imports in this module as it contains only pure python constants
-FPS = 0 #Target Framerate
 DEBUG = True
 
 _:object = object()
@@ -12,6 +11,7 @@ WIDTH = 900
 HEIGHT = 600
 HALFWIDTH = WIDTH//2
 HALFHEIGHT = HEIGHT//2
+FPS = 0 #Target Framerate
 
 _:object
 '''Chunk Generation Variables'''
@@ -59,11 +59,11 @@ INTERNAL_DAMAGE = 'internal' # this one is like for if an entity needs to do an 
 
 _:object
 '''All Items Name''' #this is the name that will pop up in-game
-WOODEN_SWORD = 'wood sword'
-HAT= 'hat'
-DIRT = 'Dirt'
-BOW = 'Bow'
-BUNNY_EGG = 'bunny egg'
+ITAG_WOODEN_SWORD = 'Wooden Sword'
+ITAG_HAT= 'hat'
+ITAG_DIRT = 'Dirt'
+ITAG_BOW = 'Bow'
+ITAG_BUNNY_EGG = 'bunny egg'
 
 
 _:object

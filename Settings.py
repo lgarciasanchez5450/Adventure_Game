@@ -80,9 +80,17 @@ VISION_BY_SPECIES = {
     'bunny': 3.5,
 }
 INVENTORY_SPACES_BY_SPECIES = {'human':27,'spirit':0,'bamboo':0,'raccoon':1,'squid':0,'bunny':0}
+
+
 GROUND_NAME_BY_NUMBER = {}#to be filled by the groundRegisterer at runtime
+
+STACK_COUNT_BY_TAG = {
+    ITAG_WOODEN_SWORD:64
+}
 
 #Variables that can change
 RenderDistance = 6
+ 
+GenerationDistance = 10 # Should be larger than RenderDistance
 
 game_state = RUNNING
