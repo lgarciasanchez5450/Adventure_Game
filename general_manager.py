@@ -121,7 +121,7 @@ class Tree(Block):
     oak_tex = '03.png'
     @staticmethod
     def spawnable_on(ground:Ground) -> bool:
-        return ground.name is DIRT
+        return ground.name is GROUND_DIRT
     #this class is an "obstacle" 
     def __init__(self,pos,ground:Ground):
         assert Tree.spawnable_on(ground), f"Tree was spawned on illegal block: {ground}"
@@ -137,7 +137,7 @@ class TNT(Block):
     tnt_tex = 'tnt.png'
     @staticmethod
     def spawnable_on(ground:Ground):
-        return ground.name is DIRT
+        return ground.name is GROUND_DIRT
     __slots__ = 'timer','energy'
     def __init__(self, pos):
         super().__init__(pos, 'tnt')
@@ -629,7 +629,7 @@ class Player(AliveEntity):
                 velocity = Vector2.randdir
             spawn_entity(FireArrow(self.pos + velocity/2,velocity*3+self.vel,self))
         if Input.space_d:
-            spawn_item(Items.getItem(BUNNY_EGG),self.pos,Vector2.randdir)
+            spawn_item(Items.getItem(ITAG_BUNNY_EGG),self.pos,Vector2.randdir)
         if self.animation.state != 'attack':
             x,y=  set_mag(Input.d-Input.a,Input.s-Input.w,self.speed * self.ground.surface_friction)
             self.accelerate(x,y)
@@ -1097,10 +1097,14 @@ class Item:
     def stopUse(self) -> None:
         return
     
-    def canStack(self,other) -> bool:
+    def stackCompatible(self,other) -> bool:
+        '''
+        returns whether the items can possibly be stacked
+        with no regard to the max_stack_count
+        '''
         if other is None: return False
         assert isinstance(other,Item) 
-        return self.tag is other.tag and self.name == other.name 
+        return self.tag is other.tag and self.name == other.name
     
     def __eq__(self,other):
         raise RuntimeError("For what purpose?!?!")
@@ -1282,15 +1286,9 @@ NormalNP = LayeredNoiseMap(
     (.1 * SCALE, .2 * SCALE),
     (1.0,0.5)
 )
-
 ExperimentalNP = WorleyNoise(2,SCALE*.4)
-if __name__ == '__main__':
-    from matplotlib import pyplot
-    #height = [(ExperimentalNP.getAt(x/1000,13.3)) for x in range(1000)]
-    #pyplot.plot(height)
-    #pyplot.show()
-def _create(chunk:Chunk):
 
+def _create(chunk:Chunk):
     ## PHASE 1 ##
     #generate layered noisemap
     xs = np.arange(CHUNK_SIZE)+chunk.chunk_pos[0]*CHUNK_SIZE
@@ -1467,7 +1465,6 @@ def manage_chunks():
         if chunk_pos in entity_chunks:
             chunk = entity_chunks[chunk_pos]
             for entity in reversed(chunk): #could just do range(len(chunk),0,-1) and use pop instead of remove, which is faster
-        
                 entity_chunk = (entity.pos//CHUNK_SIZE).tuple
                 if  entity_chunk != chunk_pos:            
                     chunk.remove(entity)
@@ -1539,7 +1536,6 @@ def get_chunk(cx,cy) -> Chunk:
 def get_around_chunk(cx,cy,xbuffer = 1):
     #returns perfect square
     return [(cx+x,cy + y) for x in range(-Settings.RenderDistance,Settings.RenderDistance+1,1) for y in range(-Settings.RenderDistance,Settings.RenderDistance+1,1)] 
-
 
 def get_loaded_chunks_collided(collider:Collider):
     if _DEBUG_ and not is_collider(collider): raise RuntimeError("<collider> argument must be of type<settings.Collider>")
@@ -1647,24 +1643,18 @@ def _sdtb(px,py,cx,cy,w,h):
     unsignedDst = hypot(max(offset_x,0),max(offset_y,0))
     dstInsideBox = max(min(offset_x,0),min(offset_y,0))
     return unsignedDst + dstInsideBox
-_sdtb(1.0,1.0,1.0,1.0,1.0,1.0)
 
 def signed_distance_to_box(x,y,collider:Collider):
     return _sdtb(x,y,collider.centerx,collider.centery,collider.width,collider.height)
 def get_collider_offset(raydir:Vector2,half_width):
- 
     #ch_over2 = collider.height/2
     rx,ry = raydir
     rx *= half_width
     ry *= half_width
     return Vector2(rx,ry)
 
-
 def can_see_each_other(entity1:Entity,entity2:Entity) -> bool:
     return ray_can_reach(entity1.pos,entity2.pos)
-
-
-
 
 def raycast(pos:Vector2,direction:Vector2):
     MAX_DIST = 500
@@ -1820,26 +1810,11 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
         raylen = dist_to_closest(x,y)
     return False
 
-def registerItems():
-    def spawn_bunny(self:Item):
-        spawn_entity(Bunny(Camera.world_position_from_normalized(Input.m_pos_normalized)))
-        return self.remove_one()
-                     
-
-    Items.registerItem(lambda : Item(DIRT,'dirt').setMaxCount(64).setWearable('chest',30_000) ,DIRT)
-
-    Items.registerItem(lambda : Item(HAT).setWearable(HEADWEAR,3).setBreakable(20,20),HAT)
-
-    Items.registerItem(lambda : Item(BOW).setBreakable(10,10),BOW)
-
-    Items.registerItem(lambda : Item(BUNNY_EGG).setMaxCount(64).setLeftClick(spawn_bunny),BUNNY_EGG)
-
-
 if __name__ == '__main__':
     from pympler.asizeof import asizeof
     chunk = Chunk((1,1))
     print(asizeof(chunk.ground if chunk.active else 0))
     ting = _create(chunk)
-    for _ in ting:
+    for _ in ting: #finish the creation of the chunk
         pass
     print(asizeof(chunk.ground))

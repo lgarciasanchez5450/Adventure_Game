@@ -84,8 +84,12 @@ INVENTORY_SPACES_BY_SPECIES = {'human':27,'spirit':0,'bamboo':0,'raccoon':1,'squ
 
 GROUND_NAME_BY_NUMBER = {}#to be filled by the groundRegisterer at runtime
 
+# If the item doesn't exist in this dictionary, the game will probably assume a stack of 64
 STACK_COUNT_BY_TAG = {
-    ITAG_WOODEN_SWORD:64
+    ITAG_WOODEN_SWORD:64,
+    ITAG_BOW:1,
+    ITAG_HAT:1,
+    ITAG_BUNNY_EGG:1,
 }
 
 #Variables that can change
