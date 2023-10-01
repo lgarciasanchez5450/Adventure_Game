@@ -45,7 +45,7 @@ class Animation:
 
 
 class SimpleAnimation:
-    '''This Animation Class is meant to provide a simpler interface and be faster'''
+    '''This Animation Class is meant to provide a simpler interface and be faster than the normal Animation class'''
     __slots__ = 'csurface','frames','fps','time','_frame_in_state','max_frames_in_state','surf'
     def __init__(self,csurf:Camera.CSurface,fps:int,frames:list):
         self.csurface = csurf
@@ -56,6 +56,13 @@ class SimpleAnimation:
         self.time:float = 0.0
         self._frame_in_state:int = 0
         self.max_frames_in_state = len(self.frames)
+
+    @property
+    def time_per_cycle(self) -> float:
+        '''Seconds it takes to complete all frames'''
+        if self.fps == 0:
+            return float('inf')
+        return self.max_frames_in_state / self.fps
 
     def reset(self):
         self.time = 0.0

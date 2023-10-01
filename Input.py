@@ -29,8 +29,11 @@ m_3:Binary
 '''Mouse Button 3'''
 
 m_d1:Binary
+m_u1:Binary
 m_d2:Binary
+m_u2:Binary
 m_d3:Binary
+m_u3:Binary
 m_x:Binary
 m_y:Binary 
 m_pos:game_math.Vector2 = game_math.Vector2.zero
@@ -73,11 +76,11 @@ KDQueue = []
 def update():
     _update_mouse()
     KDQueue.clear()
-    global wheel,w,a,s,d,lshift,rshift,lctrl,rctrl,m_d1,m_d2,m_d3,pressed,space,space_d
+    global wheel,w,a,s,d,lshift,rshift,lctrl,rctrl,m_d1,m_d2,m_d3,pressed,space,space_d,m_u1,m_u2,m_u3
     wheel = 0
     pressed = pygame.key.get_pressed()
 
-    m_d1,m_d2,m_d3,space_d = 0,0,0,0
+    m_d1,m_d2,m_d3,space_d,m_u1,m_u2,m_u3 = 0,0,0,0,0,0,0
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -131,6 +134,13 @@ def update():
                 m_d2 = 1
             elif event.button == 3:
                 m_d3 = 1
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:
+                m_u1 = 1
+            elif event.button == 2:
+                m_u2 = 1
+            elif event.button == 3:
+                m_u3 = 1        
         elif event.type == pygame.MOUSEWHEEL:
             wheel = event.y
         elif event.type == pygame.MUSICEND:

@@ -104,7 +104,8 @@ class Vector2:
 		return Vector2(self.x // __object, self.y // __object)
 	
 	def dot(self,__object):
-		self.x*__object.x+self.y*__object.y
+		assert isinstance(__object,Vector2)
+		return self.x*__object.x+self.y*__object.y
 	
 	def vector_mul(self,__object):
 		return Vector2(self.x*__object.x,self.y*__object.y)
@@ -376,6 +377,8 @@ class Array(list,typing.Generic[T]):
     def new(cls,size:int):
         return cls(cls.none_range(size))
     
+    def __getitem__(self,index:int) -> T:
+        return super().__getitem__(index)
     def append(self, __object):
         return SyntaxError("Array Size cannot be changed")
     
@@ -467,6 +470,7 @@ def hsv_to_rgb(h,s,v):
   z = (M-m)*(1-abs((h/60)%2-1))
 
   #Now you can compute R, G, and B according to the angle measure of H. There are six cases. 
+  R,G,B = 0,0,0
   if 0 <= h < 60:
     R = M
     G = z + m

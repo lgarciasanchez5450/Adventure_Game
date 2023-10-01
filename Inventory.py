@@ -1,8 +1,19 @@
 from Constants import * 
-from Items import Item
 _DEBUG_ = True
 
-from game_math import Array
+from game_math import Array,UnInstantiable
+class ArmourStats:
+    type:str
+class Item(UnInstantiable):
+    count:int
+    max_stack_count:int
+    armour_stats:ArmourStats
+    durability_stats:object
+    def canStack(self,other) -> bool: ...
+    def split(self): ...
+    def startUse(self): ...
+    def stopUse(self): ...
+    
 
 
 class Inventory:
@@ -11,6 +22,7 @@ class Inventory:
         self.inventory:Array[Item] = Array.new(spaces)
         self.full = False
         self._any_empty = True
+
 
     @property
     def added_def(self):
@@ -49,10 +61,10 @@ class Inventory:
         self._any_empty = None
         first_empty = None
         for index, inventory_item in enumerate(self.inventory):
-            inventory_item:Item
             if inventory_item is None and first_empty is None:
                 first_empty = index
             elif item.canStack(inventory_item):
+                inventory_item:Item
                 if inventory_item.count + item.count <= inventory_item.max_stack_count:
                     inventory_item.count += item.count
                     item.count = 0
@@ -171,6 +183,24 @@ class HotbarInventory(Inventory):
 
     def get_selected(self) -> Item|None:
         return self.inventory[self.selected]
+    
+    def start_use_selected(self) -> None:
+        item:Item = self.inventory[self.selected]
+        assert isinstance(item,(Item,None))
+        if item is None: return
+        item.startUse();  
+        if item.count == 0:
+            self.inventory[self.selected] = None
+
+    def stop_use_selected(self):
+        item:Item = self.inventory[self.selected]
+        assert isinstance(item,(Item,None)) 
+        if item is None: return
+        item.stopUse()
+        if item.count == 0:
+            self.inventory[self.selected] = None
+
+
     
     def pop_selected(self) -> Item|None:
         return self.inventory.take(self.selected)

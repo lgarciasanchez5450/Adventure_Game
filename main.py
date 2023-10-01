@@ -14,7 +14,6 @@ display = pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT),pygame.OPENGL| py
 
 import Textures
 
-
 Textures.init()
 
 screen = pygame.Surface((WIDTH,HEIGHT))
@@ -93,7 +92,7 @@ while True:
         UI.showingUIs[0].draw()
         Camera.flip()
 
-
+ 
     elif Settings.game_state is SETTINGS:
         Time.update()
         #

@@ -1,7 +1,9 @@
 from Constants import *
 from typing import final, Generator
 from pygame import Surface,draw
+from UI import Vector2
 from game_math import *
+from game_math import Vector2
 from perlin2 import LayeredNoiseMap,rescale,unit_smoothstep
 from Worley import WorleyNoise
 import Textures
@@ -112,12 +114,10 @@ class Item:
         return self.damage
     
     #this method is called on right click down
-    def startUse(self) -> None:
-        return
+    def startUse(self) -> None: ...
     
     #This function will also be called when the item stops being in main hand or on right click up
-    def stopUse(self) -> None:
-        return
+    def stopUse(self) -> None: ...
     
     def stackCompatible(self,other) -> bool:
         '''
@@ -131,10 +131,23 @@ class Item:
     def canStack(self,other) -> bool:
         return self.stackCompatible(other) and (self.count +other.count >= self.max_stack_count)
 
+    def __repr__(self) -> str:
+        return self.__class__.__name__ + ": " + self.tag +": " + self.name
 
     def __eq__(self,other):
         raise RuntimeError("For what purpose?!?!")
 
+class BunnyEgg(Item): 
+    __slots__ = 'species',
+    def __init__(self):
+        super().__init__(ITAG_BUNNY_EGG)
+        self.name = f"Bunny Spawn Egg"
+        self.species =  'bunny'
+    
+    def startUse(self) -> None:
+        spawn_entity(Bunny(Camera.world_position_from_normalized(Input.m_pos_normalized)))
+
+     
 
 #### BLOCKS ####
 class Block:
@@ -185,6 +198,7 @@ class Tree(Block):
     def spawnable_on(ground:Ground) -> bool:
         return ground.name is GROUND_DIRT
     #this class is an "obstacle" 
+    __slots__ = 'surf',
     def __init__(self,pos,ground:Ground):
         assert Tree.spawnable_on(ground), f"Tree was spawned on illegal block: {ground}"
         super().__init__(pos,'tree')
@@ -368,6 +382,7 @@ class LiveTNT(Entity):
         return EXPLOSION_DAMAGE
 
 class AliveEntity(Entity):
+        
     def __init__(self,pos,species):
         super().__init__(pos,species)
         self.actions = Settings.ACTIONS_BY_SPECIES[species]
@@ -588,6 +603,7 @@ class Arrow(Entity):
         return( 0.5 * self.base_damage * (self.vel/2).magnitude_squared() * self.weight * max(0.01,self.penetration)).__trunc__()
 
 class FireArrow(Arrow):
+
     def get_attack_type(self):
         return FIRE_DAMAGE
 
@@ -656,7 +672,6 @@ class Player(AliveEntity):
             if self.showingInventory:
                 self.vel.reset()
                 showingUIs.append(self.ui) 
-                
             else:
                 showingUIs.append(Null) 
                 item  = self.ui.in_hand
@@ -666,18 +681,6 @@ class Player(AliveEntity):
                     spawn_item(item,self.pos,Input.m_pos_normalized)
                 self.ui.in_hand = None
         if self.showingInventory:return
-        self.hbui.update()
-        if Input.m_1 and self.animation.state != 'attack':
-            #use_item(self.inventory.)
-            pass
-        
-        if Input.m_d1:
-            item = self.hotbar.get_selected()
-            print('attacked with item',item)
-        if Input.m_d3:
-            item = self.hotbar.get_selected()
-            print('used item',item)
-
         if 'r' in Input.KDQueue:
             #print('position is ',self.pos)
             place_block(TNT(Camera.world_position_from_normalized(Input.m_pos_normalized).floored()))
@@ -691,7 +694,7 @@ class Player(AliveEntity):
                 velocity = Vector2.randdir
             spawn_entity(FireArrow(self.pos + velocity/2,velocity*3+self.vel,self))
         if Input.space_d:
-            spawn_item(Item(ITAG_BUNNY_EGG),self.pos,Vector2.randdir)
+            spawn_item(BunnyEgg(),self.pos,Vector2.randdir)
         if self.animation.state != 'attack':
             x,y=  set_mag(Input.d-Input.a,Input.s-Input.w,self.speed * self.ground.surface_friction)
             self.accelerate(x,y)
@@ -702,6 +705,24 @@ class Player(AliveEntity):
             self.animation.direction = 'right' 
         elif self.vel.x < 0:
             self.animation.direction = 'left'
+        self.hbui.update()
+        if self.hbui.has_mouse: return
+        if Input.m_1 and self.animation.state != 'attack':
+            #use_item(self.inventory.)
+            pass
+
+        if Input.m_d1:
+            item = self.hotbar.get_selected()
+            print('attacked with item',item)
+        if Input.m_d3:
+            item = self.hotbar.get_selected()
+            if item is not None:
+                item.startUse()
+        if Input.m_u3:
+            item = self.hotbar.get_selected()
+            if item is not None:
+                item.stopUse()
+
 
     def move(self):
         super().update()
@@ -879,7 +900,6 @@ class Driver:
             return lineVec/sqrt(magSqrd)
     
 class Bunny(AliveEntity):
-
     enemies = set() #have no natural enemies for now
     eats = set()# bunny's eat nothing (for now)
     fears = {'spirit'}
@@ -946,7 +966,7 @@ class Bunny(AliveEntity):
             self.set_state(1)
         elif self.state is self.states[1]:
             self.set_state(0)
-        print('updating state curr:',self.state)       
+        #print('updating state curr:',self.state)       
 
         #self.state = self.states[1]            
 
@@ -1104,6 +1124,7 @@ class HotBarUI:
         Events.add_OnResize(self.onResize)
         self.collider = Collider(self.x / WIDTH,self.y / HEIGHT,self.surface.get_width()/WIDTH,self.surface.get_height()/HEIGHT)# this is a normalized collider e.g. its values are from [0,1] so that they work with the input
         Camera.ui_draw_method(self)
+        self.has_mouse = False
     
     def onResize(self,newWidth,newHeight):
         self.recalc_slots()
@@ -1113,9 +1134,14 @@ class HotBarUI:
         self.slots = [ItemSlot((i*(ITEM_SIZE+self.slot_spacing)+self.slot_spacing,self.slot_spacing),i,self.hb_inventory) for i in range(self.inventory_size)]
         self.surface.fill(self.background_color)
 
+    def onMouseLeave(self):
+        for slot in self.slots:
+            slot.state = slot.UP
+
     def update(self):
         m_pos = Input.m_pos.vector_mul(Camera.screen_size.inverse())
         if self.collider.collide_point_inclusive(m_pos.tuple):
+            self.has_mouse = True
             m_pos = m_pos.vector_mul(Camera.screen_size)
             m_pos -= self.topleft
             for slot in self.slots:
@@ -1123,6 +1149,10 @@ class HotBarUI:
                 if slot.state == slot.HOVER:
                     if Input.m_d1:
                         self.hb_inventory.selected = slot.index
+        else:
+            if self.has_mouse:
+                self.has_mouse = False
+                self.onMouseLeave()
 
     def draw(self):
         for slot in self.slots:
@@ -1132,6 +1162,13 @@ class HotBarUI:
         #    self.in_hand:Item
         #    self.surface.blit(self.in_hand.animation.surf,(self.rel_mouse_pos.x-ITEM_SIZE//2,self.rel_mouse_pos.y-ITEM_SIZE//2))
 
+entities_by_species:dict[str,Entity] = {
+    'item':ItemWrapper,
+    'arrow':Arrow,
+    'human':Player,
+    'spirit':Spirit,
+    'bunny':Bunny
+}
 
 #######################################
 ########### BLOCK_CHUNKS ##############
