@@ -3,12 +3,12 @@ import game_math
 from typing import Literal
 import Music
 from pygame.constants import *
-import Constants
+from Constants.Display import HALFWIDTH,HALFHEIGHT,WINDOW_WIDTH,WINDOW_HEIGHT
 import Settings
 
 from Events import call_OnResize,add_OnResize
-HALF_SCREEN = game_math.Vector2(Constants.WIDTH//2,Constants.HEIGHT//2)
-s_width,s_height = Constants.WINDOW_WIDTH,Constants.WINDOW_HEIGHT
+HALF_SCREEN = game_math.Vector2(HALFWIDTH,HALFHEIGHT)
+s_width,s_height = WINDOW_WIDTH,WINDOW_HEIGHT
 _width_multiplier,_height_multiplier = 2/(s_width-1),2/(s_height-1)
 def onResize(width,height):
     global s_width,s_height, HALF_SCREEN,_width_multiplier,_height_multiplier

@@ -1,12 +1,13 @@
 #idea. let the game simply take items in and out of the draw queue while the camera only repeatedly draws it
 import pygame,game_math,Time
 from typing import Literal, Callable
-from Constants import *
+from Constants import BLOCK_SIZE
 from Input import m_pos_normalized
 import moderngl
 from array import array
 from Events import add_OnResize
 from pygame import Surface
+from game_math import floor
 #####Variables#####
 
 ##### OPENGL MAGIC #####
@@ -26,6 +27,7 @@ render_object:moderngl.VertexArray
 opengl_screen:moderngl.Texture
 
 def create_new_render_object(vertex_path,frag_path,size:tuple[float,float] = (1,1),offset = (0,0)):
+    global ctx
     program = ctx.program(vertex_shader=get_shader(vertex_path), fragment_shader=get_shader(frag_path))
     vbo = ctx.buffer(data = array('f',[
     -1.0 * size[0]+offset[0] , 1.0 * size[1]+offset[1], 0.0, 0.0,
@@ -254,7 +256,6 @@ def blit(surface,position,s_offset_x = 0, s_offset_y = 0):
     wx,wy = position
     screen.blit(surface,((wx-effective_camera_pos.x)*BLOCK_SIZE+HALFWIDTH+s_offset_x,(wy-effective_camera_pos.y)*BLOCK_SIZE+ HALFHEIGHT+s_offset_y))
 
-from math import floor
 
 def blit_csurface(csurface:CSurface):
     screen.blit(csurface.surf,(floor(csurface.pos.x*BLOCK_SIZE-camera_offset_x+HALFWIDTH+csurface.offset[0]),floor(csurface.pos.y*BLOCK_SIZE-camera_offset_y+ HALFHEIGHT+csurface.offset[1])))

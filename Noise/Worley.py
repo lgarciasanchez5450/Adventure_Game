@@ -1,7 +1,18 @@
-from numba import njit,prange
+try:
+    from numba import njit,prange
+except ImportError:
+    def njit(*args, **kwargs):
+        def wrapper(func):
+            return func
+        return wrapper  
+    prange = range
+
 from math import floor,hypot, sqrt
 import numpy
 import random
+
+
+
 class WorleyNoise:
     def __init__(self,seed:int, scale):
         self.global_hash = hash(seed.__repr__()) # for each cell hashing

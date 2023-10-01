@@ -6,6 +6,8 @@ ENTITY_MAX_LIFESPAN = 1 * 10 #seconds
 ITEM_SIZE = BLOCK_SIZE//2
 PARTICLE_SIZE = BLOCK_SIZE // 8
 ZERO = 0
+POSITIVE_INFINITY = float('inf')
+NEGATIVE_INFINITY = float('-inf')
 
 
 '''Game States'''

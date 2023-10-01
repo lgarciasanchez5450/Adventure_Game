@@ -5,4 +5,4 @@ WIDTH = 900
 HEIGHT = 600
 HALFWIDTH = WIDTH//2
 HALFHEIGHT = HEIGHT//2
-FPS = 60 #Target Framerate
+FPS = 120 #Target Framerate

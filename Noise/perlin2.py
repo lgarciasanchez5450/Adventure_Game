@@ -1,40 +1,64 @@
+'''
+This module has been ported over to python from java 
+Made by ??? (found on reddit, search for supersimplex noise)
+Ported by Hithere32123
+
+'''
 import Perlin
-from typing import Any
-from numba import njit
+from array import array
 import numpy
+from math import floor
+try:
+    from numba import njit,prange
+except ImportError:
+    def njit(*args, **kwargs):
+        def wrapper(func):
+            return func
+        return wrapper  
+    prange = range
+    
+
 PRIME_X = 0x5205402B9270C86F
 PRIME_Y = 0x598CD327003817B5
-
 HASH_MULTIPLIER = 0x53A3F72DEEC546F5
-
 ROOT2OVER2 = 0.7071067811865476
 SKEW_2D = 0.366025403784439
 UNSKEW_2D = -0.21132486540518713
-
-N_GRADS_2D_EXPONENT = 7
 N_GRADS_2D = 128
-
-
 NORMALIZER_2D = 0.05481866495625118
-
 RSQUARED_2D = 2.0 / 3.0
-import typing 
-#float = typing.TypeVar('float',bound = float)
-'''
-    * Noise Evaluators
-'''
+TWICE_UNSKEW_ONE = 1 + 2 * UNSKEW_2D
+seed = 3
+
+def set_seed(x:int):
+    global seed
+    seed = x
 
 '''*
     * 2D OpenSimplex2S/SuperSimplex noise, standard lattice orientation.
 '''
-def noise2(seed, x, y):
+def noise2(x, y):
+    global SKEW_2D
     # Get points for A2* lattice
     s = SKEW_2D * (x + y)
     xs = x + s
     ys = y + s
-
     return noise2_UnskewedBase(seed, xs, ys)
 
+def noise2_s(seed,x,y):
+    global SKEW_2D
+    # Get points for A2* lattice
+    s = SKEW_2D * (x + y)
+    xs = x + s
+    ys = y + s
+    return noise2_UnskewedBase(seed, xs, ys)  
+
+def noise2_array(xs:numpy.ndarray,ys:numpy.ndarray):
+    noise = numpy.empty((ys.size, xs.size), dtype=numpy.double)
+    for y_i in range(ys.size):
+        for x_i in range(xs.size):
+            noise[y_i, x_i] = noise2(xs[x_i], ys[y_i])
+    return noise
 
 '''*
     * 2D OpenSimplex2S/SuperSimplex noise, with Y pointing down the main diagonal.
@@ -44,162 +68,147 @@ def noise2(seed, x, y):
     * difference, but the option is here to make it easy.
     '''
 def noise2_ImproveX( seed,  x:float, y:float):
-
+    global ROOT2OVER2, SKEW_2D
     # Skew transform and rotation baked into one.
     xx:float = x * ROOT2OVER2
     yy:float = y * (ROOT2OVER2 * (1 + 2 * SKEW_2D))
-
     return noise2_UnskewedBase(seed, yy + xx, yy - xx)
 
 
 '''*
     * 2D  OpenSimplex2S/SuperSimplex noise base.
     '''
-def noise2_UnskewedBase( seed, xs:float, ys:float):
-
+def noise2_UnskewedBase(seed:int, xs:float, ys:float):
+    global PRIME_X,PRIME_Y,UNSKEW_2D,RSQUARED_2D, TWICE_UNSKEW_ONE
     # Get base points and offsets.
+    
     xsb:int = floor(xs)
     ysb:int = floor(ys)
-    xi:float = float(xs - xsb)
-    yi:float = float(ys - ysb)
+    xi:float = xs - xsb
+    yi:float = ys - ysb
 
     # Prime pre-multiplication for hash.
     xsbp = xsb * PRIME_X
     ysbp = ysb * PRIME_Y
-
     # Unskew.
-    t:float = (xi + yi) * float(UNSKEW_2D)
+    t:float = (xi + yi) * UNSKEW_2D
     dx0:float = xi + t
     dy0:float = yi + t
 
     # First vertex.
     a0:float = RSQUARED_2D - dx0 * dx0 - dy0 * dy0
-    value:float = (a0 * a0) * (a0 * a0) * grad(seed, xsbp, ysbp, dx0, dy0)
+    value:float =  a0 * a0 * a0 * a0 * grad(seed, xsbp, ysbp, dx0, dy0)
 
     # Second vertex.
-    a1:float = float(2 * (1 + 2 * UNSKEW_2D) * (1 / UNSKEW_2D + 2)) * t + (float(-2 * (1 + 2 * UNSKEW_2D) * (1 + 2 * UNSKEW_2D)) + a0)
-    dx1:float = dx0 - float(1 + 2 * UNSKEW_2D)
-    dy1:float = dy0 - float(1 + 2 * UNSKEW_2D)
-    value += (a1 * a1) * (a1 * a1) * grad(seed, xsbp + PRIME_X, ysbp + PRIME_Y, dx1, dy1)
+    #a1:float = (2 * (1 + 2 * UNSKEW_2D) * (1 / UNSKEW_2D + 2)) * t + ((-2 * (1 + 2 * UNSKEW_2D) * (1 + 2 * UNSKEW_2D)) + a0)
+    a1:float = geta1(t,a0)
+
+    dx1:float = dx0 - TWICE_UNSKEW_ONE
+    dy1:float = dy0 - TWICE_UNSKEW_ONE
+    value += a1 * a1 * a1 * a1 * grad(seed, xsbp + PRIME_X, ysbp + PRIME_Y, dx1, dy1)#
 
     # Third and fourth vertices.
     # Nested conditionals were faster than compact bit logic/arithmetic.
     xmyi:float = xi - yi
     if (t < UNSKEW_2D):
         if (xi + xmyi > 1):
-            dx2:float = dx0 - float(3 * UNSKEW_2D + 2)
-            dy2:float = dy0 - float(3 * UNSKEW_2D + 1)
+            dx2:float = dx0 - (3 * UNSKEW_2D + 2)
+            dy2:float = dy0 - (3 * UNSKEW_2D + 1)
             a2:float = RSQUARED_2D - dx2 * dx2 - dy2 * dy2
             if (a2 > 0):
                 value += (a2 * a2) * (a2 * a2) * grad(seed, xsbp + (PRIME_X << 1), ysbp + PRIME_Y, dx2, dy2)
             
         else:
-            dx2:float = dx0 - float(UNSKEW_2D)
-            dy2:float = dy0 - float(UNSKEW_2D + 1)
+            dx2:float = dx0 - (UNSKEW_2D)
+            dy2:float = dy0 - (UNSKEW_2D + 1)
             a2:float = RSQUARED_2D - dx2 * dx2 - dy2 * dy2
             if (a2 > 0):
                 value += (a2 * a2) * (a2 * a2) * grad(seed, xsbp, ysbp + PRIME_Y, dx2, dy2)
             
-        if (yi - xmyi > 1):
-            dx3:float = dx0 - float(3 * UNSKEW_2D + 1)
-            dy3:float = dy0 - float(3 * UNSKEW_2D + 2)
+        if (yi > 1 + xmyi):
+            dx3:float = dx0 - (3 * UNSKEW_2D + 1)
+            dy3:float = dy0 - (3 * UNSKEW_2D + 2)
             a3:float = RSQUARED_2D - dx3 * dx3 - dy3 * dy3
             if (a3 > 0):
                 value += (a3 * a3) * (a3 * a3) * grad(seed, xsbp + PRIME_X, ysbp + (PRIME_Y << 1), dx3, dy3)
-            
-        
+       
         else:
-            dx3:float = dx0 - float(UNSKEW_2D + 1)
-            dy3:float = dy0 - float(UNSKEW_2D)
+            dx3:float = dx0 - (UNSKEW_2D + 1)
+            dy3:float = dy0 - (UNSKEW_2D)
             a3:float = RSQUARED_2D - dx3 * dx3 - dy3 * dy3
             if (a3 > 0):
                 value += (a3 * a3) * (a3 * a3) * grad(seed, xsbp + PRIME_X, ysbp, dx3, dy3)
             
-        
-    
     else:
         if (xi + xmyi < 0):
-            dx2:float = dx0 + float(1 + UNSKEW_2D)
-            dy2:float = dy0 + float(UNSKEW_2D)
+            dx2:float = dx0 + (1 + UNSKEW_2D)
+            dy2:float = dy0 + (UNSKEW_2D)
             a2:float = RSQUARED_2D - dx2 * dx2 - dy2 * dy2
             if (a2 > 0):
                 value += (a2 * a2) * (a2 * a2) * grad(seed, xsbp - PRIME_X, ysbp, dx2, dy2)
-            
-        
+          
         else:
-            dx2:float = dx0 - float(UNSKEW_2D + 1)
-            dy2:float = dy0 - float(UNSKEW_2D)
+            dx2:float = dx0 - (UNSKEW_2D + 1)
+            dy2:float = dy0 - (UNSKEW_2D)
             a2:float = RSQUARED_2D - dx2 * dx2 - dy2 * dy2
             if (a2 > 0):
                 value += (a2 * a2) * (a2 * a2) * grad(seed, xsbp + PRIME_X, ysbp, dx2, dy2)
             
         
-
         if (yi < xmyi):
-            dx2:float = dx0 + float(UNSKEW_2D)
-            dy2:float = dy0 + float(UNSKEW_2D + 1)
+            dx2:float = dx0 + (UNSKEW_2D)
+            dy2:float = dy0 + (UNSKEW_2D + 1)
             a2:float = RSQUARED_2D - dx2 * dx2 - dy2 * dy2
             if (a2 > 0):
                 value += (a2 * a2) * (a2 * a2) * grad(seed, xsbp, ysbp - PRIME_Y, dx2, dy2)
             
         else:
-            dx2:float = dx0 - float(UNSKEW_2D)
-            dy2:float = dy0 - float(UNSKEW_2D + 1)
+            dx2:float = dx0 - (UNSKEW_2D)
+            dy2:float = dy0 - (UNSKEW_2D + 1)
             a2:float = RSQUARED_2D - dx2 * dx2 - dy2 * dy2
             if (a2 > 0):
                 value += (a2 * a2) * (a2 * a2) * grad(seed, xsbp, ysbp + PRIME_Y, dx2, dy2)
-            
-        
-    
-
     return value
-
-
 
 
 
 '''
     * Utility
 '''
-
-'''def correct(value, bits, signed) -> int:
-    base = 1 << bits
-    value %= base
-    return value - base if signed and value.bit_length() == bits else value
-
-
-ubyte, sbyte, uinteger,  ulong = (
-    lambda v: correct(v, 8, False), lambda v: correct(v, 8, True),
-    lambda v: correct(v, 32, False), 
-    lambda v: correct(v, 64, False)
-)'''
 def slong(value:int) -> int:
-    base = 18446744073709551616 # 1<<64
-    value %= base
+    #18446744073709551616 # 1<<64
+    value %= 18446744073709551616
     #return value - base if value.bit_length() == 64 else value
-    return value - base if value >= 9223372036854775808 else value
+    return value - 18446744073709551616 if value >= 9223372036854775808 else value
  
-@njit
+@njit(cache=True,inline = 'always')
 def sinteger(value:int):
-    base = 4294967296
-    value %= base
-    #value &= base-1
-    return value - base if value >=2147483648 else value
-sinteger(139)
+    #base = 4294967296
+    value %= 4294967296
+    return value - 4294967296 if value >=2147483648 else value
 
-def grad( seed,  xsvp,  ysvp,  dx:float,  dy:float) -> float:
-    hash = slong((seed ^ xsvp ^ ysvp) * HASH_MULTIPLIER)
-    hash ^= hash >> 58
-    gi:int = sinteger(hash) & 0b11111110
-    return GRADIENTS_2D[gi | 0] * dx + GRADIENTS_2D[gi | 1] * dy
+@njit(cache = True)
+def custom_int(value:int) -> int:
+    return sinteger(value ^ (value >> 58)) & 0b11111110
 
-H = 0b11111110
+def grad(seed:int,  xsvp:int,  ysvp:int,  dx:float,  dy:float) -> float:
+    global GRADIENTS_2D,HASH_MULTIPLIER
+    gi:int = custom_int(slong((seed ^ xsvp ^ ysvp) * HASH_MULTIPLIER))
+    return GRADIENTS_2D[gi] * dx + GRADIENTS_2D[gi | 1] * dy
+
+@njit(cache = True)
+def geta1(t,a0) -> float:
+    return (2 * (1 + 2 * UNSKEW_2D) * (1 / UNSKEW_2D + 2)) * t + ((-2 * (1 + 2 * UNSKEW_2D) * (1 + 2 * UNSKEW_2D)) + a0)
+
+    
+
+
 
 '''
     * Lookup Tables & Gradients
 '''
 
-GRADIENTS_2D:list[float] = [None] * 128 * 2
+GRADIENTS_2D:list[float] = [None] * N_GRADS_2D * 2
 grad2 = [
         0.38268343236509,   0.923879532511287,
         0.923879532511287,  0.38268343236509,
@@ -228,16 +237,18 @@ grad2 = [
         -0.130526192220052,  0.99144486137381,
 ]
 for i in range(len(grad2)):
-    grad2[i] = float(grad2[i] / NORMALIZER_2D)
+    grad2[i] = grad2[i] / NORMALIZER_2D
+del i
 
 j = 0
 for i in range(len(GRADIENTS_2D)):
     if (j == len(grad2)): j = 0
     GRADIENTS_2D[i] = grad2[j]
     j+=1
+del j,i
     
 def list_is_close_to(list1,list2):
-    return max([abs(a-b) for a,b in zip(list1,list2)]) < .000001    
+    return max([abs(a-b) for a,b in zip(list1,list2)]) < .0000001    
 
 def run_tests():
     from time import perf_counter
@@ -262,20 +273,20 @@ def run_tests():
         else:
             print(f'Test1 failed with seed: {seed}')
             failed = True
-        test2 = [noise2(seed,x/3,y/3) for x in range(1,50,15) for y in range(1,50,15) ]
+        test2 = [noise2_s(seed,x/3,y/3) for x in range(1,50,15) for y in range(1,50,15) ]
         if list_is_close_to(test2_answers[seed], test2):
             print('Test Passed')
         else:
             print(f'Test2 failed with seed: {seed}') 
             failed = True  
     if failed:
-        print(f'Test Failed in {perf_counter() - start} seconds')
+        print(f'Tests Failed in {perf_counter() - start} seconds')
     else:
-        print(f'Test Passed in {perf_counter() - start} seconds')
-    print("Starting Stress Test")
-    start = perf_counter()
+        print(f'Tests Passed in {perf_counter() - start} seconds')
+    print("Starting Stress Test. Rating Goal: 500")
     cycles = 1_000
-    [noise2(123,x,y)for x in range(cycles) for y in range(cycles)]
+    start = perf_counter()
+    [noise2(x,y) for x in range(cycles) for y in range(cycles)]
     time = perf_counter()-start
     cycles_per_second = cycles*cycles / time
     print("Rating:",cycles_per_second.__trunc__()/1000)
@@ -284,8 +295,7 @@ def run_tests():
     else:
         print(f'Stress Test Failed in {time} seconds')
 
-from array import array
-import debug
+'''
 class LayeredNoiseMap:
     def __init__(self,noise_scales,noise_strengths):
         assert len(noise_scales) == len(noise_strengths), "all arguments must be of the same length"
@@ -299,14 +309,14 @@ class LayeredNoiseMap:
     def getAt(self,x,y):
         data = 0
         for scale,strength in zip(self.noise_scales,self.noise_strengths):
-            data += Perlin.noise2(x*scale,y*scale) * strength
+            data += noise2(x*scale,y*scale) * strength
         data /= self.noise_normalizer
         return data
     
     def getArr(self,xs:numpy.ndarray,ys:numpy.ndarray):
         data = numpy.zeros(shape=(ys.size,xs.size))
         for scale,strength in zip(self.noise_scales,self.noise_strengths):
-            data += Perlin.noise2_array(xs*scale,ys*scale) * strength
+            data += noise2_array(xs*scale,ys*scale) * strength
         data /= self.noise_normalizer
         return data
     
@@ -316,46 +326,11 @@ class LayeredNoiseMap:
         yshift = 2.718
         data = numpy.zeros(shape=(ys.size,xs.size),dtype = numpy.float32)
         for scale,strength,i in zip(self.noise_scales,self.noise_strengths,self.noise_counts):
-            data += Perlin.noise2_array((xs+xshift*i)*scale,(ys+yshift*i)*scale) * strength
+            data += noise2_array((xs+xshift*i)*scale,(ys+yshift*i)*scale) * strength
         data /= self.noise_normalizer
         return data
-
-from math import floor,dist, hypot,prod
-from perlin import manhattan_dist
-from Worley import WorleyNoise
+'''
 
 
-def unit_smoothstep(i:numpy.ndarray):
-    return i * (-i*i+3) / 2
-def rescale(i:numpy.ndarray):
-    return (i + 1) / 2
 if __name__ == '__main__':
-    import Perlin,numpy
-    from debug import profile
-    
-    noisemap = WorleyNoise(3,1)
-    
-    xs = numpy.arange(500,dtype = numpy.double)/100-2.5
-    ys = numpy.arange(500,dtype = numpy.double)/100-2.5
-    import pygame
-    from pygame import surfarray
-    screen = pygame.display.set_mode((500,500))
-    from perlin import noise2a,smoothstep
-    import numpy as np
-    noise = noisemap.getArrShifted(xs,ys)
-
-
-    arr:numpy.ndarray = ((noise))   
-
-    
-    d1 = pygame.Surface((500,500))
-    surfarray.blit_array(d1,rescale(unit_smoothstep(arr))*255)
-
-    screen.blit(d1,(0,0))
-    pygame.display.flip()
-    while True:
-        pygame.event.pump()
-    
-
-    #run_tests()
-    
+    run_tests()

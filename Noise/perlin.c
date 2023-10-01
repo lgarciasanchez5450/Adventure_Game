@@ -394,7 +394,6 @@ static PyMethodDef functions[] = {
     {"set_seed", (PyCFunction) PySetSeed, METH_O, "Set the seed value for opensimplex noise"},
     {"noise2_array", (PyCFunction) PyCreateNoiseArray, METH_VARARGS, "Create a 2d ndarray filled with noise"},
     {"npsum",(PyCFunction) PyCreateNumpyArray,METH_VARARGS,"np.sum"},
-    {"init", (PyCFunction) init, METH_NOARGS, "initiate the module"},
 
     {NULL,NULL,0,NULL}  /* Sentinel */
 };

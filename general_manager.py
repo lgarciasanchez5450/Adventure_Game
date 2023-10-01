@@ -1,11 +1,11 @@
 from Constants import *
 from typing import final, Generator
 from pygame import Surface,draw
+import debug
 from UI import Vector2
 from game_math import *
 from game_math import Vector2
-from perlin2 import LayeredNoiseMap,rescale,unit_smoothstep
-from Worley import WorleyNoise
+from Noise import WorleyNoise,LayeredNoiseMap, rescale, unit_smoothstep
 import Textures
 if __name__ == '__main__':
     import pygame
@@ -90,7 +90,7 @@ class DurabilityStats:
 
 
 class Item:
-    __slots__ = 'tag', 'name',  'count', 'durability_stats', 'armour_stats', 'damage', 'mining_speed', 'fps', 'animation','frames'
+    __slots__ = 'tag', 'name',  'count', 'durability_stats', 'armour_stats', 'damage', 'mining_speed', 'fps', 'animation','frames','inventory'
     def __init__(self,tag:str):
         self.tag = tag #all the same types of items should have the same tag
         self.name = tag # display name should start as default tag
@@ -104,7 +104,6 @@ class Item:
 
         #self.path = f'{Textures.PATH()}Images\\items\\{name}'
         self.animation = Animation.SimpleAnimation(Camera.CSurface(self.frames[0],Vector2.zero,(0,0)),self.fps,self.frames)
-
 
     @property
     def max_stack_count(self):
@@ -129,7 +128,7 @@ class Item:
         return self.tag is other.tag and self.name == other.name
     
     def canStack(self,other) -> bool:
-        return self.stackCompatible(other) and (self.count +other.count >= self.max_stack_count)
+        return self.stackCompatible(other)
 
     def __repr__(self) -> str:
         return self.__class__.__name__ + ": " + self.tag +": " + self.name
@@ -145,9 +144,11 @@ class BunnyEgg(Item):
         self.species =  'bunny'
     
     def startUse(self) -> None:
+        self.count -= 1
         spawn_entity(Bunny(Camera.world_position_from_normalized(Input.m_pos_normalized)))
 
-     
+class Bow(Item):
+    print('TODO MAKE BOW CLASS')
 
 #### BLOCKS ####
 class Block:
@@ -248,12 +249,6 @@ class WoodenPlank(Block):
         super().__init__(pos,'woodenplank')
         self.surf = Textures.texture['15.png']
         self.csurface.surf = self.surf
-
-
-class BunnySpawn(Block):
-    def __init__(self,pos:Vector2):
-        spawn_entity(Bunny(pos))
-        self.onDeath()
 
 
 #### ENTITIES ####
@@ -458,7 +453,7 @@ class AliveEntity(Entity):
 
     def update(self):
         if self.dead: return
-        if self.time_til_vulnerable == -float('inf'):
+        if self.time_til_vulnerable == NEGATIVE_INFINITY:
             self.time_til_vulnerable = self.invulnerability_time
         self.time_to_attack -= Time.deltaTime
         self.time_til_vulnerable -= Time.deltaTime
@@ -502,7 +497,7 @@ class AliveEntity(Entity):
             print('taking damage',damage,'now health is',self.health)
             if self.health <= 0:
                 self.onDeath()
-            self.time_til_vulnerable = -float('inf')
+            self.time_til_vulnerable = NEGATIVE_INFINITY
     
     def get_energy_multiplier(self) -> float:
         return (self.energy/self.stats['energy'] + 1)/2
@@ -670,17 +665,17 @@ class Player(AliveEntity):
         if 'e' in Input.KDQueue:
             self.showingInventory = not self.showingInventory  
             if self.showingInventory:
-                self.vel.reset()
+                #self.vel.reset() # I dont know what this is for but i m   
                 showingUIs.append(self.ui) 
             else:
                 showingUIs.append(Null) 
                 item  = self.ui.in_hand
                 if item is not None:
                     item:Item
-                    #item.to_entity(self.pos,Input.m_pos_normalized)
                     spawn_item(item,self.pos,Input.m_pos_normalized)
                 self.ui.in_hand = None
         if self.showingInventory:return
+
         if 'r' in Input.KDQueue:
             #print('position is ',self.pos)
             place_block(TNT(Camera.world_position_from_normalized(Input.m_pos_normalized).floored()))
@@ -707,6 +702,9 @@ class Player(AliveEntity):
             self.animation.direction = 'left'
         self.hbui.update()
         if self.hbui.has_mouse: return
+
+        #item usage
+
         if Input.m_1 and self.animation.state != 'attack':
             #use_item(self.inventory.)
             pass
@@ -715,14 +713,9 @@ class Player(AliveEntity):
             item = self.hotbar.get_selected()
             print('attacked with item',item)
         if Input.m_d3:
-            item = self.hotbar.get_selected()
-            if item is not None:
-                item.startUse()
-        if Input.m_u3:
-            item = self.hotbar.get_selected()
-            if item is not None:
-                item.stopUse()
-
+            self.hotbar.start_use_selected()
+        elif Input.m_u3:
+            self.hotbar.stop_use_selected()
 
     def move(self):
         super().update()
@@ -1015,13 +1008,12 @@ class Bunny(AliveEntity):
         
 
     def onLoad(self):
-        print('Loading bunny')
-
         self.time_to_introspection = 0
         return super().onLoad()
 
 #### UI ####
 class InventoryUI(UI):
+    font = pygame.font.SysFont("Arial",ITEM_COUNTER_SIZE)   
     def __init__(self,entity:AliveEntity, surface_size:tuple|list = (WIDTH, HEIGHT)):
         screen_size = (surface_size[0]/WIDTH,surface_size[1]/HEIGHT)
         super().__init__(surface_size, (0,0), screen_size)
@@ -1101,7 +1093,12 @@ class InventoryUI(UI):
             for slot in self.hb_slots:
                 slot.draw(self.surface)
         if self.in_hand is not None:
-            self.surface.blit(self.in_hand.animation.surf,(self.rel_mouse_pos.x-ITEM_SIZE//2,self.rel_mouse_pos.y-ITEM_SIZE//2))
+            in_hand_pos = (self.rel_mouse_pos.x-ITEM_SIZE//2,self.rel_mouse_pos.y-ITEM_SIZE//2)
+            self.surface.blit(self.in_hand.animation.surf,in_hand_pos)
+            if self.in_hand.count > 1:
+                item_count = self.font.render(str(self.in_hand.count),False,'white')
+                self.surface.blit(item_count,(in_hand_pos[0] + ITEM_SIZE-item_count.get_width(),in_hand_pos[1] + ITEM_SIZE-item_count.get_height()))
+
         entity = pygame.transform.scale_by(self.entity.image.surf,2)
         draw.rect(self.surface,(70,70,70),entity.get_rect().move(self.screen_center.x-100,10))
         self.surface.blit(entity,(self.screen_center.x-100,10))
@@ -1178,7 +1175,7 @@ entities_by_species:dict[str,Entity] = {
 active_chunks = [] 
 '''stores the x and y values of the loaded chunks'''
 
-_DEBUG_ = True
+_DEBUG_ = False
 
 def noise_to_ground(n):
   if n > 1 or n < 0: 
@@ -1368,8 +1365,8 @@ def _create(chunk:Chunk):
             #surf.blit(myfont.render(str((x+chunk.chunk_pos[0]*CHUNK_SIZE,y+chunk.chunk_pos[1]*CHUNK_SIZE)),True,'black'),(x*BLOCK_SIZE,y*BLOCK_SIZE))
     #yield
     
-
-    draw.lines(chunk.surf,(255,0,0),1,((0,0),(CHUNK_SIZE*BLOCK_SIZE,0),(CHUNK_SIZE*BLOCK_SIZE,CHUNK_SIZE*BLOCK_SIZE),(0,CHUNK_SIZE*BLOCK_SIZE)),3)    
+    if _DEBUG_:
+        draw.lines(chunk.surf,(255,0,0),1,((0,0),(CHUNK_SIZE*BLOCK_SIZE,0),(CHUNK_SIZE*BLOCK_SIZE,CHUNK_SIZE*BLOCK_SIZE),(0,CHUNK_SIZE*BLOCK_SIZE)),3)    
     #to make trees we check the 8 immediately surrounding chunks if they exist and add them to a list
     cx ,cy = chunk.chunk_pos
     surrounding_chunks = [(cx-1,cy-1),(cx,cy-1),(cx+1,cy-1),(cx-1,cy),(cx+1,cy),(cx-1,cy+1),(cx,cy+1),(cx+1,cy+1)]
@@ -1544,6 +1541,12 @@ def update_entities():
         chunk = entity_chunks.get(chunk_pos,[])
         for entity in chunk:
             entity.update()
+def active_entity_count():
+    count = 0
+    for chunk_pos in active_chunks:
+        count += len(entity_chunks.get(chunk_pos,[]))
+    return count
+        
 
 def collide_entities(collider:Collider):
     checked = set()

@@ -1,4 +1,5 @@
 '''All Items Tags''' #this is the tag that will pop up in-game
+ITEM_COUNTER_SIZE = 13
 ITAG_WOODEN_SWORD = 'Wooden Sword'
 ITAG_HAT= 'hat'
 ITAG_DIRT = 'Dirt'

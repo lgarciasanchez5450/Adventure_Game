@@ -1,4 +1,6 @@
 from Constants import * 
+from Settings import STACK_COUNT_BY_TAG
+from typing import Callable
 _DEBUG_ = True
 
 from game_math import Array,UnInstantiable
@@ -6,12 +8,15 @@ class ArmourStats:
     type:str
 class Item(UnInstantiable):
     count:int
-    max_stack_count:int
+    tag:str
     armour_stats:ArmourStats
     durability_stats:object
+    @property
+    def max_stack_count(self) -> int:...
     def canStack(self,other) -> bool: ...
     def split(self): ...
     def startUse(self): ...
+    def stackCompatible(self,other) -> bool: ...
     def stopUse(self): ...
     
 
@@ -22,7 +27,6 @@ class Inventory:
         self.inventory:Array[Item] = Array.new(spaces)
         self.full = False
         self._any_empty = True
-
 
     @property
     def added_def(self):
@@ -43,7 +47,6 @@ class Inventory:
     @property
     def added_maxhp(self):
         return 0
-    
     
     def any_empty(self) -> bool:
         if self._any_empty is not None: return self._any_empty
@@ -96,7 +99,7 @@ class Inventory:
         if item is None:
             return self.inventory.take(index)
 
-        if type(item) is type(i_item):
+        if  item.canStack(i_item):
             if i_item.count + item.count <= i_item.max_stack_count:
                 i_item.count += item.count
                 i_item.count = 0
@@ -186,7 +189,6 @@ class HotbarInventory(Inventory):
     
     def start_use_selected(self) -> None:
         item:Item = self.inventory[self.selected]
-        assert isinstance(item,(Item,None))
         if item is None: return
         item.startUse();  
         if item.count == 0:
@@ -194,18 +196,109 @@ class HotbarInventory(Inventory):
 
     def stop_use_selected(self):
         item:Item = self.inventory[self.selected]
-        assert isinstance(item,(Item,None)) 
         if item is None: return
         item.stopUse()
         if item.count == 0:
             self.inventory[self.selected] = None
-
+    
+    def setSelected(self,newSelected:int) -> None:
+        self.stop_use_selected()
+        self.selected = newSelected
 
     
     def pop_selected(self) -> Item|None:
         return self.inventory.take(self.selected)
     
+class InventoryUnion:
+    def __init__(self,*inventories:Inventory) -> None:
 
+        self.inventories = inventories
+        self.inventories = {
+            #0:inv1,
+            #10:inv2,
+            #30:inv3
+        }
+        self._index = 0
+        for inv in inventories:
+            self.inventories[self._index] = inv
+            self._index += inv.spaces
+    
+    def addInventory(self,inventory:Inventory):
+        if inventory.spaces < 1: raise ValueError("Inventory must have at least one space")
+        self.inventories[self._index] = inventory
+        self._index += inventory.spaces
+
+    def setItem(self,index):...
+
+class UniversalInventory:
+    def __init__(self,spaces:int):
+        self.spaces = spaces
+        self.inventory:Array[Item] = Array.new(spaces)
+        self.full = False
+        self._any_empty = True
+        self.slot_restrictions:dict[int,Callable[[Item],bool]] = {} #will store slot indexes that have restrictions via a function that will accept the item and return True only if it fits
+
+    def setItem(self,item:Item|None,index:int):
+        '''
+        The implementation should prioritize combining the items, if that doesn't work it will swap them
+        Should return item that is left over
+        '''
+        #check if new item passes slot restrictions
+        if index in self.slot_restrictions:
+            if not self.slot_restrictions[index](item):
+                #test failed, return early
+                return item
+        # the test is passed
+        if item is None: #we can just skip to swapping immediately
+            return self.inventory.swap(index,item)
+        
+        if item.stackCompatible(self.inventory[index]): #if the objects can be combined
+            # here i_item is guaranteed to not be None 
+            i_item = self.inventory[index]
+            if i_item.count == i_item.max_stack_count:
+                return item
+            to_transfer = min(i_item.max_stack_count - i_item.count,item.count) # we take the smaller value of how much the i_item needs to be full and how much item can give
+            item.count -= to_transfer
+            i_item.count += to_transfer
+            if item.count == 0:
+                return None
+            else: 
+                return item
+        # in all cases where the items arent compatible or if they are the but something went wrong
+        return self.inventory.swap(index,item)
+
+    def _addItem(self,item:Item,index:int) -> Item|None:
+        '''Does not check if item & i_item are compatible, this should be done beforehand 
+        returns item left over or none'''
+        i_item = self.inventory[index]
+        if i_item.count == i_item.max_stack_count:
+            return item
+        
+        to_transfer = min(i_item.max_stack_count - i_item.count,item.count) # we take the smaller value of how much the i_item needs to be full and how much item can give
+        item.count -= to_transfer
+        i_item.count += to_transfer
+        if item.count == 0:
+            return None
+        else: 
+            return item
+    
+    def fitItem(self,item:Item) -> Item|None:
+        first_empty = None
+        for index, inventory_item in enumerate(self.inventory):
+            if first_empty is None and inventory_item is None:
+                first_empty = index
+            elif item.stackCompatible(inventory_item):
+                item = self._addItem(item,index)
+                if item is None:
+                    return None
+        if first_empty is not None:
+            #if it has reached here then there is no previously existing item of the same type but there is an empty slot   
+            self.inventory[first_empty] = item
+            return None
+        return None
+
+        
+        
 if __name__ == '__main__':
     inv1 = Inventory(10)
     

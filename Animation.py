@@ -80,3 +80,6 @@ class SimpleAnimation:
 if __name__ == '__main__':
     from pympler.asizeof import asizeof
     print(asizeof(SimpleAnimation(Camera.NullCSurface,10,[])))
+    t = Animation(Camera.NullCSurface)
+    t.add_state('left',10,[],[])
+    print(asizeof(t))

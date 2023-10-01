@@ -1,4 +1,5 @@
 from Constants import *
+
 from Inventory import Inventory
 from game_math import *
 from Camera import CSurface
@@ -16,7 +17,7 @@ class ItemSlot:
     UP = 0
     HOVER = 1
     PRESSED = 2
-    font = font.SysFont("Arial",7)   
+    font = font.SysFont("Arial",ITEM_COUNTER_SIZE)   
     def __init__(self,pos:tuple|list,index:int,inventory:Inventory):
         self.index = index
         self.inventory = inventory
@@ -49,7 +50,7 @@ class ItemSlot:
         self.surface.fill(self.hover_color if self.state == self.HOVER else self.bg_color)
         if item is not None:
             self.surface.blit(item.animation.surf,(0,0))
-            if item.count >1:
+            if item.count > 1:
                 item_count = self.font.render(str(item.count),False,'white')
 
                 self.surface.blit(item_count,(ITEM_SIZE-item_count.get_width(),ITEM_SIZE-item_count.get_height()))

@@ -6,7 +6,8 @@ def imports():
 
 import gc 
 gc.disable()
-from Constants import *
+from Constants.Display import *
+from Constants.Misc import *
 import pygame
 
 
@@ -59,6 +60,8 @@ print(Game_Time.game_time())
 Camera.program['tex'] = 0 # can be set outside of the game loop
 t = gc.collect()
 print(t)
+del t
+
 while True:
     if Settings.game_state is RUNNING:
         #update each module in order
@@ -85,6 +88,7 @@ while True:
         Particles.anim_draw()
         Camera.draw_collider_queue()
         Camera.draw_UI()
+        debug.debug(general_manager.active_entity_count(),(200,200))
         debug.debug(Time.get_frameRateInt())
         Camera.program['light'] = Game_Time.light
 

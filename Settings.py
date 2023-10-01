@@ -93,7 +93,7 @@ STACK_COUNT_BY_TAG = {
 }
 
 #Variables that can change
-RenderDistance = 3
+RenderDistance = 6
  
 GenerationDistance = 10 # Should be larger than RenderDistance
 

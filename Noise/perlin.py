@@ -1,7 +1,8 @@
 from math import floor
 import numpy as np
 from ctypes import c_int64,c_uint32
-import rng
+from math import sqrt, atan2,sin, tanh,exp
+
 try:
   from numba import njit,prange,vectorize,guvectorize
 except:
@@ -186,11 +187,10 @@ def set_seed(seed):
   global SEED,perm
   SEED = seed
   perm = _init(seed)
-from debug import profile
-@profile
+
 def noise2a(xs,ys,scale):  #noise 2 array
     return _noise2a(xs * scale,ys * scale,perm)
-@profile
+
 def noise2al(xs,ys,frequencies = 1,scale = 1): #noise 2 array layered
     return _noise2al(xs,ys,frequencies,scale,perm)
 
@@ -255,7 +255,6 @@ def _noise2al(xs,ys,octaves,scale,perm): # TODO : make this run in parallel usin
 
 
 
-from math import sqrt, atan2,sin, tanh,exp
 
 @njit(cache = True)
 def is_far(x,y,d):
