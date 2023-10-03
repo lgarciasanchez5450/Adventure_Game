@@ -71,7 +71,6 @@ ARMOUR_SLOTS_BY_SPECIES = {
     'human': ['headwear','chestwear','legwear','footwear'],
     'spirit':[],
     'bunny':['headwear'],
-
 }
 
 VISION_BY_SPECIES = {

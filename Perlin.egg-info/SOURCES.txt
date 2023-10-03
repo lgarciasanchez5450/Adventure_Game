@@ -1,8 +1,0 @@
-LICENSE
-README.md
-perlin.c
-perlin_modulebuilder.py
-Perlin.egg-info/PKG-INFO
-Perlin.egg-info/SOURCES.txt
-Perlin.egg-info/dependency_links.txt
-Perlin.egg-info/top_level.txt

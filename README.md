@@ -1,7 +1,7 @@
 # Adventure_Game
 A very ambitious adventure game
 Pip dependencies:
-    - Pygame (c.e. is preferable)
+    - Pygame (ce is preferable)
     - moderngl
     - numba
     - psutils

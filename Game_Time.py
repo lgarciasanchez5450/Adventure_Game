@@ -1,10 +1,15 @@
 #for date time
 from time import time,perf_counter
 from math import sin,pi,sqrt
-from perlin import noise1
-from numba import njit
+from Noise import noise1
+try:
+    from numba import njit
+except:
+    def njit(*args,**kwargs):
+        def wrapper(func):
+            return func
+        return wrapper
 from Constants import WIDTH,HEIGHT
-import pygame
 three_pi_two = 3 * pi / 2
 @njit(cache=True)
 def full_range_sqrt(x:float) -> float:
@@ -14,7 +19,7 @@ def full_range_sqrt(x:float) -> float:
         return sqrt(x)
 @njit(cache = True)
 def _get_daylight(day_passed):
-    d = sin(2*pi*day_passed+three_pi_two - .2)
+    d = sin(2*pi*day_passed+(3*pi/2) - .2)
     d = (full_range_sqrt(d))+1
     d /= 2
     if d < 0:
@@ -22,7 +27,6 @@ def _get_daylight(day_passed):
     if d > 1:
         d = 1
     return d
-_get_daylight(0.1)
 
 light = 1.0
 
@@ -162,18 +166,3 @@ def game_time() -> tuple:
     return (year,month,day,hour,minute,second,meridian_designation)
 
 
-
-
-'''
-def raw_time():
-    global _time
-    _time = get_time()
-    return (_time - _start_time) * time_speed
-
-
-
-def date() -> tuple:
-    return (month(),day(),year())
-def daytime() -> tuple:
-    return (hour(),minute(),second())
-'''

@@ -3,12 +3,14 @@ from os.path import dirname,realpath
 from pygame.image import load
 from pygame.transform import scale,flip,rotate
 from pygame import Surface
+from Constants.Items import *
 
 
 def PATH():
   return dirname(realpath(__file__)) + '\\'
 
 texture:dict[str,Surface] = {}
+item_textures:dict[str,Surface] = {}
 def scale_image(surface,newSize):
 	return scale(surface,newSize)
 accepted_image_extentions = {'png','jpg','jpeg','bmp'}
@@ -21,6 +23,22 @@ def is_image(path):
 	
 def load_image(path:str):
 	return load(PATH()+path)
+
+def load_item_anim(tag,alpha=True):
+	# the directory path should be as follows:
+	# C:\\ ... Adventure_Game\\Images\\items\\<tag>\\
+	path = f'{PATH()}Images\\Items\\{tag}'
+	item_images = []
+	for root,_dirs,files in walk(path):
+		for image in files:
+			image_path = root + '\\' + image
+			print(image_path)
+			surf = load(image_path)
+			surf = surf.convert_alpha() if alpha else surf.convert()
+			item_images.append(surf)
+	return item_images
+
+
 
 def import_folder(path,alpha=True,size:None|tuple = None,return_flipped_too:bool = False):
 	surface_list = []
@@ -63,6 +81,8 @@ def init():
 	s = Surface((PARTICLE_SIZE,PARTICLE_SIZE))
 	s.fill('grey')
 	texture['grey.png'] = s
+	load_item_anim(ITAG_BOW)
+	load_item_anim(ITAG_ARROW)
 
 	del s
 
@@ -72,5 +92,6 @@ if __name__ == "__main__":
 	import pygame
 	pygame.init()
 	pygame.display.set_mode((1,1),pygame.NOFRAME)
+	print(len(load_item_anim('bow')) == 0)
 	init()
 	print('All Tests Passed')

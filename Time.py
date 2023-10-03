@@ -1,7 +1,7 @@
 from pygame.time import Clock
 from time import perf_counter as _getTime # can switch to normal time 
 import time as _time
-from Constants import *
+from Constants import FPS
 class Stopwatch:
   def __init__(self,function = _time.time):
     self.startTime = None
@@ -88,14 +88,15 @@ def init():
 def update():
     global frameCount,deltaTime,time,fixedDeltaTime,fixedTime,_prev_time,_start_time,_clock
     frameCount += 1
-    if FPS: # may or may not be faster than checking for truthy value of <FPS>
+    if FPS: 
       _clock.tick(FPS) #can be changed to .tick_busy_loop for MUCH more accurate timing 
     #update dynamic time
     current_time = _getTime()
     deltaTime = current_time - _prev_time
     time = current_time - _start_time
     _prev_time = current_time
-
-
     #update fixed time
     fixedTime += fixedDeltaTime
+
+if __name__ == '__main__':
+  print(locals())

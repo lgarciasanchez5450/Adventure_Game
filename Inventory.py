@@ -15,9 +15,9 @@ class Item(UnInstantiable):
     def max_stack_count(self) -> int:...
     def canStack(self,other) -> bool: ...
     def split(self): ...
-    def startUse(self): ...
+    def startUse(self,inventory:object): ...
     def stackCompatible(self,other) -> bool: ...
-    def stopUse(self): ...
+    def stopUse(self,inventory:object): ...
     
 
 
@@ -190,14 +190,14 @@ class HotbarInventory(Inventory):
     def start_use_selected(self) -> None:
         item:Item = self.inventory[self.selected]
         if item is None: return
-        item.startUse();  
+        item.startUse(self);  
         if item.count == 0:
             self.inventory[self.selected] = None
 
     def stop_use_selected(self):
         item:Item = self.inventory[self.selected]
         if item is None: return
-        item.stopUse()
+        item.stopUse(self)
         if item.count == 0:
             self.inventory[self.selected] = None
     
@@ -231,12 +231,14 @@ class InventoryUnion:
     def setItem(self,index):...
 
 class UniversalInventory:
-    def __init__(self,spaces:int):
+    def __init__(self,spaces:int,entity:object):
         self.spaces = spaces
         self.inventory:Array[Item] = Array.new(spaces)
         self.full = False
-        self._any_empty = True
+        self.entity = entity
+        self.selected:int = -1
         self.slot_restrictions:dict[int,Callable[[Item],bool]] = {} #will store slot indexes that have restrictions via a function that will accept the item and return True only if it fits
+
 
     def setItem(self,item:Item|None,index:int):
         '''
@@ -281,23 +283,58 @@ class UniversalInventory:
             return None
         else: 
             return item
-    
+
+    def checkItem(self,index):
+        '''
+           *Run checks on item to make sure that it is valid
+           *Runs slot restriction, Checks item count and removes it accordingly'''
+        if self.inventory[index].count <= 0:
+            return self.inventory.remove(index)
+        if index in self.slot_restrictions:
+            if not self.slot_restrictions[index](self.inventory[index]):
+                return self.inventory.remove(index)
+
     def fitItem(self,item:Item) -> Item|None:
-        first_empty = None
+        empty_slots = []
         for index, inventory_item in enumerate(self.inventory):
-            if first_empty is None and inventory_item is None:
-                first_empty = index
+            if inventory_item is None:
+                empty_slots.append(index)
             elif item.stackCompatible(inventory_item):
                 item = self._addItem(item,index)
                 if item is None:
                     return None
-        if first_empty is not None:
-            #if it has reached here then there is no previously existing item of the same type but there is an empty slot   
-            self.inventory[first_empty] = item
-            return None
+        del index, inventory_item
+        #if it has reached here then there is no previously existing item of the same type but there are empty slots
+        for slot in empty_slots:
+            if slot in self.slot_restrictions:
+                if self.slot_restrictions[slot](item):
+                    self.inventory[slot] = item
+                    return None
         return None
 
-        
+    def get_selected(self) -> Item|None:
+        return self.inventory[self.selected]
+    
+    def start_use_selected(self) -> None:
+        item:Item = self.inventory[self.selected]
+        if item is None: return
+        item.startUse();  
+        if item.count == 0:
+            self.inventory[self.selected] = None
+
+    def stop_use_selected(self):
+        item:Item = self.inventory[self.selected]
+        if item is None: return
+        item.stopUse()
+        if item.count == 0:
+            self.inventory[self.selected] = None
+    
+    def setSelected(self,newSelected:int) -> None:
+        self.stop_use_selected()
+        self.selected = newSelected
+    
+    def pop_selected(self) -> Item|None:
+        return self.inventory.take(self.selected)     
         
 if __name__ == '__main__':
     inv1 = Inventory(10)

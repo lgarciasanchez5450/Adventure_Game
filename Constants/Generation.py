@@ -8,6 +8,9 @@ MAPWIDTH  = 700
 MAPHEIGHT = 700
 SCALE     = .1
 
+'''Initial Generation Variables'''
+INITIAL_GEN_SIZE = 50 #for both x and y
+
 '''Biomes that exist'''
 PLAINS = 0
 SAVANAH = 1

@@ -14,6 +14,7 @@ NEGATIVE_INFINITY = float('-inf')
 MAIN_MENU = 0
 RUNNING = 1
 SETTINGS = 2
+GENERATING_WORLD = 3
 
 '''Types of Ground'''
 GROUND_DIRT = 1

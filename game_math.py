@@ -1,8 +1,9 @@
 from typing import final
 from numba import njit,prange
-from math import cos, sin,pi,hypot,sqrt,atan2,floor,log2,ceil,acos
+from math import cos, sin,pi,hypot,sqrt,atan2,floor,log2,ceil,acos,tanh
 from random import random,randint
 from collections import deque
+import numpy as np
 import entity_manager
 
 scalar = int|float
@@ -368,45 +369,46 @@ class Has_Collider:
 import typing
 T = typing.TypeVar('T')
 class Array(list,typing.Generic[T]):
-    @staticmethod
-    def none_range(stop:int):
-        a = -1
-        while (a := a + 1) < stop:
-            yield None
-    @classmethod
-    def new(cls,size:int):
-        return cls(cls.none_range(size))
-    
-    def __getitem__(self,index:int) -> T:
-        return super().__getitem__(index)
-    def append(self, __object):
-        return SyntaxError("Array Size cannot be changed")
-    
-    def remove(self, __value):
-        return SyntaxError("Array Size cannot be changed")
-    
-    def insert(self, __index, __object):
-        return SyntaxError("Array Size cannot be changed")
+	@staticmethod
+	def none_range(stop:int):
+		a = -1
+		while (a := a + 1) < stop:
+			yield None
+	@classmethod
+	def new(cls,size:int):
+		return cls(cls.none_range(size))
+	
+	def __getitem__(self,index:int) -> T:
+		return super().__getitem__(index)
+	def append(self, __object):
+		return SyntaxError("Array Size cannot be changed")
+	
+	def insert(self, __index, __object):
+		return SyntaxError("Array Size cannot be changed")
 
-    def clear(self):
-        return SyntaxError("Array Size cannot be changed")
-    
-    def extend(self, __iterable):
-        return SyntaxError("Array Size cannot be changed")
+	def clear(self):
+		return SyntaxError("Array Size cannot be changed")
+	
+	def extend(self, __iterable):
+		return SyntaxError("Array Size cannot be changed")
 
-    def pop(self, __index = -1):
-        return SyntaxError("Array Size cannot be changed")
+	def pop(self, __index = -1):
+		return SyntaxError("Array Size cannot be changed")
 
-    def iadd(self,__object):
-        return SyntaxError("Array Size cannot be changed")
+	def iadd(self,__object):
+		return SyntaxError("Array Size cannot be changed")
 
-    def take(self,__index):
-        item,self[__index] = self[__index],None
-        return item
+	def remove(self,__index):
+		'''Set a certain Index to None'''
+		self[__index] = None
 
-    def swap(self,__index,__object):
-        item,self[__index] = self[__index],__object
-        return item
+	def take(self,__index):
+		item,self[__index] = self[__index],None
+		return item
+
+	def swap(self,__index,__object):
+		item,self[__index] = self[__index],__object
+		return item
 
 
 def is_collider(object) -> bool:
@@ -418,16 +420,16 @@ def make2dlist(x,y = None):
 
 @njit(cache = True)
 def normalize(x,y) -> tuple[float,float]:
-  mag = hypot(x,y)
-  if mag == 0: return (0,0)
-  else: return (x/mag,y/mag)
+	mag = hypot(x,y)
+	if mag == 0: return (0,0)
+	else: return (x/mag,y/mag)
 
 @njit(cache = True)
 def set_mag(x,y,mag:int|float) -> tuple[float,float]:
-  if x*x+y*y == 0: return (0,0)
-  ux,uy = normalize(x,y)
+	if x*x+y*y == 0: return (0,0)
+	ux,uy = normalize(x,y)
 
-  return  (ux*mag,uy*mag)
+	return  (ux*mag,uy*mag)
 
 
 def cache(func):
@@ -446,61 +448,61 @@ def arccos(x:float):
 
 
 def rgb_to_hsv(r,g,b): 
-  M = max(r, g, b)
-  m = min(r, g, b)
+	M = max(r, g, b)
+	m = min(r, g, b)
 
-  #And then V and S are defined by the equations
+	#And then V and S are defined by the equations
 
-  V = M/255
-  S = 1 - m/M  if M > 0 else 0
+	V = M/255
+	S = 1 - m/M  if M > 0 else 0
 
-  #As in the HSI and HSL color schemes, the hue H is defined by the equations
-  d = sqrt(r*r+g*g+b*b-r*g-r*b-g*b)
-  H = arccos((r - g/2 - b/2)/d)  if g >= b else 360 - arccos( (r - g/2 - b/2)/d)  
-  return H/360,S,V
+	#As in the HSI and HSL color schemes, the hue H is defined by the equations
+	d = sqrt(r*r+g*g+b*b-r*g-r*b-g*b)
+	H = arccos((r - g/2 - b/2)/d)  if g >= b else 360 - arccos( (r - g/2 - b/2)/d)  
+	return H/360,S,V
 
 @njit
 def hsv_to_rgb(h,s,v): 
-  h *= 360
-  M = 255*v
-  m = M*(1-s)
+	h *= 360
+	M = 255*v
+	m = M*(1-s)
 
-  #Now compute another number, z, defined by the equation
+	#Now compute another number, z, defined by the equation
 
-  z = (M-m)*(1-abs((h/60)%2-1))
+	z = (M-m)*(1-abs((h/60)%2-1))
 
-  #Now you can compute R, G, and B according to the angle measure of H. There are six cases. 
-  R,G,B = 0,0,0
-  if 0 <= h < 60:
-    R = M
-    G = z + m
-    B = m
+	#Now you can compute R, G, and B according to the angle measure of H. There are six cases. 
+	R,G,B = 0,0,0
+	if 0 <= h < 60:
+		R = M
+		G = z + m
+		B = m
 
-  elif 60 <= h < 120:
-    R = z + m
-    G = M
-    B = m
+	elif 60 <= h < 120:
+		R = z + m
+		G = M
+		B = m
 
-  elif 120 <= h < 180:
-    R = m
-    G = M
-    B = z + m
+	elif 120 <= h < 180:
+		R = m
+		G = M
+		B = z + m
 
-  elif 180 <= h < 240:
-    R = m
-    G = z + m
-    B = M
+	elif 180 <= h < 240:
+		R = m
+		G = z + m
+		B = M
 
-  elif 240 <= h < 300:
-    R = z + m
-    G = m
-    B = M
+	elif 240 <= h < 300:
+		R = z + m
+		G = m
+		B = M
 
-  elif 300 <= h <= 360:
-    R = M
-    G = m
-    B = z + m
-  return R,G,B
+	elif 300 <= h <= 360:
+		R = M
+		G = m
+		B = z + m
+	return R,G,B
 
 if __name__ == '__main__':
 	pass

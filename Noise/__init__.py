@@ -14,9 +14,10 @@ __all__ = [
     'WorleyNoise',
     'unit_smoothstep',
     'rescale',
+    'noise1',
 ]
 
-from Worley import WorleyNoise
+from Noise.Worley import WorleyNoise
 
 try:
     from Perlin import noise2,noise2_array,set_seed
@@ -55,6 +56,9 @@ class LayeredNoiseMap:
             data += noise2_array((xs+xshift*i)*scale,(ys+yshift*i)*scale) * strength
         data /= self.noise_normalizer
         return data
+    
+def noise1(x:float):
+    return noise2(2.7181,x)
     
     
 def unit_smoothstep(i:ndarray):
