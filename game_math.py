@@ -54,7 +54,7 @@ class ImplementsDraw:
 
 class Vector2:
 	__slots__  = ('x','y')
-	def __init__(self,x,y):
+	def __init__(self,x:float|int,y:float|int):
 		self.x:scalar = x
 		self.y:scalar = y
 	@final
@@ -219,7 +219,7 @@ def cap_magnitude(vector2:Vector2,mag:scalar):
 	return vector2.copy()
 class Collider:
 	__slots__ = ('x','y','width','height','bottom','top','left','right')
-	def __init__(self,x,y,w,h) -> None:
+	def __init__(self,x:float|int,y:float|int,w:float|int,h:float|int) -> None:
 		self.x:float|int = x
 		self.y:float|int = y
 		self.width:float|int = w
@@ -350,14 +350,14 @@ class Collider:
 		return rectangle_overlap(self.left,self.top,self.right,self.bottom,c.left,c.top,c.right,c.bottom)
 
 	def collide_point_inclusive(self,point):
-		assert isinstance(point,(tuple,list)), 'point must be a "tuple" or "list" '
-		assert len(point) == 2, 'point must have a length of 2'
+		#assert isinstance(point,(tuple,list)), 'point must be a "tuple" or "list" '
+		#assert len(point) == 2, 'point must have a length of 2'
 		x,y = point
 		return self.left <= x <= self.right and self.top <= y <= self.bottom
 
 	def collide_point_exclusive(self,point):
-		assert isinstance(point,(tuple,list)), 'point must be a "tuple" or "list" '
-		assert len(point) == 2, 'point must have a length of 2'
+		#assert isinstance(point,(tuple,list)), 'point must be a "tuple" or "list" '
+		#assert len(point) == 2, 'point must have a length of 2'
 		x,y = point
 		return self.left < x < self.right and self.top < y < self.bottom
 		

@@ -64,7 +64,7 @@ focus = game_math.Vector2.zero
 HALFSCREENSIZE:game_math.Vector2
 screen_size:game_math.Vector2
 camera_pos = focus.copy()
-tracking_system:Literal['fixed','smooth']
+tracking_system:Literal['fixed','smooth'] = 'fixed'
 mouse_assisted:bool = False
 #variables for smooth tracking
 smooth_speed = 4
@@ -154,7 +154,7 @@ def set_tracking(system):
 
 def set_focus(position:game_math.Vector2):
     global focus,camera_pos #this works because unlike C, python 'globals' are global to a module, not across all files, unless ofcourse you add it to the builtins module
-    focus = position #
+    focus = position # type: ignore
     if tracking_system == 'fixed':
         camera_pos = focus
 

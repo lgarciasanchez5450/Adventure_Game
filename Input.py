@@ -3,7 +3,7 @@ import game_math
 from typing import Literal
 import Music
 from pygame.constants import *
-from Constants.Display import HALFWIDTH,HALFHEIGHT,WINDOW_WIDTH,WINDOW_HEIGHT
+from Constants.Display import HALFWIDTH,HALFHEIGHT,WINDOW_WIDTH,WINDOW_HEIGHT, FORCE_ASPECT_RATIO
 import Settings
 
 from Events import call_OnResize,add_OnResize
@@ -42,11 +42,11 @@ m_pos_normalized:game_math.Vector2 = game_math.Vector2.zero
 m_rel:game_math.Vector2 = game_math.Vector2.zero
 
 def _update_mouse():
-    global wheel,m_1,m_2,m_3,m_x,m_y,m_pos,m_pos_normalized
-    m_1,m_2,m_3 = pygame.mouse.get_pressed()
+    global wheel,m_1,m_2,m_3,m_x,m_y,m_pos,m_pos_normalized, _width_multiplier, _height_multiplier
+    m_1,m_2,m_3 = pygame.mouse.get_pressed() #type: ignore
     m_pos.x,m_pos.y = pygame.mouse.get_pos()
     m_rel.x,m_rel.y = pygame.mouse.get_rel()
-    m_x,m_y = m_pos
+    m_x,m_y = m_pos #type: ignore
     m_pos_from_middle.set_to(m_pos-HALF_SCREEN)
     m_pos_normalized.x = m_pos.x*_width_multiplier - 1
     m_pos_normalized.y = m_pos.y*_height_multiplier - 1
@@ -143,9 +143,23 @@ def update():
                 m_u3 = 1        
         elif event.type == pygame.MOUSEWHEEL:
             wheel = event.y
-        elif event.type == pygame.MUSICEND:
+        elif event.type == pygame.MUSICEND: # type: ignore
             Music.onMusicEnd()
         elif event.type == pygame.VIDEORESIZE:
-            call_OnResize(event.w,event.h)
+            #check if we need to force another change
+            if FORCE_ASPECT_RATIO is not None: #BUG when you fullscreen it sometimes it gets caught in a loop to force ascpect ratio
+                #get the aspect that changed
+                change_on_x = s_width != event.w
+                change_on_y = s_height != event.h
+                if change_on_x:#prioritize changes on x
+                    event.h = FORCE_ASPECT_RATIO[1] * event.w // FORCE_ASPECT_RATIO[0]
+                elif change_on_y:
+                    event.w = FORCE_ASPECT_RATIO[0] * event.h // FORCE_ASPECT_RATIO[1]
+                
+                if change_on_x or change_on_y:
+                    call_OnResize(event.w,event.h)
+                    pygame.display.set_mode((event.w,event.h),pygame.OPENGL|pygame.RESIZABLE|pygame.DOUBLEBUF)
+            else:
+                call_OnResize(event.w,event.h)
         
         

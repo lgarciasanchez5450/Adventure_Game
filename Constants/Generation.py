@@ -2,6 +2,7 @@
 CHUNK_SIZE = 8 #must be divisible by 2
 HALF_CHUNK_SIZE = CHUNK_SIZE//2 # cause of this
 BLOCK_SIZE = 64
+HALF_BLOCK_SIZE = BLOCK_SIZE//2
 PLAYER_PLACEMENT_IRREGULARITY = 5
 OCTAVES = 6
 MAPWIDTH  = 700
@@ -9,7 +10,7 @@ MAPHEIGHT = 700
 SCALE     = .1
 
 '''Initial Generation Variables'''
-INITIAL_GEN_SIZE = 50 #for both x and y
+INITIAL_GEN_SIZE = 20 #for both x and y
 
 '''Biomes that exist'''
 PLAINS = 0

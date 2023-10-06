@@ -89,6 +89,7 @@ STACK_COUNT_BY_TAG = {
     ITAG_BOW:1,
     ITAG_HAT:1,
     ITAG_BUNNY_EGG:64,
+    
 }
 
 #Variables that can change
@@ -96,4 +97,4 @@ RenderDistance = 6
  
 GenerationDistance = 10 # Should be larger than RenderDistance
 
-game_state = RUNNING
+game_state = MAIN_MENU

@@ -8,7 +8,7 @@ PARTICLE_SIZE = BLOCK_SIZE // 8
 ZERO = 0
 POSITIVE_INFINITY = float('inf')
 NEGATIVE_INFINITY = float('-inf')
-
+DEFAULT_ITEM_MAX_STACK = 64
 
 '''Game States'''
 MAIN_MENU = 0

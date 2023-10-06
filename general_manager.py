@@ -204,6 +204,11 @@ class DurabilityStats:
 
 
 class Item:
+    def setCount(self,count:int):
+        assert count < self.max_stack_count
+        self.count = count
+        return self
+
     __slots__ = 'tag', 'name',  'count', 'durability_stats', 'armour_stats', 'damage', 'mining_speed', 'fps', 'animation','frames','inventory'
     def __init__(self,tag:str):
         self.tag = tag #all the same types of items should have the same tag
@@ -221,7 +226,7 @@ class Item:
 
     @property
     def max_stack_count(self):
-        return Settings.STACK_COUNT_BY_TAG[self.tag]
+        return Settings.STACK_COUNT_BY_TAG.get(self.tag,DEFAULT_ITEM_MAX_STACK)
 
     def getAttack(self) -> int:
         return self.damage
@@ -288,7 +293,7 @@ class Bow(Item):
         print('stoping use')
         if self.startTime is None: return
         assert isinstance(inventory,UniversalInventory)
-        speed_modifier = tanh((Time.time - self.startTime)/2) * self.springyness
+        speed_modifier = tanh((Time.time - self.startTime)) * self.springyness
         direction = Input.m_pos_from_middle.normalized 
         spawn_entity(Arrow(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
         
@@ -524,15 +529,14 @@ class LiveTNT(Entity):
         return EXPLOSION_DAMAGE
 
 class Arrow(Entity):
-    straight_right =Textures.scale(Textures.rotate(Textures.load_image('Images/enemies/arrow/default_arrow.png').convert_alpha(),90+47),(BLOCK_SIZE,BLOCK_SIZE))
     def __init__(self,pos,velocity:Vector2,shooter:Entity):
 
         super().__init__(pos,'arrow')
         
         angle = -velocity.get_angle() 
         velocity += shooter.vel # add the shooters velocity to our own because its relative to the shooters vel in real life
-        tex = Textures.rotate(self.straight_right,angle * 180 / pi)
-        self.animation.add_state('going',0,[tex],[self.straight_right])
+        tex = Textures.rotate(Textures.texture['entity_arrow.png'],angle * 180 / pi)
+        self.animation.add_state('going',0,[tex],[Textures.texture['entity_arrow.png']])
         self.image.offset = (-tex.get_width()/2,-tex.get_height()/2)
         self.animation.set_state('going')
         self.vel = velocity.copy()
@@ -930,10 +934,12 @@ class Spirit(AliveEntity):
     fears = set() #spirits fear nothing (for now)
 
     neutral_to = set()
-    right_idle,left_idle = Textures.import_folder('Images/enemies/spirit/idle',True,(32,32),True)
+    #right_idle,left_idle = Textures.import_folder('Images/enemies/spirit/idle',True,(32,32),True)
     def __init__(self,pos):
+        self.right_idle,self.left_idle = Textures.import_folder('Images/enemies/spirit/idle',True,(32,32),True)
+
         super().__init__(pos,'spirit')
-        self.animation.add_state('idle',8,Spirit.right_idle,Spirit.left_idle)        
+        self.animation.add_state('idle',8,self.right_idle,self.left_idle)        
         self.animation.set_state('idle')
         self.vision_collider = Collider(0,0,Settings.VISION_BY_SPECIES['spirit']*2,Settings.VISION_BY_SPECIES['spirit']*2)
         self.vision_squared = Settings.VISION_BY_SPECIES['spirit'] ** 2
@@ -1049,13 +1055,13 @@ class Bunny(AliveEntity):
     fears = {'spirit'}
 
     neutral_to = set()
-    right_idle,left_idle = Textures.import_folder('Images/enemies/bamboo/idle',True,(32,32),True)
     def __init__(self,pos):
         super().__init__(pos,'bunny')
+        self.right_idle,self.left_idle = Textures.import_folder('Images/enemies/bamboo/idle',True,(32,32),True)
         self.fears = self.fears.copy()
         self.eats = self.eats.copy()
         self.enemies = self.enemies.copy()
-        self.animation.add_state('idle',8,Bunny.right_idle,Bunny.left_idle)        
+        self.animation.add_state('idle',8,self.right_idle,self.left_idle)        
         self.animation.set_state('idle')
         self.vision_collider = Collider(0,0,Settings.VISION_BY_SPECIES['bunny']*2,Settings.VISION_BY_SPECIES['bunny']*2)
         self.vision_squared = Settings.VISION_BY_SPECIES['bunny'] ** 2
@@ -1653,6 +1659,7 @@ def find_entity_chunk(entity:Entity) -> tuple[int,int]:
         chunk = entity_chunks[chunk_pos]
         if entity in chunk:
             return chunk_pos
+    return (0,0)
 
 def manage_chunks():
     #search for each entity and see if they crossed a chunk border
@@ -2021,10 +2028,12 @@ def generate_world():
     def checkIsGen() -> None:
         if (Settings.game_state is not GENERATING_WORLD):
             raise GenerationError('Game state must be <GENERATING_WORLD')
+    checkIsGen()
 
     if len(Chunk._insts) != 0 or len(chunks) != 0: # if we have tried to create some chunks previously
         raise GenerationError('The game has tried to generate a world that already has chunks!??!??!')
     yield 
+    checkIsGen()
     to_generate = set()
     for cy in range(INITIAL_GEN_SIZE):
         cy -= INITIAL_GEN_SIZE//2
@@ -2036,16 +2045,17 @@ def generate_world():
             to_generate.add(cpos)
     done = 0
     while True:
+        checkIsGen()
         yield done, len((to_generate))
         if len(chunk_loading_queue) == 0: break
         chunk_to_load:Chunk = chunk_loading_queue[0]
         status = _chunk_step(chunk_to_load)
-
         match status:
             case 'done':
                 chunk_loading_queue.popleft()
 
         chunk_loading_queue.rotate()
+
 if __name__ == '__main__':
     from pympler.asizeof import asizeof
     chunk = Chunk((1,1))

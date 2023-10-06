@@ -47,15 +47,19 @@ class Animation:
 class SimpleAnimation:
     '''This Animation Class is meant to provide a simpler interface and be faster than the normal Animation class'''
     __slots__ = 'csurface','frames','fps','time','_frame_in_state','max_frames_in_state','surf'
-    def __init__(self,csurf:Camera.CSurface,fps:int,frames:list):
+    def __init__(self,csurf:Camera.CSurface,fps:float,frames:list):
         self.csurface = csurf
         if not isinstance(frames,list):
             frames = [frames]
-        self.frames:list[pygame.Surface] = frames
+        self.setFrames(tuple(frames),fps)
+
+    def setFrames(self,frames:tuple[pygame.Surface,...],fps:float) -> None:
+        self.frames = list(frames)
         self.fps = fps
+        self.max_frames_in_state = len(self.frames)
+        self.surf = frames[0]
         self.time:float = 0.0
         self._frame_in_state:int = 0
-        self.max_frames_in_state = len(self.frames)
 
     @property
     def time_per_cycle(self) -> float:

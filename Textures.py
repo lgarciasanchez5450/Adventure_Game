@@ -4,6 +4,7 @@ from pygame.image import load
 from pygame.transform import scale,flip,rotate
 from pygame import Surface
 from Constants.Items import *
+from game_math import cache
 
 
 def PATH():
@@ -21,6 +22,7 @@ def is_image(path):
 	else:
 		return False
 	
+@cache
 def load_image(path:str):
 	return load(PATH()+path)
 
@@ -38,8 +40,7 @@ def load_item_anim(tag,alpha=True):
 			item_images.append(surf)
 	return item_images
 
-
-
+@cache
 def import_folder(path,alpha=True,size:None|tuple = None,return_flipped_too:bool = False):
 	surface_list = []
 	flipped_list = []
@@ -66,7 +67,6 @@ def import_folder(path,alpha=True,size:None|tuple = None,return_flipped_too:bool
 	else:
 		return surface_list
 	
-
 from Constants import BLOCK_SIZE,PARTICLE_SIZE,WIDTH,HEIGHT,HALFHEIGHT,HALFWIDTH,ITEM_SIZE
 def init():
 	import_folder('Images/objects')
@@ -83,6 +83,8 @@ def init():
 	texture['grey.png'] = s
 	load_item_anim(ITAG_BOW)
 	load_item_anim(ITAG_ARROW)
+	print(texture['Dirt.png'])
+	texture['entity_arrow.png'] = scale(rotate(load_image('Images/enemies/arrow/default_arrow.png').convert_alpha(),90+47),(BLOCK_SIZE,BLOCK_SIZE))
 
 	del s
 
