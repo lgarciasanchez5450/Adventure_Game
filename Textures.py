@@ -1,4 +1,5 @@
-from os import walk
+from Constants import BLOCK_SIZE,PARTICLE_SIZE,WIDTH,HEIGHT,HALFHEIGHT,HALFWIDTH,ITEM_SIZE
+from os import walk,listdir
 from os.path import dirname,realpath
 from pygame.image import load
 from pygame.transform import scale,flip,rotate
@@ -15,9 +16,9 @@ item_textures:dict[str,Surface] = {}
 def scale_image(surface,newSize):
 	return scale(surface,newSize)
 accepted_image_extentions = {'png','jpg','jpeg','bmp'}
-def is_image(path):
+def is_image(path:str):
 	extension = path.split('.')[-1]
-	if extension in accepted_image_extentions:
+	if extension.lower() in accepted_image_extentions:
 		return True
 	else:
 		return False
@@ -26,6 +27,7 @@ def is_image(path):
 def load_image(path:str):
 	return load(PATH()+path)
 
+@cache
 def load_item_anim(tag,alpha=True):
 	# the directory path should be as follows:
 	# C:\\ ... Adventure_Game\\Images\\items\\<tag>\\
@@ -39,6 +41,29 @@ def load_item_anim(tag,alpha=True):
 			surf = surf.convert_alpha() if alpha else surf.convert()
 			item_images.append(surf)
 	return item_images
+
+@cache
+def load_entity_anim(species:str,subspecies:str = ''):
+	'''Will return a dictionary with each key being a folder holding a list of the 
+	Images stored in the folders
+	Only supports single depth of folders past the entity folder'''
+	anims:dict[str,tuple[Surface,...]] = dict()
+
+	path = f"{PATH()}Images\\Entities\\{species}"
+	if subspecies != '':#if a subspecies exists then append it to the path 
+		path += "\\"+subspecies
+		
+	dirpath,dirnames,filenames = next(walk(path),(None,None,None))
+
+	if dirnames is None or dirpath is None or filenames is None: #the path doesn't exist
+		raise RuntimeError(f"Entity Animation does not exist in path {path}")
+	
+	#if we reach here then we should be in a directory holding a bunch of folders, each having an array of surfaces
+	for folder in dirnames:
+		anims[folder] = load_top(f'{path}\\{folder}')
+	
+	return anims
+
 
 @cache
 def import_folder(path,alpha=True,size:None|tuple = None,return_flipped_too:bool = False):
@@ -67,7 +92,6 @@ def import_folder(path,alpha=True,size:None|tuple = None,return_flipped_too:bool
 	else:
 		return surface_list
 	
-from Constants import BLOCK_SIZE,PARTICLE_SIZE,WIDTH,HEIGHT,HALFHEIGHT,HALFWIDTH,ITEM_SIZE
 def init():
 	import_folder('Images/objects')
 	import_folder('Images/items',True,(ITEM_SIZE,ITEM_SIZE))
@@ -84,10 +108,14 @@ def init():
 	load_item_anim(ITAG_BOW)
 	load_item_anim(ITAG_ARROW)
 	print(texture['Dirt.png'])
-	texture['entity_arrow.png'] = scale(rotate(load_image('Images/enemies/arrow/default_arrow.png').convert_alpha(),90+47),(BLOCK_SIZE,BLOCK_SIZE))
+	texture['entity_arrow.png'] = scale(rotate(load_image('Images/Entities/arrow/default_arrow.png').convert_alpha(),90+47),(BLOCK_SIZE,BLOCK_SIZE))
 
 	del s
 
+def flipX(surf:Surface|tuple[Surface,...]):
+	if isinstance(surf,(tuple,list)):
+		return [flipX(s) for s in surf]
+	return flip(surf,True,False)
 
 if __name__ == "__main__":
 	print('Running Tests on Module Textures')
@@ -97,3 +125,28 @@ if __name__ == "__main__":
 	print(len(load_item_anim('bow')) == 0)
 	init()
 	print('All Tests Passed')
+
+
+	
+
+
+
+
+#### HELPER FUNCTIONS ####
+
+def load_top(path:str):
+	surfs:list[Surface] = []
+	if not path.endswith(('\\','/')): path += '\\' #make sure our path ends with a "\"
+	for file in listdir(path):
+		surfs.append(load(path+file))
+	return tuple(surfs) #to save memory we make it a tuple
+		
+def _compress_and_save():
+	from pygame.image import load,save
+	p = 'Images\\Entities\\player\\walk'
+	o = p.replace("Entities","_LegacyUncompressedImages")
+	c = import_folder(p,True,(BLOCK_SIZE,BLOCK_SIZE))
+	unc = import_folder(p,True)
+	for csurf,usurf,x in zip(c,unc,range(100000)):
+		save(csurf,f"{p}\\{x}.png",'png')
+		save(usurf,f"{o}\\{x}.png",'png')

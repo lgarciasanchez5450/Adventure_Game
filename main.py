@@ -111,8 +111,14 @@ while True:
             Settings.game_state = GENERATING_WORLD
     elif Settings.game_state is GENERATING_WORLD:
             try:
-                next(gen)
+                next(gen) #type: ignore
             except StopIteration:
                 Main_Menu.close()
                 onGameStart()
                 Settings.game_state = RUNNING
+
+    elif Settings.game_state == CHARACTER_CREATION:
+        pass
+    elif Settings.game_state == WORLD_SELECT:
+        pass
+

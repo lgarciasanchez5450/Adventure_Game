@@ -3,5 +3,5 @@
         "limits.h": "c",
         "string.h": "c"
     },
-    "python.analysis.typeCheckingMode": "basic"
+    "python.analysis.typeCheckingMode": "off"
 }

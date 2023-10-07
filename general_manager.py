@@ -276,7 +276,7 @@ class Bow(Item):
     def __init__(self):
         super().__init__(ITAG_BOW)
         self.loadStage = 0.0
-        self.startTime:int|None
+        self.startTime:float|None
         self.startTime = None
         self.springyness:float = 7.0 # used to calculate arrow speed
     def startUse(self,inventory):
@@ -465,7 +465,7 @@ class ItemWrapper(Entity):
         self.item = item
         item.animation.csurface = self.image
         self.animation = item.animation
-        self.alive_time = ENTITY_MAX_LIFESPAN
+        self.alive_time = ITEM_MAX_LIFESPAN
         
     def update(self):
         self.pickup_time -= Time.deltaTime
@@ -781,9 +781,14 @@ class Player(AliveEntity):
         self.direction = 'right'
 
     def set_up_animation(self):
-        walk_right,walk_left= Textures.import_folder('player/walk',True,(64,64),True)
-        idle_right,idle_left = Textures.import_folder('player/idle',True,(64,64),True)
-        attack_right,attack_left = Textures.import_folder('player/attack',True,(64,64),True)
+        player_animations = Textures.load_entity_anim('player')
+        walk_right = player_animations['walk']
+        walk_left = Textures.flipX(walk_right)
+        idle_right = player_animations['idle']
+        idle_left = Textures.flipX(idle_right)
+        attack_right = player_animations['idle']
+        attack_left = Textures.flipX(attack_right)
+        
         self.walking_particle = Textures.import_folder('Images/particles/Dirt',False,(PARTICLE_SIZE,PARTICLE_SIZE))[0]
         self.animation.add_state('walk',4,walk_right,walk_left)
         self.animation.add_state('idle',1.2,idle_right,idle_left)
@@ -934,7 +939,6 @@ class Spirit(AliveEntity):
     fears = set() #spirits fear nothing (for now)
 
     neutral_to = set()
-    #right_idle,left_idle = Textures.import_folder('Images/enemies/spirit/idle',True,(32,32),True)
     def __init__(self,pos):
         self.right_idle,self.left_idle = Textures.import_folder('Images/enemies/spirit/idle',True,(32,32),True)
 
@@ -947,7 +951,7 @@ class Spirit(AliveEntity):
         self.timer_to_vision = 1
         self.states = ['idle','wander','fight','afraid']
         self.state = self.states[0]
-        self.mark:Entity = None
+        self.mark:Entity|None = None
         self.time_to_introspection = 5
         #Set up animation
         for state in self.states:
@@ -970,7 +974,7 @@ class Spirit(AliveEntity):
                 self.fear_producer = entity
                 return 
         self.closest_enemy = None
-        closest_distance_squared = float('inf')
+        closest_distance_squared = POSITIVE_INFINITY
         for entity in entities_seen:
             if entity.species in self.enemies:
                 dist_squared = (self.pos - entity.pos).magnitude_squared()
@@ -1626,7 +1630,7 @@ def print_entity_chunks():
 
 def get_nearest_block(pos:Vector2):
     nearest = None
-    dist_sqrd = float('inf')
+    dist_sqrd = POSITIVE_INFINITY
     cpos = (pos//CHUNK_SIZE).tuple
     to_check = []
     for chunk in get_around_chunk(cpos[0],cpos[1]):
