@@ -13,3 +13,7 @@ for every single .c file , you must replace the Python.h header with the full pa
 for the perlin.c noise, you must pass do the same but with arrayobject as well, there are steps to find the path written on the file itself.
 
 The game is run via main.py
+
+
+Contact Me via:
+ - Discord @ hithere32123
