@@ -1124,8 +1124,6 @@ class Bunny(AliveEntity):
 
         #self.state = self.states[1]            
 
-    
-
     def trySprinting(self) -> float:
         if self.sprinting:
             if self.canDoAction('RUN'):
@@ -1271,7 +1269,7 @@ class HotBarUI:
             raise RuntimeError('entity passed into HotBarUI does not seem to define its hotbar!')
         self.entity = entity
         self.slot_spacing = 4 #this is how many pixels will be between the edges of each
-        self.hb_inventory:Inventory = entity.hotbar
+        self.hb_inventory = entity.hotbar
         self.inventory_size = entity.hotbar.spaces
         self.background_color = [133,133,133,150]    #RGBA
         self.surface = Surface((self.hb_inventory.spaces * (self.slot_spacing + ITEM_SIZE) + self.slot_spacing, ITEM_SIZE + self.slot_spacing * 2),pygame.SRCALPHA)
