@@ -44,7 +44,7 @@ class UI:
         self.program['tex'] = tex_location
         tex_location += 1
         self.collider = Collider(self.topleft.x,self.topleft.y,screen_size[0]*2,screen_size[1]*2)
-        self.thingy = Vector2(*screen_size).inverse()
+        self.thingy = Vector2(*screen_size).inverse
 
     def _():
         pass

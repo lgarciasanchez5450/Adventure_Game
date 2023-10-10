@@ -1,5 +1,12 @@
 from typing import final
-from numba import njit,prange
+try:
+	from numba import njit,prange
+except ImportError:
+	def njit (*args,**kwargs):
+		def wrapper(func):
+			return func
+		return wrapper
+	prange = range
 from math import cos, sin,pi,hypot,sqrt,atan2,floor,log2,ceil,acos,tanh
 from random import random,randint
 from collections import deque
@@ -12,7 +19,24 @@ def rectangle_overlap(x1:float,x2:float,x3:float,x4:float,y1:float,y2:float,y3:f
 	widthIsPositive = min(x3, y3) > max(x1, y1)
 	heightIsPositive = min(x4, y4) > max(x2, y2)
 	return (widthIsPositive and heightIsPositive)
-rectangle_overlap(1,2,3,4,5,6,7,8)
+
+@njit(cache = True)
+def restrainMagnitude(x:float,y:float,mag:float):
+	sqrM =  x*x+y*y
+	if sqrM > mag * mag:
+		mult = mag/sqrt(sqrM)
+		x *= mult
+		y *= mult
+	return x,y
+
+@njit(cache = True)
+def randomNudge(x:float,y:float,nudgeMag:float): #this random nudge prefers smaller nudges than bigger ones
+	#techincally it will nudge it more in the diagonal more than horiztonal since the nudge values are not normalized
+	mag = sqrt(x*x+y*y)
+	x += nudgeMag * (2*random()-1) #TODO make it so that it nudges equally in all directions using restrainMagnitude
+	y += nudgeMag * (2*random()-1)
+	return  set_mag(x,y,mag)
+	
 
 def get_most_sig_bits(x:int,bits:int) -> int:
 	bit_length = x.bit_length()
@@ -134,7 +158,7 @@ class Vector2:
 	
 	def __neg__(self):
 		return Vector2(-self.x,-self.y)
-	
+	@property
 	def inverse(self):
 		return Vector2(1/self.x,1/self.y)
 	
@@ -209,7 +233,9 @@ class Vector2:
 			self.y = -magnitude
 		return self
 	
-
+	def restrain_magnitude(self,mag:float): 
+		self.from_tuple(restrainMagnitude(self.x,self.y,mag))
+		return self
 ones= Vector2(1,1)
 
 
@@ -217,6 +243,7 @@ def cap_magnitude(vector2:Vector2,mag:scalar):
 	if vector2.magnitude_squared() > mag*mag:
 		return vector2 * (mag / vector2.magnitude())
 	return vector2.copy()
+
 class Collider:
 	__slots__ = ('x','y','width','height','bottom','top','left','right')
 	def __init__(self,x:float|int,y:float|int,w:float|int,h:float|int) -> None:

@@ -1,6 +1,6 @@
 ITEM_COUNTER_SIZE = 13
 DEFAULT_ITEM_MAX_STACK = 64
-ITEM_MAX_LIFESPAN = 1 * 10 #seconds
+ITEM_MAX_LIFESPAN = 1 * 60 #seconds
 
 
 '''All Items Tags''' #this is the tag that will pop up in-game

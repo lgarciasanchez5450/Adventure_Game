@@ -39,9 +39,8 @@ def onGameAwake():
     Sounds.init()
     debug.init(screen)
     Time.init()
-    Camera.set_mouse_pull_strength(13)
-    Camera.set_tracking('smooth')
     Music.init()
+    Camera.set_mouse_pull_strength(13)
     Music.start()
     Game_Time.time_speed = 24   
     Game_Time.start()
@@ -54,8 +53,9 @@ def onGameStart():
     Camera.set_mouse_assist(False)
     player = general_manager.Player((0,0))
     general_manager.spawn_entity(player)
-    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(3,0),general_manager.Bow()))
-    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(3,2),general_manager.ItemArrow().setCount(10)))
+    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,0),general_manager.QuickBow()))
+    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(-2,0),general_manager.Bow()))
+    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),general_manager.ItemArrow().setCount(64)))
     Camera.set_focus(player.pos)
     Events.call_OnResize(WINDOW_WIDTH,WINDOW_HEIGHT)
     display = pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT),pygame.OPENGL| pygame.DOUBLEBUF|pygame.RESIZABLE) # can be Resizable with no problems

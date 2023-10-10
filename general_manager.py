@@ -205,7 +205,7 @@ class DurabilityStats:
 
 class Item:
     def setCount(self,count:int):
-        assert count < self.max_stack_count
+        assert count <= self.max_stack_count
         self.count = count
         return self
 
@@ -272,13 +272,14 @@ class ItemArrow(Item):
 
 
 class Bow(Item):
-    __slots__ = 'springyness','startTime','loadStage'
+    __slots__ = 'springyness','startTime','loadStage','max_pull_time'
     def __init__(self):
         super().__init__(ITAG_BOW)
         self.loadStage = 0.0
         self.startTime:float|None
         self.startTime = None
         self.springyness:float = 7.0 # used to calculate arrow speed
+        self.max_pull_time = 5.0 #the maximum amount of time held down that should be counted towards the bow fire
     def startUse(self,inventory):
         assert isinstance(inventory,UniversalInventory)
         for i,item in enumerate(inventory.inventory):
@@ -290,15 +291,33 @@ class Bow(Item):
         self.startTime = None
     
     def stopUse(self,inventory) -> None:
-        print('stoping use')
         if self.startTime is None: return
         assert isinstance(inventory,UniversalInventory)
-        speed_modifier = tanh((Time.time - self.startTime)) * self.springyness
-        direction = Input.m_pos_from_middle.normalized 
+        time = min(Time.time - self.startTime,self.max_pull_time)
+        speed_modifier = tanh(time) * self.springyness
+        direction = Input.m_pos_from_middle.normalized
+        direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
         spawn_entity(Arrow(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
         
+    def getArrowInstability(self,t): # this is how much the arrow should be randomized for 
+        return 1/ ( 5.0 + (4.5 * (t - 0.3))**2)
 
-
+class QuickBow(Bow):
+    __slots__ = 'springyness','startTime','loadStage','max_pull_time'
+    def __init__(self):
+        super().__init__()
+        #self.springyness = 5.0
+        
+    def stopUse(self, inventory) -> None:
+        if self.startTime is None: return
+        assert isinstance(inventory,UniversalInventory)
+        time = min(2*(Time.time - self.startTime),self.max_pull_time)
+        speed_modifier = tanh(time) * self.springyness
+        direction = Input.m_pos_from_middle.normalized
+        direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
+        spawn_entity(Arrow(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
+    def getArrowInstability(self,t): # this is how much the arrow should be randomized for 
+        return 1/ ( 3.0 + (3.5 * (t - 0.3))**2)
 #### BLOCKS ####
 class Block:
     @staticmethod
@@ -1203,7 +1222,7 @@ class InventoryUI(UI):
         self.items_offset = self.screen_center + self.slots_center - slots_size/2
 
         self.slots = [ItemSlot(((i%self.slots_width)*self.slot_spacing+self.items_offset[0],(i//self.slots_width)*self.slot_spacing+self.items_offset[1]),i,self.inventory) for i in range(self.inventory_size)]
-        self.thingy = self.size.inverse()
+        self.thingy = self.size.inverse
 
         if self.has_hotbar:
             self.hb_offset = self.screen_center+self.hb_slots_center - Vector2(self.hb_size * self.slot_spacing,self.slot_spacing)/2 
@@ -1275,7 +1294,6 @@ class HotBarUI:
         self.surface = Surface((self.hb_inventory.spaces * (self.slot_spacing + ITEM_SIZE) + self.slot_spacing, ITEM_SIZE + self.slot_spacing * 2),pygame.SRCALPHA)
         self.x = Camera.HALFSCREENSIZE.x - self.surface.get_width()/2
         self.y = Camera.HEIGHT - self.surface.get_height()
-        self.topleft = Vector2(self.x,self.y)
         self.recalc_slots()
         Events.add_OnResize(self.onResize)
         self.collider = Collider(self.x / WIDTH,self.y / HEIGHT,self.surface.get_width()/WIDTH,self.surface.get_height()/HEIGHT)# this is a normalized collider e.g. its values are from [0,1] so that they work with the input
@@ -1283,9 +1301,14 @@ class HotBarUI:
         self.has_mouse = False
     
     def onResize(self,newWidth,newHeight):
+        self.collider = Collider(self.x / newWidth,self.y / newHeight,self.surface.get_width()/newWidth,self.surface.get_height()/newHeight)# this is a normalized collider e.g. its values are from [0,1] so that they work with the input
+
         self.recalc_slots()
 
     def recalc_slots(self):
+        self.x = Camera.HALFSCREENSIZE.x - self.surface.get_width()/2
+        self.y = Camera.HEIGHT - self.surface.get_height()
+        self.topleft = Vector2(self.x,self.y)
 
         self.slots = [ItemSlot((i*(ITEM_SIZE+self.slot_spacing)+self.slot_spacing,self.slot_spacing),i,self.hb_inventory) for i in range(self.inventory_size)]
         self.surface.fill(self.background_color)
@@ -1295,7 +1318,8 @@ class HotBarUI:
             slot.state = slot.UP
 
     def update(self):
-        m_pos = Input.m_pos.vector_mul(Camera.screen_size.inverse())
+        m_pos = Input.m_pos.vector_mul(Camera.screen_size.inverse)
+        print(m_pos)
         if self.collider.collide_point_inclusive(m_pos.tuple):
             self.has_mouse = True
             m_pos = m_pos.vector_mul(Camera.screen_size)
