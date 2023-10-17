@@ -62,7 +62,7 @@ class UniversalInventory:
         self.spaces = spaces
         self.inventory:Array[Item] = Array.new(spaces)
         self.full = False
-        self.entity = entity
+        self.entity:AliveEntity = entity
         self.selected:int = -1
         self.slot_restrictions:dict[int,Callable[[Item],bool]] = {} #will store slot indexes that have restrictions via a function that will accept the item and return True only if it fits
 
@@ -123,8 +123,10 @@ class UniversalInventory:
         if index in self.slot_restrictions:
             if not self.slot_restrictions[index](self.inventory[index]):
                 return self.inventory.remove(index)
+   
     def slotCompatible(self,item,index):
         return self.slot_restrictions.get(index,lambda x: True)(item)
+  
     def fitItem(self,item):
         assert isinstance(item,(Item,type(None)))
         empty_slots = []
@@ -178,6 +180,16 @@ class UniversalInventory:
     @property
     def added_def(self) -> float:
         return 0.0
+    
+    def addRestriction(self,index:int,func:Callable[[Any],bool]):
+        self.slot_restrictions[index] = func
+        return self
+    
+    def addArmourRestrictionsFromDictionary(self,dict:dict[int,tuple[str,...]]):
+        '''Will add it to the end of the slots'''
+        index = self.slot_restrictions.__len__() - dict.__len__()
+        for i,string in enumerate(dict.values(),start = index):
+            self.addRestriction(i,lambda item : item.armour_type == string)
 
 #### ITEMS ####
 class ArmourStats:
@@ -230,6 +242,9 @@ class Item:
 
     def getAttack(self) -> int:
         return self.damage
+    @property
+    def armour_type(self) -> str|None:
+        return None if self.armour_stats is None else self.armour_stats.type
     
     #this method is called on right click down
     def startUse(self,inventory:UniversalInventory) -> None: ...
@@ -306,7 +321,7 @@ class QuickBow(Bow):
     __slots__ = 'springyness','startTime','loadStage','max_pull_time'
     def __init__(self):
         super().__init__()
-        #self.springyness = 5.0
+        self.springyness = 5.0
         
     def stopUse(self, inventory) -> None:
         if self.startTime is None: return
@@ -317,7 +332,7 @@ class QuickBow(Bow):
         direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
         spawn_entity(Arrow(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
     def getArrowInstability(self,t): # this is how much the arrow should be randomized for 
-        return 1/ ( 3.0 + (3.5 * (t - 0.3))**2)
+        return 1/ ( 5.0 + (3.5 * (t - 0.3))**2)+0.2
 #### BLOCKS ####
 class Block:
     @staticmethod
@@ -619,6 +634,15 @@ class FireArrow(Arrow):
     def get_attack_type(self):
         return FIRE_DAMAGE
 
+### HELPER FUNCTION ###
+def fitsArmourBuilder(armourType:str) -> Callable[[Item],bool]:
+    def inner(item:Item):
+        return item.armour_type == armourType
+    return inner
+    
+### END HELPER FUNCTION ###
+
+
 class AliveEntity(Entity):
         
     def __init__(self,pos,species):
@@ -627,7 +651,6 @@ class AliveEntity(Entity):
         self.pickup_range = max(*Settings.HITBOX_SIZE[species]) * half_sqrt_2 # just a shortcut for finding the length to the corner of a box from the middle when you only know a side length
         self.inventory = UniversalInventory(Settings.INVENTORY_SPACES_BY_SPECIES[species],self)
         self.armour_inventory = ArmorInventory(*Settings.ARMOUR_SLOTS_BY_SPECIES[species])
-
         #Stats
         self.stats = Settings.STATS_BY_SPECIES[species].copy()
         self.exp = 5000 #dont make attribute points (overused). make exp have another purpose. attribute points can lead to severely op setups and the player getting exactly what they want. 
@@ -1032,7 +1055,6 @@ class Spirit(AliveEntity):
                 self.attack(self.closest_enemy)
             self.vel = distance_to_enemy.normalized
         
-
     def onLoad(self):
         self.time_to_introspection = 0
         print('Loading Spirit')
@@ -1192,14 +1214,14 @@ class Bunny(AliveEntity):
 #### UI ####
 class InventoryUI(UI):
     font = pygame.font.SysFont("Arial",ITEM_COUNTER_SIZE)   
-    def __init__(self,entity:AliveEntity, surface_size:tuple|list = (WIDTH, HEIGHT)):
+    def __init__(self,entity:AliveEntity, surface_size:tuple|list = (WIDTH, HEIGHT), hotBarIndexes:tuple[int,...]|None = None):
         screen_size = (surface_size[0]/WIDTH,surface_size[1]/HEIGHT)
         super().__init__(surface_size, (0,0), screen_size)
         self.screen_center = self.surface_size/2
         self.inventory:None|UniversalInventory = entity.inventory
         self.inventory_size = entity.inventory.spaces
         self.armour_inventory = entity.armour_inventory
-        self.has_hotbar = hasattr(entity,'hotbar')
+        self.has_hotbar = hasattr(entity,'hotbar') 
         if self.has_hotbar:
             self.hb_inventory = entity.hotbar
             self.hb_size = entity.hotbar.spaces
@@ -1226,7 +1248,6 @@ class InventoryUI(UI):
 
         if self.has_hotbar:
             self.hb_offset = self.screen_center+self.hb_slots_center - Vector2(self.hb_size * self.slot_spacing,self.slot_spacing)/2 
-            print(self.hb_offset,self.hb_size)
             self.hb_slots = [ItemSlot((i*self.slot_spacing+self.hb_offset[0],self.slot_spacing+self.hb_offset[1]),i,self.hotbar) for i in range(self.hb_size)]
 
         armour_size = Vector2(self.slot_spacing,self.slot_spacing * self.armour_inventory.spaces)
@@ -1299,11 +1320,11 @@ class HotBarUI:
         self.collider = Collider(self.x / WIDTH,self.y / HEIGHT,self.surface.get_width()/WIDTH,self.surface.get_height()/HEIGHT)# this is a normalized collider e.g. its values are from [0,1] so that they work with the input
         Camera.ui_draw_method(self)
         self.has_mouse = False
+        self.collider = Collider(self.x / WINDOW_WIDTH,self.y / WINDOW_HEIGHT,self.surface.get_width()/WINDOW_WIDTH,self.surface.get_height()/WINDOW_HEIGHT)# this is a normalized collider e.g. its values are from [0,1] so that they work with the input
     
     def onResize(self,newWidth,newHeight):
-        self.collider = Collider(self.x / newWidth,self.y / newHeight,self.surface.get_width()/newWidth,self.surface.get_height()/newHeight)# this is a normalized collider e.g. its values are from [0,1] so that they work with the input
-
-        self.recalc_slots()
+        #self.recalc_slots()
+        pass
 
     def recalc_slots(self):
         self.x = Camera.HALFSCREENSIZE.x - self.surface.get_width()/2
@@ -1319,10 +1340,9 @@ class HotBarUI:
 
     def update(self):
         m_pos = Input.m_pos.vector_mul(Camera.screen_size.inverse)
-        print(m_pos)
         if self.collider.collide_point_inclusive(m_pos.tuple):
             self.has_mouse = True
-            m_pos = m_pos.vector_mul(Camera.screen_size)
+            m_pos = m_pos.vector_mul(Vector2(WINDOW_WIDTH,WINDOW_HEIGHT))
             m_pos -= self.topleft
             for slot in self.slots:
                 slot.update(m_pos)

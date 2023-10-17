@@ -5,7 +5,7 @@ from Constants import BLOCK_SIZE
 from Input import m_pos_normalized
 import moderngl
 from array import array
-from Events import add_OnResize
+from Events import add_OnResize, call_OnResize
 from pygame import Surface
 from game_math import floor
 #####Variables#####
@@ -110,11 +110,11 @@ def init(display:Surface):
     opengl_screen.use(0)
 
     
-
 def onResize(_width,_height):
     global width,height,HALFWIDTH,HALFHEIGHT,HALFSCREENSIZE,screen_size
     
-    width,height = _width,_height
+    WIDTH, HEIGHT = width,height = _width,_height
+    
     HALFWIDTH = WIDTH//2
     HALFHEIGHT = HEIGHT//2
     HALFSCREENSIZE.x = HALFWIDTH
@@ -260,6 +260,10 @@ def blit(surface,position,s_offset_x = 0, s_offset_y = 0):
 def blit_csurface(csurface:CSurface):
     screen.blit(csurface.surf,(floor(csurface.pos.x*BLOCK_SIZE-camera_offset_x+HALFWIDTH+csurface.offset[0]),floor(csurface.pos.y*BLOCK_SIZE-camera_offset_y+ HALFHEIGHT+csurface.offset[1])))
 
+def resize_screen(width:int,height:int) -> Surface:
+    call_OnResize(width,height)
+    return pygame.display.set_mode((width,height),pygame.OPENGL|pygame.DOUBLEBUF|pygame.RESIZABLE)
+
 def sorted_draw_from_queue():
     queue.sort(key = _rank_csurface)
     for thing in queue:
@@ -272,12 +276,6 @@ def draw_collider_queue():
 def draw_background():
     for thing in background_queue:
         blit_csurface(thing)
-'''
-def draw():
-    screen.fill((0,0,0))
-    draw_background()
-    sorted_draw_from_queue()'''
-
 
 def draw_UI():
     for ui in UIs:

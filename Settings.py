@@ -69,7 +69,7 @@ MAX_SPEED_BY_SPECIES = {'human':15,
 
 ARMOUR_SLOTS_BY_SPECIES:dict[str,tuple[str,...]] = {
     'human': ('headwear','chestwear','legwear','footwear'),
-    'spirit':  tuple(), #the tuple must be explicit because python doesn't recognize the shorthand version
+    'spirit':  tuple(), #the tuple must be explicit because python doesn't recognize the shorthand version in this context
     'bunny':('headwear',)
 }
 
@@ -78,7 +78,7 @@ VISION_BY_SPECIES:dict[str,int] = {
     'spirit': 3,
     'bunny': 3.5
 }
-INVENTORY_SPACES_BY_SPECIES = {'human':27,'spirit':0,'bamboo':0,'raccoon':1,'squid':0,'bunny':0}
+INVENTORY_SPACES_BY_SPECIES = {'human':36,'spirit':0,'bamboo':0,'raccoon':1,'squid':0,'bunny':0} # should include hotbar too
 
 ## Since the "Great Merge of Inventories" each entity has to start by getting its armourslots and then its normal inventory spaces
 

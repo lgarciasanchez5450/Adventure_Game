@@ -33,8 +33,11 @@ def restrainMagnitude(x:float,y:float,mag:float):
 def randomNudge(x:float,y:float,nudgeMag:float): #this random nudge prefers smaller nudges than bigger ones
 	#techincally it will nudge it more in the diagonal more than horiztonal since the nudge values are not normalized
 	mag = sqrt(x*x+y*y)
-	x += nudgeMag * (2*random()-1) #TODO make it so that it nudges equally in all directions using restrainMagnitude
-	y += nudgeMag * (2*random()-1)
+	nudgeX = 2*random()-1
+	nudgeY = 2*random()-1
+	nudgeX, nudgeY = restrainMagnitude(nudgeX,nudgeY,1)
+	x += nudgeMag * nudgeX #TODO make it so that it nudges equally in all directions using restrainMagnitude
+	y += nudgeMag * nudgeY
 	return  set_mag(x,y,mag)
 	
 

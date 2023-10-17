@@ -7,7 +7,6 @@ import pygame
 pygame.init()
 
 
-screen = pygame.Surface((WIDTH,HEIGHT))
 import Camera
 import Time
 import Input 
@@ -34,22 +33,18 @@ def onGameAwake():
     global gen
     import Textures
     Textures.init()
-    Camera.init(screen)
-    Pause_Menu.init()
-    Sounds.init()
-    debug.init(screen)
     Time.init()
     Music.init()
-    Camera.set_mouse_pull_strength(13)
-    Music.start()
-    Game_Time.time_speed = 24   
-    Game_Time.start()
-    Game_Time.set_time(hour =8)
-    Game_Time.update()
-    gen = general_manager.generate_world()
+    Pause_Menu.init()
+
 
 def onGameStart():
     
+    screen = pygame.Surface((WIDTH,HEIGHT))
+    Camera.init(screen)
+    Sounds.init()
+    debug.init(screen)
+    Music.start()
     Camera.set_mouse_assist(False)
     player = general_manager.Player((0,0))
     general_manager.spawn_entity(player)
@@ -57,8 +52,14 @@ def onGameStart():
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(-2,0),general_manager.Bow()))
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),general_manager.ItemArrow().setCount(64)))
     Camera.set_focus(player.pos)
-    Events.call_OnResize(WINDOW_WIDTH,WINDOW_HEIGHT)
-    display = pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT),pygame.OPENGL| pygame.DOUBLEBUF|pygame.RESIZABLE) # can be Resizable with no problems
+    Camera.set_mouse_pull_strength(13)
+    #Events.call_OnResize(WINDOW_WIDTH,WINDOW_HEIGHT)
+    Game_Time.time_speed = 24   
+    Game_Time.start()
+    Game_Time.set_time(hour =8)
+    Game_Time.update()
+    Camera.resize_screen(WINDOW_WIDTH,WINDOW_HEIGHT)
+    #pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT),pygame.OPENGL| pygame.DOUBLEBUF|pygame.RESIZABLE) # can be Resizable with no problems
 
 Camera.program['tex'] = 0 # can be set outside of the game loop
 t = gc.collect()
@@ -107,10 +108,14 @@ while True:
     elif Settings.game_state is MAIN_MENU:
         Main_Menu.update()
         if (Main_Menu.loading_for.timeElapsed() > 2): #if has been "loading" for more than 2 seconds start generating the world-
+            gen = general_manager.generate_world()
+
             onGameAwake()
             Settings.game_state = GENERATING_WORLD
     elif Settings.game_state is GENERATING_WORLD:
             try:
+                Main_Menu.update()
+
                 next(gen) #type: ignore
             except StopIteration:
                 Main_Menu.close()
