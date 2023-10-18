@@ -1,4 +1,4 @@
-import game_math'
+import game_math
 
 # There will be a sort of convention to follow when creating a custom character or even an AliveEntity in the first place
 
