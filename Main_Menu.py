@@ -1,6 +1,6 @@
-from Main_Menu_Framework import Button, Picture, Surface, Vector2, BLOCK_SIZE,Stopwatch
+from Main_Menu_Framework import Button, Picture, Surface, Vector2, BLOCK_SIZE,Stopwatch, LoadingBar
 import Camera, pygame,Input, Events,Time
-
+from Constants.Generation import TOTAL_GENERATED_CHUNKS
     #Camera-Viewpoints
 main_view_pos = Vector2.zero
 
@@ -8,7 +8,7 @@ play_view_pos = Vector2(0,-8)
 
 loading_for = Stopwatch()
 def start():
-    global p,b
+    global p,b,lb
     pygame.MUSICEND = pygame.USEREVENT + 1  # type: ignore
     screen = pygame.display.set_mode((500,500),pygame.OPENGL| pygame.DOUBLEBUF|pygame.RESIZABLE) 
     pygame.font.init()
@@ -45,6 +45,7 @@ def start():
 
     b = Button(main_view_pos,Vector2(1,1)).setOnPress(startLoad).setCustomFrames((playTextSurface,))
     p = Picture(play_view_pos,Vector2(500,500)).setCustomFrames((loadingSurf1,loadingSurf2,loadingSurf3,loadingSurf4),2)
+    lb = LoadingBar(play_view_pos.moved_by(0,2),Vector2(300,30)).setMax(TOTAL_GENERATED_CHUNKS)
 
     del playTextSurface,playText,loadingSurf1,loadingSurf2,loadingSurf3,loadingSurf4,text1,text2,text3,text4
 
@@ -57,6 +58,7 @@ def update():
     Input.update()
     b.update()
     p.update()
+    lb.update()
     Camera.update()
     Camera.sorted_draw_from_queue()
     Camera.translate_to_opengl()
@@ -67,6 +69,7 @@ def close():
     loading_for.reset()
     b.onLeave()
     p.onLeave()
+    lb.onLeave()
 
 
 if __name__ == '__main__':

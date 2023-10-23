@@ -2078,7 +2078,7 @@ def generate_world():
 
     if len(Chunk._insts) != 0 or len(chunks) != 0: # if we have tried to create some chunks previously
         raise GenerationError('The game has tried to generate a world that already has chunks!??!??!')
-    yield 
+    yield 1,TOTAL_GENERATED_CHUNKS
     checkIsGen()
     to_generate = set()
     for cy in range(INITIAL_GEN_SIZE):
@@ -2089,6 +2089,8 @@ def generate_world():
             cpos = (cx,cy)
             queue_chunk(cpos)
             to_generate.add(cpos)
+    if len(to_generate) != TOTAL_GENERATED_CHUNKS:
+        raise GenerationError("Math error: Chunks loaded to generate are not the amount that should be.")
     done = 0
     while True:
         checkIsGen()
@@ -2099,6 +2101,7 @@ def generate_world():
         match status:
             case 'done':
                 chunk_loading_queue.popleft()
+                done += 1
 
         chunk_loading_queue.rotate()
 

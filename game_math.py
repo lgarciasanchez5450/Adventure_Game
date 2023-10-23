@@ -131,6 +131,9 @@ class Vector2:
 	def __floordiv__(self,__object:scalar):
 		return Vector2(self.x // __object, self.y // __object)
 	
+	def moved_by(self,x:scalar,y:scalar):
+		return Vector2(self.x + x, self.y + y)
+
 	def dot(self,__object):
 		assert isinstance(__object,Vector2)
 		return self.x*__object.x+self.y*__object.y

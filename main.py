@@ -102,7 +102,7 @@ while True:
     elif Settings.game_state is SETTINGS:
         Time.update()
         #
-        Pause_Menu.update()
+        Pause_Menu.update()  
         Camera.flip()
 
     elif Settings.game_state is MAIN_MENU:
@@ -115,8 +115,9 @@ while True:
     elif Settings.game_state is GENERATING_WORLD:
             try:
                 Main_Menu.update()
-
-                next(gen) #type: ignore
+                chunks_finished, _ = next(gen)
+                print(chunks_finished)
+                Main_Menu.lb.setDone(chunks_finished) #type: ignore
             except StopIteration:
                 Main_Menu.close()
                 onGameStart()
