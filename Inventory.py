@@ -19,6 +19,8 @@ class Item(UnInstantiable):
     def stackCompatible(self,other) -> bool: ...
     def stopUse(self,inventory:object): ...
     
+class InventoryInterface(UnInstantiable):
+    def seeIndex(self,index:int): ...
 
 
 class Inventory:
@@ -141,6 +143,8 @@ class ArmorInventory:
         self.inventory = {}
         for space in spaces:
             self.inventory[space] = None
+    def seeIndex(self,index:str):
+        return self.inventory[index]
 
     def set_armour(self,armour:Item|None,body_space:str) -> Item|None:
         '''
@@ -204,6 +208,7 @@ class HotbarInventory(Inventory):
     def setSelected(self,newSelected:int) -> None:
         self.stop_use_selected()
         self.selected = newSelected
+
 
     
     def pop_selected(self) -> Item|None:

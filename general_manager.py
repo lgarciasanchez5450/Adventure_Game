@@ -69,7 +69,7 @@ class UniversalInventory:
     def setItem(self,item,index:int):
         '''
         The implementation should prioritize combining the items, if that doesn't work it will swap them
-        Should return item that is left over
+        Should return item that is left over or None if nothing is left over
         '''
         assert isinstance(item,(Item,type(None)))
         #check if new item passes slot restrictions
@@ -148,7 +148,7 @@ class UniversalInventory:
                 self.inventory[slot] = item
                 return 
         return item
-
+    '''
     def get_selected(self) -> None:
         return self.inventory[self.selected]
     
@@ -172,6 +172,9 @@ class UniversalInventory:
     
     def pop_selected(self) -> None:
         return self.inventory.take(self.selected)          
+    '''
+    def seeIndex(self,index:int):
+        return self.inventory[index]
 
     @property
     def added_spd(self) -> float:
@@ -816,9 +819,11 @@ class Player(AliveEntity):
         self.set_state(0)
         self.showingInventory = False
         
-        self.hotbar = UniversalInventory(9,self)
+        #humans have 36 inventory spots and 9 hotbar spots
+        self.hotbar = Hotbar(self.inventory,27,28,29,30,31,32,33,34,35)
+        
         self.ui = InventoryUI(self,(WIDTH*.7,HEIGHT*.7))
-        self.hbui = HotBarUI(self)
+        self.hbui = HotBarUI(self,self.hotbar)
 
         self.direction = 'right'
 
@@ -909,7 +914,7 @@ class Player(AliveEntity):
             pass
 
         if Input.m_d1:
-            item = self.hotbar.get_selected()
+            item = self.hotbar.seeSelected()
             print('attacked with item',item)
         if Input.m_d3:
             self.hotbar.start_use_selected()
@@ -960,9 +965,8 @@ class Player(AliveEntity):
             print('picking up ',item)
             item:ItemWrapper
             if item.pickup_time < 0 :
-                i = self.hotbar.fitItem(item.item) 
-                if i is not None:
-                    i = self.inventory.fitItem(item.item) #this will never add the same object to both hotbar and inventory becasue the or will only try to add to inventory if the item couldn't be added to the hotbar
+
+                i = self.inventory.fitItem(item.item) #this will never add the same object to both hotbar and inventory becasue the or will only try to add to inventory if the item couldn't be added to the hotbar
                 if i is None:
                     item.onDeath()
 
@@ -1222,10 +1226,14 @@ class InventoryUI(UI):
         self.inventory_size = entity.inventory.spaces
         self.armour_inventory = entity.armour_inventory
         self.has_hotbar = hasattr(entity,'hotbar') 
+        self.inventory_dont_do = tuple()
         if self.has_hotbar:
+            assert isinstance(entity.hotbar,Hotbar)
+            assert entity.hotbar._inv is self.inventory, 'the hotbar must derive from the entities\' own inventory!'
             self.hb_inventory = entity.hotbar
-            self.hb_size = entity.hotbar.spaces
-            self.hotbar:UniversalInventory = entity.hotbar
+            self.hb_size = entity.hotbar.len
+            self.hotbar = entity.hotbar
+            self.inventory_dont_do = self.hb_inventory.spaces
 
         self.collider = Collider(self.topleft.x,self.topleft.y,screen_size[0]*2,screen_size[1]*2)
 
@@ -1242,8 +1250,18 @@ class InventoryUI(UI):
     def recalc_slots(self):
         slots_size = Vector2(self.slots_width * self.slot_spacing, self.inventory_size//self.slots_width * self.slot_spacing)
         self.items_offset = self.screen_center + self.slots_center - slots_size/2
+        self.slots = []
+        for i in range(self.inventory_size):
+            # two ways to stop hotbar slots to be shown twice
+            # way 1 is to simply skip over them when creating the ItemSlots
+            # this could lead to empty spaces if there hotbar slots in the middle of the main inventory
+            # way 2 is to only increment <i> if the current index is not currently part of the hotbar so basically it will make the Itemslots appear continuous 
+            
+            # for now imma just skip them and still increment <i> to clearly show if im skpping any so any bugs will be found easily
+            if i in self.inventory_dont_do: continue #there.. happy??
 
-        self.slots = [ItemSlot(((i%self.slots_width)*self.slot_spacing+self.items_offset[0],(i//self.slots_width)*self.slot_spacing+self.items_offset[1]),i,self.inventory) for i in range(self.inventory_size)]
+            item = ItemSlot(((i%self.slots_width)*self.slot_spacing+self.items_offset[0],(i//self.slots_width)*self.slot_spacing+self.items_offset[1]),i,self.inventory)
+            self.slots.append(item)
         self.thingy = self.size.inverse
 
         if self.has_hotbar:
@@ -1303,26 +1321,67 @@ class InventoryUI(UI):
         self.surface.blit(entity,(self.screen_center.x-100,10))
         super().draw()
 
+class Hotbar:
+    def __init__(self,inventory:UniversalInventory,*spaces):
+        '''Spaces should be indexes  '''
+        self._inv = inventory
+        self.len = len(spaces)
+        self.spaces = spaces # offers a level of indirection to map hotbar indexes to inventory indexs
+        self.selected:int =  0 # this is a hotbar index
+
+    def __len__(self) -> int:
+        return self.len
+    
+    def setItem(self,item,index) -> (Item | None):
+        return self._inv.setItem(item,self.spaces[index])
+
+    def seeIndex(self,hotbarIndex:int):
+        return self._inv.inventory[self.spaces[hotbarIndex]]
+
+    def seeSelected(self) -> None:
+        return self.seeIndex(self.selected)
+    
+    def start_use_selected(self) -> None:
+        item:Item = self.seeSelected()
+        if item is None: return
+        item.startUse(self);  
+        if item.count == 0:
+            self._inv.inventory[self.selected] = None
+
+    def stop_use_selected(self):
+        item:Item = self.seeSelected()
+        if item is None: return
+        item.stopUse(self)
+        if item.count == 0:
+            self._inv.inventory[self.selected] = None
+    
+    def setSelected(self,newSelected:int) -> None:
+        self.stop_use_selected()
+        self.selected = newSelected
+    
+    def getSelected(self) -> None:
+        '''Will return the original item while removing it from the hotbar.\n
+        If only using for information then use seeSelected()'''
+        return self._inv.inventory.take(self.spaces[self.selected])          
+
+
 class HotBarUI:
-    def __init__(self,entity:AliveEntity):
+    def __init__(self,entity:AliveEntity,hotbar:Hotbar):
         if not hasattr(entity,'hotbar'):
             raise RuntimeError('entity passed into HotBarUI does not seem to define its hotbar!')
         self.entity = entity
         self.slot_spacing = 4 #this is how many pixels will be between the edges of each
-        self.hb_inventory = entity.hotbar
-        self.inventory_size = entity.hotbar.spaces
+        self.hb_inventory = hotbar
         self.background_color = [133,133,133,150]    #RGBA
-        self.surface = Surface((self.hb_inventory.spaces * (self.slot_spacing + ITEM_SIZE) + self.slot_spacing, ITEM_SIZE + self.slot_spacing * 2),pygame.SRCALPHA)
+        self.surface = Surface((self.hb_inventory.len * (self.slot_spacing + ITEM_SIZE) + self.slot_spacing, ITEM_SIZE + self.slot_spacing * 2),pygame.SRCALPHA)
         self.x = Camera.HALFSCREENSIZE.x - self.surface.get_width()/2
         self.y = Camera.HEIGHT - self.surface.get_height()
         self.recalc_slots()
-        Events.add_OnResize(self.onResize)
         self.collider = Collider(self.x / WIDTH,self.y / HEIGHT,self.surface.get_width()/WIDTH,self.surface.get_height()/HEIGHT)# this is a normalized collider e.g. its values are from [0,1] so that they work with the input
         Camera.ui_draw_method(self)
         self.has_mouse = False
         self.collider = Collider(self.x / WINDOW_WIDTH,self.y / WINDOW_HEIGHT,self.surface.get_width()/WINDOW_WIDTH,self.surface.get_height()/WINDOW_HEIGHT)# this is a normalized collider e.g. its values are from [0,1] so that they work with the input
     
-    def onResize(self,newWidth,newHeight):
         #self.recalc_slots()
         pass
 
@@ -1331,7 +1390,7 @@ class HotBarUI:
         self.y = Camera.HEIGHT - self.surface.get_height()
         self.topleft = Vector2(self.x,self.y)
 
-        self.slots = [ItemSlot((i*(ITEM_SIZE+self.slot_spacing)+self.slot_spacing,self.slot_spacing),i,self.hb_inventory) for i in range(self.inventory_size)]
+        self.slots = [ItemSlot((i*(ITEM_SIZE+self.slot_spacing)+self.slot_spacing,self.slot_spacing),i,self.hb_inventory) for i in range(self.hb_inventory.len)]
         self.surface.fill(self.background_color)
 
     def onMouseLeave(self):
