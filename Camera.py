@@ -61,7 +61,7 @@ collider_queue = []
 background_queue = []
 UIs:list[Callable[[],game_math.ImplementsDraw]] = []
 focus = game_math.Vector2.zero
-HALFSCREENSIZE:game_math.Vector2
+halfscreensize:game_math.Vector2
 screen_size:game_math.Vector2
 camera_pos = focus.copy()
 tracking_system:Literal['fixed','smooth'] = 'fixed'
@@ -72,13 +72,13 @@ mouse_pull_strength = 1/3
 width:int
 height:int
 def init(display:Surface):
-    global screen,WIDTH,HEIGHT,HALFWIDTH,HALFHEIGHT,HALFSCREENSIZE,width,height,screen_size
+    global screen,WIDTH,HEIGHT,HALFWIDTH,HALFHEIGHT,halfscreensize,width,height,screen_size
 
     screen = display
     WIDTH,HEIGHT = width,height = screen.get_size()
     HALFWIDTH = WIDTH//2
     HALFHEIGHT = HEIGHT//2
-    HALFSCREENSIZE = game_math.Vector2(HALFWIDTH,HALFHEIGHT)
+    halfscreensize = game_math.Vector2(HALFWIDTH,HALFHEIGHT)
     screen_size = game_math.Vector2(width-1,height-1)
 
     global ctx, quad_buffer, vertex_src, fragment_src
@@ -111,14 +111,10 @@ def init(display:Surface):
 
     
 def onResize(_width,_height):
-    global width,height,HALFWIDTH,HALFHEIGHT,HALFSCREENSIZE,screen_size
-    
-    WIDTH, HEIGHT = width,height = _width,_height
-    
-    HALFWIDTH = WIDTH//2
-    HALFHEIGHT = HEIGHT//2
-    HALFSCREENSIZE.x = HALFWIDTH
-    HALFSCREENSIZE.y = HALFHEIGHT
+    global width,height,screen_size
+    width, height = _width, _height
+    halfscreensize.x = _width//2
+    halfscreensize.y = _height//2
     screen_size.x = width-1
     screen_size.y = height-1
 add_OnResize(onResize)
@@ -229,14 +225,14 @@ def screen_position(pos:game_math.Vector2):
     return (floor(pos.x*BLOCK_SIZE-floor(effective_camera_pos.x*BLOCK_SIZE)+HALFWIDTH) * (width/ WIDTH),floor(pos.y*BLOCK_SIZE-floor(effective_camera_pos.y*BLOCK_SIZE)+ HALFHEIGHT)* ( width/WIDTH)) 
 
 def screen_position_normalized(world_pos:game_math.Vector2):
-    return ((world_pos-effective_camera_pos) * BLOCK_SIZE).vector_mul((HALFSCREENSIZE-game_math.ones).inverse())
+    return ((world_pos-effective_camera_pos) * BLOCK_SIZE).vector_mul((halfscreensize-game_math.ones).inverse)
 
 def world_position(screen_pos:game_math.Vector2):
     
-    return (screen_pos - HALFSCREENSIZE) / BLOCK_SIZE + effective_camera_pos
+    return (screen_pos - halfscreensize) / BLOCK_SIZE + effective_camera_pos
 
 def world_position_from_normalized(screen_pos:game_math.Vector2):
-    return screen_pos.vector_mul(HALFSCREENSIZE-game_math.ones) / BLOCK_SIZE + effective_camera_pos
+    return screen_pos.vector_mul(halfscreensize-game_math.ones) / BLOCK_SIZE + effective_camera_pos
 
 
 '''Helper Functions'''

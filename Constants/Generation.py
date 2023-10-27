@@ -7,7 +7,7 @@ PLAYER_PLACEMENT_IRREGULARITY = 5
 OCTAVES = 6
 MAPWIDTH  = 700
 MAPHEIGHT = 700
-SCALE     = .1
+SCALE     = .1 #should be .001 for production
 
 '''Initial Generation Variables'''
 INITIAL_GEN_SIZE = 2 #for both x and y

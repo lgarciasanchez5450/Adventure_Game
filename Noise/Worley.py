@@ -31,6 +31,8 @@ class WorleyNoise:
 
 
 
+### BEWARE ###
+# There be dragons in the depths below
 
 @njit(inline='never')
 def _get_point_of_cell(x:int,y:int,global_hash):
@@ -62,7 +64,7 @@ def _getAt(x:float,y:float,global_hash):
     return shortest
 
 @njit(parallel = True,boundscheck = False)
-def _getArr(xs:numpy.ndarray,ys:numpy.ndarray,scale,global_hash,island_mod):
+def _getArr(xs:numpy.ndarray,ys:numpy.ndarray,scale:float,global_hash,island_mod):
     xs = xs * scale
     ys = ys * scale
     noise = numpy.empty((ys.size, xs.size), dtype=numpy.float32)

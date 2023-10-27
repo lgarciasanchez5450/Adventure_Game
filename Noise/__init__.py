@@ -17,7 +17,10 @@ __all__ = [
     'noise1',
 ]
 
-from Noise.Worley import WorleyNoise
+try:
+    from Noise.Worley import WorleyNoise
+except: 
+    from Worley import WorleyNoise #if we are running from this script
 
 try:
     from Perlin import noise2,noise2_array,set_seed
@@ -65,5 +68,43 @@ def unit_smoothstep(i:ndarray):
     return i * (-i*i+3) / 2
 def rescale(i:ndarray):
     return (i + 1) / 2
+def inverse_rescale(i:ndarray):
+    return i * 2 - 1
+
+if __name__ == '__main__':
+    def lerp(a,b,t):
+        return a * (1-t) + b * t
+    import numpy as np
+    import pygame
+    pygame.init()
 
 
+    screen = pygame.display.set_mode((500,500))
+    scale = 0.4
+    a = (
+        lerp(
+            lerp(
+                LayeredNoiseMap((0.02 * scale, .040 * scale, .080 * scale , .080* scale ),(1.0 , 0.5 , 0.25 , 0.125)).getArr(np.arange(500),np.arange(500)), # texturing
+                inverse_rescale(WorleyNoise(0,.01* scale).getArr(np.arange(500),np.arange(500))), # continents
+                .4
+            ) ,
+            -WorleyNoise(0,.2* scale).getArr(np.arange(500),np.arange(500)), # continents
+            .1
+        )
+    )
+    for y,row in enumerate((a + 1)/2):
+        for x, height in enumerate(row):
+            if height > .5:
+                screen.set_at((x,y),(0,255,0))
+            else:
+                screen.set_at((x,y),(height*255,height*255,height*255))
+        
+    running = True
+    while running:
+        pygame.event.pump()
+        pygame.time.Clock().tick(10)
+        pygame.display.flip()
+
+
+
+    pygame.quit()

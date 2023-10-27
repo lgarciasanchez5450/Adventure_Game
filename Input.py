@@ -157,10 +157,10 @@ def update():
                     event.w = FORCE_ASPECT_RATIO[0] * event.h // FORCE_ASPECT_RATIO[1]
                 
                 if change_on_x or change_on_y:
-                    #call_OnResize(event.w,event.h)
+                    call_OnResize(event.w,event.h)
                     pygame.display.set_mode((event.w,event.h),pygame.OPENGL|pygame.RESIZABLE|pygame.DOUBLEBUF)
             else:
                 pass
-                #call_OnResize(event.w,event.h)
+                call_OnResize(event.w,event.h)
         
         

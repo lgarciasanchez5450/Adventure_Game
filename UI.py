@@ -86,5 +86,4 @@ Null = EmtpyUI()
 
 showingUIs:deque[UI] = deque([Null],maxlen=1)
 
-current_ui = Null
 

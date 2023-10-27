@@ -288,16 +288,16 @@ class ItemArrow(Item):
     def __init__(self):
         super().__init__(ITAG_ARROW)
 
-
-class Bow(Item):
+class BowBase(Item):
     __slots__ = 'springyness','startTime','loadStage','max_pull_time'
-    def __init__(self):
-        super().__init__(ITAG_BOW)
+    def __init__(self,item_tag:str):
+        super().__init__(item_tag)
         self.loadStage = 0.0
         self.startTime:float|None
         self.startTime = None
         self.springyness:float = 7.0 # used to calculate arrow speed
         self.max_pull_time = 5.0 #the maximum amount of time held down that should be counted towards the bow fire
+    
     def startUse(self,inventory):
         assert isinstance(inventory,UniversalInventory)
         for i,item in enumerate(inventory.inventory):
@@ -312,28 +312,62 @@ class Bow(Item):
         if self.startTime is None: return
         assert isinstance(inventory,UniversalInventory)
         time = min(Time.time - self.startTime,self.max_pull_time)
-        speed_modifier = tanh(time) * self.springyness
+        speed_modifier = self.getArrowSpeedFromTime(time)
         direction = Input.m_pos_from_middle.normalized
         direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
         spawn_entity(Arrow(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
-        
-    def getArrowInstability(self,t): # this is how much the arrow should be randomized for 
-        return 1/ ( 5.0 + (4.5 * (t - 0.3))**2)
 
-class QuickBow(Bow):
+    def getArrowSpeedFromTime(self,t:float) -> float: ...
+        
+    def getArrowInstability(self,t:float) -> float: ...
+
+class Bow(BowBase):
     __slots__ = 'springyness','startTime','loadStage','max_pull_time'
     def __init__(self):
-        super().__init__()
+        super().__init__(ITAG_BOW)
+
+    def startUse(self,inventory):
+        assert isinstance(inventory,UniversalInventory)
+        for i,item in enumerate(inventory.inventory):
+            if isinstance(item,ItemArrow):
+                item.count -= 1
+                inventory.checkItem(i)            
+                self.startTime = Time.time
+                return 
+        self.startTime = None
+    
+    def stopUse(self,inventory) -> None:
+        if self.startTime is None: return
+        assert isinstance(inventory,UniversalInventory)
+        time = min(Time.time - self.startTime,self.max_pull_time)
+        speed_modifier = self.getArrowSpeedFromTime(time)
+        direction = Input.m_pos_from_middle.normalized
+        direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
+        spawn_entity(Arrow(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
+    
+    def getArrowSpeedFromTime(self,t:float) -> float:
+        return tanh(t) * self.springyness
+
+    def getArrowInstability(self,t:float) -> float: # this is how much the arrow should be randomized for 
+        return 1/ ( 5.0 + (4.5 * (t - 0.3))**2)
+
+class QuickBow(BowBase):
+    __slots__ = 'springyness','startTime','loadStage','max_pull_time'
+    def __init__(self):
+        super().__init__(ITAG_SHORTBOW)
         self.springyness = 5.0
         
     def stopUse(self, inventory) -> None:
         if self.startTime is None: return
         assert isinstance(inventory,UniversalInventory)
-        time = min(2*(Time.time - self.startTime),self.max_pull_time)
-        speed_modifier = tanh(time) * self.springyness
+        time = min(Time.time - self.startTime,self.max_pull_time)
+        speed_modifier = self.getArrowSpeedFromTime(time)
         direction = Input.m_pos_from_middle.normalized
         direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
         spawn_entity(Arrow(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
+    
+    def getArrowSpeedFromTime(self,t:float) -> float:
+        return tanh(min(2*t,self.max_pull_time)) * self.springyness
     def getArrowInstability(self,t): # this is how much the arrow should be randomized for 
         return 1/ ( 5.0 + (3.5 * (t - 0.3))**2)+0.2
 #### BLOCKS ####
@@ -1226,13 +1260,15 @@ class InventoryUI(UI):
         self.inventory_size = entity.inventory.spaces
         self.armour_inventory = entity.armour_inventory
         self.has_hotbar = hasattr(entity,'hotbar') 
+        
         self.inventory_dont_do = tuple()
         if self.has_hotbar:
-            assert isinstance(entity.hotbar,Hotbar)
-            assert entity.hotbar._inv is self.inventory, 'the hotbar must derive from the entities\' own inventory!'
-            self.hb_inventory = entity.hotbar
-            self.hb_size = entity.hotbar.len
-            self.hotbar = entity.hotbar
+
+            assert isinstance(entity.hotbar,Hotbar) #type: ignore
+            assert entity.hotbar._inv is self.inventory, 'the hotbar must derive from the entities\' own inventory!'#type: ignore
+            self.hb_inventory = entity.hotbar  #type: ignore
+            self.hb_size = entity.hotbar.len #type: ignore
+            self.hotbar = entity.hotbar #type: ignore
             self.inventory_dont_do = self.hb_inventory.spaces
 
         self.collider = Collider(self.topleft.x,self.topleft.y,screen_size[0]*2,screen_size[1]*2)
@@ -1250,7 +1286,7 @@ class InventoryUI(UI):
     def recalc_slots(self):
         slots_size = Vector2(self.slots_width * self.slot_spacing, self.inventory_size//self.slots_width * self.slot_spacing)
         self.items_offset = self.screen_center + self.slots_center - slots_size/2
-        self.slots = []
+        self.slots:list[ItemSlot] = []
         for i in range(self.inventory_size):
             # two ways to stop hotbar slots to be shown twice
             # way 1 is to simply skip over them when creating the ItemSlots
@@ -1338,20 +1374,20 @@ class Hotbar:
     def seeIndex(self,hotbarIndex:int):
         return self._inv.inventory[self.spaces[hotbarIndex]]
 
-    def seeSelected(self) -> None:
+    def seeSelected(self) -> Item|None:
         return self.seeIndex(self.selected)
     
     def start_use_selected(self) -> None:
-        item:Item = self.seeSelected()
+        item:Item|None = self.seeSelected()
         if item is None: return
-        item.startUse(self);  
+        item.startUse(self._inv);  
         if item.count == 0:
             self._inv.inventory[self.selected] = None
 
     def stop_use_selected(self):
-        item:Item = self.seeSelected()
+        item:Item|None = self.seeSelected()
         if item is None: return
-        item.stopUse(self)
+        item.stopUse(self._inv)
         if item.count == 0:
             self._inv.inventory[self.selected] = None
     
@@ -1359,7 +1395,7 @@ class Hotbar:
         self.stop_use_selected()
         self.selected = newSelected
     
-    def getSelected(self) -> None:
+    def getSelected(self) -> None|Item:
         '''Will return the original item while removing it from the hotbar.\n
         If only using for information then use seeSelected()'''
         return self._inv.inventory.take(self.spaces[self.selected])          
@@ -1374,7 +1410,7 @@ class HotBarUI:
         self.hb_inventory = hotbar
         self.background_color = [133,133,133,150]    #RGBA
         self.surface = Surface((self.hb_inventory.len * (self.slot_spacing + ITEM_SIZE) + self.slot_spacing, ITEM_SIZE + self.slot_spacing * 2),pygame.SRCALPHA)
-        self.x = Camera.HALFSCREENSIZE.x - self.surface.get_width()/2
+        self.x = Camera.halfscreensize.x - self.surface.get_width()/2
         self.y = Camera.HEIGHT - self.surface.get_height()
         self.recalc_slots()
         self.collider = Collider(self.x / WIDTH,self.y / HEIGHT,self.surface.get_width()/WIDTH,self.surface.get_height()/HEIGHT)# this is a normalized collider e.g. its values are from [0,1] so that they work with the input
@@ -1386,7 +1422,7 @@ class HotBarUI:
         pass
 
     def recalc_slots(self):
-        self.x = Camera.HALFSCREENSIZE.x - self.surface.get_width()/2
+        self.x = Camera.halfscreensize.x - self.surface.get_width()/2
         self.y = Camera.HEIGHT - self.surface.get_height()
         self.topleft = Vector2(self.x,self.y)
 

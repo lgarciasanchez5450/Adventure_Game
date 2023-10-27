@@ -2,7 +2,9 @@ from pygame.time import Clock
 from time import perf_counter as _getTime # can switch to normal time 
 import time as _time
 from typing import Callable
-from Constants import FPS
+from Constants.Display import FPS
+from Constants.Misc import NEGATIVE_INFINITY
+
 class Stopwatch:
   def __init__(self,function:Callable[[],float] = _time.time):
     self.startTime = float('-inf')
@@ -11,7 +13,7 @@ class Stopwatch:
     self.measurement = function
 
   def running(self):
-    return self.startTime != float('-inf')
+    return self.startTime != NEGATIVE_INFINITY
       
   def start(self):
     self.startTime = self.measurement()
@@ -19,7 +21,7 @@ class Stopwatch:
   def stop(self) -> float:
     time = self.timeElapsed()
     self.paused = 0
-    self.startTime = float('-inf')
+    self.startTime = NEGATIVE_INFINITY
     self.extraTime = 0
     return time
 
@@ -99,4 +101,4 @@ def update():
     fixedTime += fixedDeltaTime
 
 if __name__ == '__main__':
-  print(locals())
+  pass
