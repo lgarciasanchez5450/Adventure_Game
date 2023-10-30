@@ -50,7 +50,7 @@ def onGameStart():
     general_manager.spawn_entity(player)
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,0),general_manager.QuickBow()))
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(-2,0),general_manager.Bow()))
-    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),general_manager.ItemArrow().setCount(64)))
+    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),general_manager.ItemArrowExplosive().setCount(64)))
     Camera.set_focus(player.pos)
     Camera.set_mouse_pull_strength(13)
     #Events.call_OnResize(WINDOW_WIDTH,WINDOW_HEIGHT)
@@ -60,8 +60,7 @@ def onGameStart():
     Game_Time.update()
     Camera.resize_screen(WINDOW_WIDTH,WINDOW_HEIGHT)
     #pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT),pygame.OPENGL| pygame.DOUBLEBUF|pygame.RESIZABLE) # can be Resizable with no problems
-
-Camera.program['tex'] = 0 # can be set outside of the game loop
+# can be set outside of the game loop
 t = gc.collect()
 print(t)
 del t

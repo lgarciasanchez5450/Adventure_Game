@@ -33,27 +33,10 @@ class WorleyNoiseSimple(WorleyNoise):
         self.scale = scale
         self.island_mod = 15
 
-class WorleyNoiseSmooth(WorleyNoise):
-    def __init__(self, seed: int, scale: float):
-        self.global_hash = hash(seed.__repr__()) # for each cell hashing
-        self.scale = scale
-
-    def getAt(self, x: float, y: float):
-        raise NotImplementedError()
-        
-    def getArr(self, xs, ys):
-        return _getArr2(xs,ys,self.scale,self.global_hash)
-
-    def getArrShifted(self, xs, ys):
-        return self.getArr(xs,ys)
 
 ### BEWARE ###
 # There be dragons in the depths below
 
-@njit
-def _get_point_of_cell_two(x:int,y:int,global_hash:int) -> tuple[float,float]:
-    random.seed(hash((x,y)) ^ global_hash) 
-    return x + 0.5 + (random.random()-0.5)/1.6, y + 0.5 + (random.random()-0.5)/1.6
 
 @njit(inline='never')
 def _get_point_of_cell(x:int,y:int,global_hash):
@@ -70,10 +53,7 @@ def _get_surrounding_cells(x:int,y:int):
 
 @njit
 def modifier(i):
-    val = (1-i*i)
-    return val * val 
-
-    return island_mod**(-i*i)
+    return 2**(-i*i) * i
 
 @njit
 def _getAt(x:float,y:float,global_hash):
@@ -94,7 +74,7 @@ def _getArr(xs:numpy.ndarray,ys:numpy.ndarray,scale:float,global_hash,island_mod
     noise = numpy.empty((ys.size, xs.size), dtype=numpy.float32)
     for y_i in prange(ys.size):
         for x_i in range(xs.size):
-            shortest_sqrd = 999.9
+            shortest_sqrd = 99999999.9
             cx = floor(xs[x_i])
             cy = floor(ys[y_i])
             surrounding_cells = numpy.array(((cx-1,cy-1),(cx,cy-1),(cx+1,cy-1),
@@ -110,33 +90,9 @@ def _getArr(xs:numpy.ndarray,ys:numpy.ndarray,scale:float,global_hash,island_mod
             noise[y_i, x_i] = sqrt(shortest_sqrd)
     return modifier(noise)
 
-@njit(parallel = True)
-def _getArr2(xs:numpy.ndarray,ys:numpy.ndarray,scale:float,global_hash):
-    xs = xs * scale
-    ys = ys * scale
-    noise = numpy.empty((ys.size, xs.size), dtype=numpy.float32)
-    for y_i in prange(ys.size):
-        for x_i in range(xs.size):
-            shortest_sqrd = 999.9
-            cx = floor(xs[x_i])
-            cy = floor(ys[y_i])
-            surrounding_cells = numpy.array(((cx-1,cy-1),(cx,cy-1),(cx+1,cy-1),
-                                             (cx-1,cy),  (cx,cy),  (cx+1,cy),
-                                             (cx-1,cy+1),(cx,cy+1),(cx+1,cy+1)))
-            for cx,cy in surrounding_cells:
-                px,py = _get_point_of_cell_two(cx,cy,global_hash)
-                dx = px-xs[x_i]
-                dy = py-ys[y_i]
-                d = dx*dx + dy*dy
-                if d < shortest_sqrd:
-                    shortest_sqrd = d
-            noise[y_i, x_i] = sqrt(shortest_sqrd)
-    return modifier(noise)
-
-
 if __name__ == "__main__":
     from time import perf_counter
-    e = WorleyNoiseSmooth(1,.01)
+    e = WorleyNoiseSimple(1,.01)
     e.getArr(numpy.arange(10),numpy.arange(10))
     import pygame
     

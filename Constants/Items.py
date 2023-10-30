@@ -10,5 +10,6 @@ ITAG_DIRT = 'Dirt'
 ITAG_BOW = 'bow'
 ITAG_SHORTBOW = 'shortbow'
 ITAG_ARROW = 'arrow'
+ITAG_ARROW_EXPLOSIVE = 'explosivearrow'
 ITAG_BUNNY_EGG = 'bunny egg'
 ITAG_SPAWN_EGG = "spawn_egg"

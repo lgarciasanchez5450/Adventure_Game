@@ -1,10 +1,12 @@
 from Constants import *
 from typing import final, Generator
 from pygame import Surface,draw
+from UI import Vector2
 import debug
 from game_math import *
-from Noise import WorleyNoise,LayeredNoiseMap, rescale, unit_smoothstep
+from Noise import WorleyNoiseSimple,LayeredNoiseMap, rescale, unit_smoothstep
 import Textures
+from game_math import Vector2
 if __name__ == '__main__':
     import pygame
     display = pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT),pygame.OPENGL| pygame.DOUBLEBUF|pygame.RESIZABLE) # can be Resizable with no problems
@@ -194,14 +196,58 @@ class UniversalInventory:
         for i,string in enumerate(dict.values(),start = index):
             self.addRestriction(i,lambda item : item.armour_type == string)
 
-#### ITEMS ####
+
+class Hotbar:
+    def __init__(self,inventory:UniversalInventory,*spaces):
+        '''Spaces should be indexes  '''
+        self._inv = inventory
+        self.len = len(spaces)
+        self.spaces = spaces # offers a level of indirection to map hotbar indexes to inventory indexs
+        self.selected:int =  0 # this is a hotbar index
+
+    def __len__(self) -> int:
+        return self.len
+    
+    def setItem(self,item,index):
+        return self._inv.setItem(item,self.spaces[index])
+
+    def seeIndex(self,hotbarIndex:int):
+        return self._inv.inventory[self.spaces[hotbarIndex]]
+
+    def seeSelected(self):
+        return self.seeIndex(self.selected)
+    
+    def start_use_selected(self) -> None:
+        item:Item|None = self.seeSelected()
+        if item is None: return
+        item.startUse(self._inv);  
+        if item.count == 0:
+            self._inv.inventory[self.selected] = None
+
+    def stop_use_selected(self):
+        item:Item|None = self.seeSelected()
+        if item is None: return
+        item.stopUse(self._inv)
+        if item.count == 0:
+            self._inv.inventory[self.selected] = None
+    
+    def setSelected(self,newSelected:int) -> None:
+        self.stop_use_selected()
+        self.selected = newSelected
+    
+    def getSelected(self):
+        '''Will return the original item while removing it from the hotbar.\n
+        If only using for information then use seeSelected()'''
+        return self._inv.inventory.take(self.spaces[self.selected])          
+
+
+#### ITEM STATS ####
 class ArmourStats:
     wearable:bool = True
     __slots__ = 'type','defense'
     def __init__(self,type:str,defense:int) -> None:
         self.type = type
         self.defense = defense
-
 
 class DurabilityStats:
     breakable = True
@@ -217,7 +263,7 @@ class DurabilityStats:
             return True
         return False
 
-
+#### ITEMS ####
 class Item:
     def setCount(self,count:int):
         assert count <= self.max_stack_count
@@ -285,8 +331,16 @@ class BunnyEgg(Item):
         spawn_entity(Bunny(Camera.world_position_from_normalized(Input.m_pos_normalized)))
 
 class ItemArrow(Item):
+    __slots__ = 'arrow'
     def __init__(self):
         super().__init__(ITAG_ARROW)
+        self.arrow = Arrow
+    
+class ItemArrowExplosive(Item):
+    __slots__ = 'arrow'
+    def __init__(self):
+        super().__init__(ITAG_ARROW_EXPLOSIVE)
+        self.arrow = ArrowExplosive
 
 class BowBase(Item):
     __slots__ = 'springyness','startTime','loadStage','max_pull_time'
@@ -297,53 +351,36 @@ class BowBase(Item):
         self.startTime = None
         self.springyness:float = 7.0 # used to calculate arrow speed
         self.max_pull_time = 5.0 #the maximum amount of time held down that should be counted towards the bow fire
+        self.loaded_item:Arrow|None = None
     
     def startUse(self,inventory):
         assert isinstance(inventory,UniversalInventory)
         for i,item in enumerate(inventory.inventory):
-            if isinstance(item,ItemArrow):
+            item:Item
+            if hasattr(item,'arrow'):
+                self.loaded_item = item.arrow
                 item.count -= 1
-                inventory.checkItem(i)            
+                inventory.checkItem(i)              
                 self.startTime = Time.time
                 return 
         self.startTime = None
     
     def stopUse(self,inventory) -> None:
-        if self.startTime is None: return
+        if self.startTime is None or self.loaded_item is None: return
         assert isinstance(inventory,UniversalInventory)
         time = min(Time.time - self.startTime,self.max_pull_time)
         speed_modifier = self.getArrowSpeedFromTime(time)
         direction = Input.m_pos_from_middle.normalized
         direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
-        spawn_entity(Arrow(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
+        spawn_entity(self.loaded_item(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
 
     def getArrowSpeedFromTime(self,t:float) -> float: ...
         
     def getArrowInstability(self,t:float) -> float: ...
 
 class Bow(BowBase):
-    __slots__ = 'springyness','startTime','loadStage','max_pull_time'
     def __init__(self):
         super().__init__(ITAG_BOW)
-
-    def startUse(self,inventory):
-        assert isinstance(inventory,UniversalInventory)
-        for i,item in enumerate(inventory.inventory):
-            if isinstance(item,ItemArrow):
-                item.count -= 1
-                inventory.checkItem(i)            
-                self.startTime = Time.time
-                return 
-        self.startTime = None
-    
-    def stopUse(self,inventory) -> None:
-        if self.startTime is None: return
-        assert isinstance(inventory,UniversalInventory)
-        time = min(Time.time - self.startTime,self.max_pull_time)
-        speed_modifier = self.getArrowSpeedFromTime(time)
-        direction = Input.m_pos_from_middle.normalized
-        direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
-        spawn_entity(Arrow(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
     
     def getArrowSpeedFromTime(self,t:float) -> float:
         return tanh(t) * self.springyness
@@ -352,24 +389,16 @@ class Bow(BowBase):
         return 1/ ( 5.0 + (4.5 * (t - 0.3))**2)
 
 class QuickBow(BowBase):
-    __slots__ = 'springyness','startTime','loadStage','max_pull_time'
     def __init__(self):
         super().__init__(ITAG_SHORTBOW)
         self.springyness = 5.0
-        
-    def stopUse(self, inventory) -> None:
-        if self.startTime is None: return
-        assert isinstance(inventory,UniversalInventory)
-        time = min(Time.time - self.startTime,self.max_pull_time)
-        speed_modifier = self.getArrowSpeedFromTime(time)
-        direction = Input.m_pos_from_middle.normalized
-        direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
-        spawn_entity(Arrow(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
     
     def getArrowSpeedFromTime(self,t:float) -> float:
         return tanh(min(2*t,self.max_pull_time)) * self.springyness
+    
     def getArrowInstability(self,t): # this is how much the arrow should be randomized for 
         return 1/ ( 5.0 + (3.5 * (t - 0.3))**2)+0.2
+
 #### BLOCKS ####
 class Block:
     @staticmethod
@@ -412,7 +441,6 @@ class Block:
 
     def update(self) -> None: ...
 
-
 class Tree(Block):
     oak_tex = '03.png'
     @staticmethod
@@ -429,7 +457,6 @@ class Tree(Block):
 
     def update(self):
         pass
-
 
 class TNT(Block):
     tnt_tex = 'tnt.png'
@@ -459,7 +486,6 @@ class TNT(Block):
         spawn_entity(LiveTNT(self.pos,4,15))
         return super().onDeath()
 
-
 class WoodenPlank(Block):
     @staticmethod
     def spawnable_on(ground:Ground):
@@ -469,7 +495,6 @@ class WoodenPlank(Block):
         super().__init__(pos,'woodenplank')
         self.surf = Textures.texture['15.png']
         self.csurface.surf = self.surf
-
 
 #### ENTITIES ####
 class Entity:
@@ -516,6 +541,11 @@ class Entity:
     def attack(self,entity):
         assert isinstance(entity,(Entity,Block))
         entity.take_damage(self.get_attack_damage(),self.get_attack_type(),self.appeareance)
+    
+    def attack_custom_damage(self,entity,damage:int):
+        assert isinstance(entity,(Entity,Block))
+        assert isinstance(damage,int)
+        entity.take_damage(damage,self.get_attack_type(),self.appeareance)
 
     def take_damage(self,damage:int,type:str,appearance:Appearance|None = None):
         self.onDeath()
@@ -555,9 +585,9 @@ class ItemWrapper(Entity):
 class LiveTNT(Entity):
     whited = Textures.load_image('Images/objects/tnt1.png')
     @staticmethod
-    def damage_func_getter(joules):
-        joules_squared = joules*joules
-        return lambda dist_squared:  (-2.5 * log2(dist_squared/joules_squared)).__trunc__() if dist_squared < joules_squared else 0
+    def damage_func_getter(joules:float) -> Callable[[float],int]:
+        E = 2.718281828
+        return lambda dist : (joules * E ** (-dist)).__trunc__()
     
     def __init__(self,pos:Vector2,time:float|int,energy:int):
         super().__init__(pos,'tnt')
@@ -578,10 +608,9 @@ class LiveTNT(Entity):
         damage_function = self.damage_func_getter(self.energy)
         for entity in collide_entities(c):
             if entity.species == 'tnt':continue #tnt in entity form will be immune to other exploding tnt
-
-            entity.take_damage(damage_function((self.pos - entity.pos).magnitude_squared()),self.get_damage_type(),None)   
+            entity.take_damage(damage_function((self.pos - entity.pos).magnitude()),self.get_attack_type(),None)   
         for block in collide_blocks(c):
-            block.take_damage(damage_function((self.pos-block.pos).magnitude_squared()),self.get_damage_type(),None)     
+            block.take_damage(damage_function((self.pos-block.pos).magnitude()),self.get_attack_type(),None)     
         return super().onDeath()
     
 
@@ -596,7 +625,7 @@ class LiveTNT(Entity):
             self.onDeath()
 
 
-    def get_damage_type(self):
+    def get_attack_type(self):
         return EXPLOSION_DAMAGE
 
 class Arrow(Entity):
@@ -639,7 +668,6 @@ class Arrow(Entity):
             self.stopped = True
         #move y rect 
         self.collider.move_y(self.vel.y * Time.deltaTime) # move in world coordinates
-
         if collision_vertical(self.collider,self.vel.y):
             self.attack(get_nearest_block(self.pos))
             self.stopped = True
@@ -649,7 +677,6 @@ class Arrow(Entity):
             self.stopped = True
         for entity in collide_entities(self.collider):
             if entity.species in {'arrow','item'}: continue
-
             self.onDeath()
             self.attack(entity)
             break
@@ -666,19 +693,36 @@ class Arrow(Entity):
     def get_attack_damage(self) -> int:
         return( 0.5 * self.base_damage * (self.vel/2).magnitude_squared() * self.weight * max(0.01,self.penetration)).__trunc__()
 
-class FireArrow(Arrow):
+class ArrowInciendiary(Arrow):
 
     def get_attack_type(self):
         return FIRE_DAMAGE
 
-### HELPER FUNCTION ###
-def fitsArmourBuilder(armourType:str) -> Callable[[Item],bool]:
-    def inner(item:Item):
-        return item.armour_type == armourType
-    return inner
-    
-### END HELPER FUNCTION ###
+class ArrowExplosive(Arrow):
+    __slots__ = 'energy'
+    def __init__(self, pos, velocity: Vector2, shooter: Entity | None = None):
+        self.energy = 5 # in joules
+        super().__init__(pos, velocity, shooter)
 
+
+    def get_attack_type(self) -> str:
+        return EXPLOSION_DAMAGE
+    
+    def onDeath(self):
+        if self.dead: return
+        super().onDeath()
+        c = Collider.spawnFromCenter(self.pos.x,self.pos.y,self.energy*2,self.energy*2)
+        for x in range(5):
+            Particles.spawn_animated(get_tnt_animation(self.pos+Vector2.randdir/3,38+x),False,0)
+        def damage_from_dist(dist) :
+            E = 2.718281828
+            return (self.energy * E ** (-dist)).__trunc__()
+        for entity in collide_entities(c):
+            if entity.species == 'tnt':continue #tnt in entity form will be immune to other exploding tnt
+            self.attack_custom_damage(entity,damage_from_dist((self.pos - entity.pos).magnitude()))
+        for block in collide_blocks(c):
+            self.attack_custom_damage(entity,damage_from_dist((self.pos - block.pos).magnitude()))
+        return
 
 class AliveEntity(Entity):
         
@@ -702,6 +746,8 @@ class AliveEntity(Entity):
         self.attack_speed = self.energy / 10
         self.time_between_attacks = 1/self.attack_speed
         self.time_to_attack = self.time_between_attacks
+        self.time_to_regen = 0.0 # regen timer
+        self.regen_speed = 1.0 # how long in seconds should we wait between regen ticks
         self.vision_collider = Collider(0,0,Settings.VISION_BY_SPECIES[species]*2,Settings.VISION_BY_SPECIES[species]*2)
         self.vision_squared = Settings.VISION_BY_SPECIES[species] ** 2
         self.states = []
@@ -745,6 +791,11 @@ class AliveEntity(Entity):
         self.state = self.states[number]
         self.animation.set_state(self.state)
 
+    def set_regen_speed(self,speed:float) -> float:
+        self.regen_speed = speed
+        if self.time_to_regen > speed:
+            self.time_to_regen = speed
+
     def update_state(self): ...
 
     def accelerate(self,x,y):
@@ -778,7 +829,7 @@ class AliveEntity(Entity):
                 self.vel += self.vel.opposite_normalized() * friction
         else:
             self.ground = getGround(GROUND_DIRT)
-        
+        self.natural_regen()
         self.animation.animate()
 
     def get_damage_resisted(self,damage:int,type:str) -> int:
@@ -821,11 +872,15 @@ class AliveEntity(Entity):
         return PHYSICAL_DAMAGE
     
     def natural_regen(self):
-        if self.health != self.total_health and self.time_til_vulnerable < -10:
+        if self.health != self.total_health and self.time_til_vulnerable < -10: # if 10 seconds have passed since we have been dealth damage that resets our invulnerability timer
+            self.time_to_regen -= Time.deltaTime
+            if self.time_to_regen < 0:
+                self.time_to_regen = self.regen_speed
+                self.health += max(1,(self.total_health/100 *  self.regen_multiplier * self.get_energy_multiplier()).__trunc__())
+                if self.health > self.total_health:
+                    self.health = self.total_health
+                print(self.health)
 
-            self.health += self.total_health/100 * Time.deltaTime * self.regen_multiplier * self.get_energy_multiplier()
-            if self.health > self.total_health:
-                self.health = self.total_health
 
     def collect_items(self):
         for item in collide_entities_in_range(self.pos,self.pickup_range):
@@ -854,7 +909,7 @@ class Player(AliveEntity):
         self.showingInventory = False
         
         #humans have 36 inventory spots and 9 hotbar spots
-        self.hotbar = Hotbar(self.inventory,27,28,29,30,31,32,33,34,35)
+        self.hotbar = Hotbar(self.inventory,27,28,29,30,31,32,33,34,35) # the numbers at the end mean the inventory slots that the hotbar should use in order
         
         self.ui = InventoryUI(self,(WIDTH*.7,HEIGHT*.7))
         self.hbui = HotBarUI(self,self.hotbar)
@@ -925,7 +980,7 @@ class Player(AliveEntity):
             velocity = (Camera.world_position_from_normalized(Input.m_pos_normalized) - self.pos).normalized
             if velocity.isZero:
                 velocity = Vector2.randdir
-            spawn_entity(FireArrow(self.pos + velocity/2,velocity*3,self))
+            spawn_entity(ArrowInciendiary(self.pos + velocity/2,velocity*3,self))
         if Input.space_d:
             spawn_item(BunnyEgg(),self.pos,Vector2.randdir)
         if self.animation.state != 'attack':
@@ -996,10 +1051,8 @@ class Player(AliveEntity):
 
     def collect_items(self): ## TODO : Make it so that in order to pick up items you click on them instead of just getting close to them
         for item in collide_entities_in_range_species(self.pos,self.pickup_range,'item'):
-            print('picking up ',item)
             item:ItemWrapper
             if item.pickup_time < 0 :
-
                 i = self.inventory.fitItem(item.item) #this will never add the same object to both hotbar and inventory becasue the or will only try to add to inventory if the item couldn't be added to the hotbar
                 if i is None:
                     item.onDeath()
@@ -1098,40 +1151,6 @@ class Spirit(AliveEntity):
         print('Loading Spirit')
         return super().onLoad()
 
-class Driver:
-    FOLLOW = 1
-    AVOID = 2
-        
-    def __init__(self,pos:Vector2):
-        self.pos = pos
-        self.target:Vector2 = None
-        self.spatial_tolerance = .1
-        self.mode = self.FOLLOW
-
-    @property
-    def spatial_tolerance(self):
-        return self._spatial_tolerance
-    
-    @spatial_tolerance.setter
-    def spatial_tolerance(self,newVal):
-        self._spatial_tolerance = newVal
-        self.spatial_tolerance_squared = newVal * newVal
-
-    
-
-    def setTarget(self,target:Vector2):
-        self.target = target.copy()
-
-    def getAccelerationDirection(self):
-        lineVec = self.target - self.pos
-        if self.mode is self.AVOID:
-            lineVec = -lineVec
-        magSqrd = lineVec.magnitude_squared()
-        if magSqrd < self.spatial_tolerance_squared:
-            return Vector2.zero #this one can actually return a cached value Vector2.zero so it doesn't have to create new ones every frame but that is a microoptimization for later
-        else:
-            return lineVec/sqrt(magSqrd)
-    
 class Bunny(AliveEntity):
     enemies = set() #have no natural enemies for now
     eats = set()# bunny's eat nothing (for now)
@@ -1249,6 +1268,49 @@ class Bunny(AliveEntity):
         self.time_to_introspection = 0
         return super().onLoad()
 
+#### DRIVERS ####
+class Driver:
+    FOLLOW = 1
+    AVOID = 2
+        
+    def __init__(self,pos:Vector2):
+        self.pos = pos
+        self.target:Vector2 = None
+        self.spatial_tolerance = .1
+        self.mode = self.FOLLOW
+
+    @property
+    def spatial_tolerance(self):
+        return self._spatial_tolerance
+    
+    @spatial_tolerance.setter
+    def spatial_tolerance(self,newVal):
+        self._spatial_tolerance = newVal
+        self.spatial_tolerance_squared = newVal * newVal
+
+    
+
+    def setTarget(self,target:Vector2):
+        self.target = target.copy()
+
+    def getAccelerationDirection(self):
+        lineVec = self.target - self.pos
+        if self.mode is self.AVOID:
+            lineVec = -lineVec
+        magSqrd = lineVec.magnitude_squared()
+        if magSqrd < self.spatial_tolerance_squared:
+            return Vector2.zero #this one can actually return a cached value Vector2.zero so it doesn't have to create new ones every frame but that is a microoptimization for later
+        else:
+            return lineVec/sqrt(magSqrd)
+    
+#### ENTITY EFFECTS ####
+#disclaimer : e - effects only affect alive entities sooo the name isn't perfect but whatever, I HAVE CONTROL HERE!!, mwuaa HA HA !!
+class EntityEffect: # these effects should take care of themselves in the sense that entities should only know that they exist not whats happening to them
+    def __init__(self, name:str, entity:AliveEntity ) -> None:
+        self.name:str = name
+        self.entity = entity
+
+
 #### UI ####
 class InventoryUI(UI):
     font = pygame.font.SysFont("Arial",ITEM_COUNTER_SIZE)   
@@ -1356,50 +1418,6 @@ class InventoryUI(UI):
         draw.rect(self.surface,(70,70,70),entity.get_rect().move(self.screen_center.x-100,10))
         self.surface.blit(entity,(self.screen_center.x-100,10))
         super().draw()
-
-class Hotbar:
-    def __init__(self,inventory:UniversalInventory,*spaces):
-        '''Spaces should be indexes  '''
-        self._inv = inventory
-        self.len = len(spaces)
-        self.spaces = spaces # offers a level of indirection to map hotbar indexes to inventory indexs
-        self.selected:int =  0 # this is a hotbar index
-
-    def __len__(self) -> int:
-        return self.len
-    
-    def setItem(self,item,index) -> (Item | None):
-        return self._inv.setItem(item,self.spaces[index])
-
-    def seeIndex(self,hotbarIndex:int):
-        return self._inv.inventory[self.spaces[hotbarIndex]]
-
-    def seeSelected(self) -> Item|None:
-        return self.seeIndex(self.selected)
-    
-    def start_use_selected(self) -> None:
-        item:Item|None = self.seeSelected()
-        if item is None: return
-        item.startUse(self._inv);  
-        if item.count == 0:
-            self._inv.inventory[self.selected] = None
-
-    def stop_use_selected(self):
-        item:Item|None = self.seeSelected()
-        if item is None: return
-        item.stopUse(self._inv)
-        if item.count == 0:
-            self._inv.inventory[self.selected] = None
-    
-    def setSelected(self,newSelected:int) -> None:
-        self.stop_use_selected()
-        self.selected = newSelected
-    
-    def getSelected(self) -> None|Item:
-        '''Will return the original item while removing it from the hotbar.\n
-        If only using for information then use seeSelected()'''
-        return self._inv.inventory.take(self.spaces[self.selected])          
-
 
 class HotBarUI:
     def __init__(self,entity:AliveEntity,hotbar:Hotbar):
@@ -1630,7 +1648,7 @@ NormalNP = LayeredNoiseMap(
     (.1 * SCALE, .2 * SCALE),
     (1.0,0.5)
 )
-ExperimentalNP = WorleyNoise(2,SCALE*.4)
+ExperimentalNP = WorleyNoiseSimple(2,SCALE*.4)
 
 def _create(chunk:Chunk):
     ## PHASE 1 ##

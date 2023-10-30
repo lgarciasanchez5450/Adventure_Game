@@ -57,6 +57,10 @@ def inclusive_range(start,stop,step):
 	#yield stop
 	return entity_manager.inclusive_range(start,stop,step)
 
+def serial_iter(iter1,iter2):
+	yield from iter1
+	yield from iter2
+
 def abssin(x:float|int):
 	return abs(sin(x))
 

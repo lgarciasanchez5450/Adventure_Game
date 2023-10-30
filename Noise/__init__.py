@@ -12,15 +12,16 @@ __all__ = [
     'set_seed',
     'LayeredNoiseMap',
     'WorleyNoise',
+    'WorleyNoiseSimple',
     'unit_smoothstep',
     'rescale',
     'noise1',
 ]
 
 try:
-    from Noise.Worley import WorleyNoise
+    from Noise.Worley import WorleyNoise, WorleyNoiseSimple
 except: 
-    from Worley import WorleyNoise #if we are running from this script
+    from Worley import WorleyNoise, WorleyNoiseSimple #if we are running from this script
 
 try:
     from Perlin import noise2,noise2_array,set_seed
