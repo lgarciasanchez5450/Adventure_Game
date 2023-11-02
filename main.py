@@ -48,7 +48,7 @@ def onGameStart():
     Camera.set_mouse_assist(False)
     player = general_manager.Player((0,0))
     general_manager.spawn_entity(player)
-    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,0),general_manager.QuickBow()))
+    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,0),general_manager.DivineBow()))
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(-2,0),general_manager.Bow()))
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),general_manager.ItemArrowExplosive().setCount(64)))
     Camera.set_focus(player.pos)

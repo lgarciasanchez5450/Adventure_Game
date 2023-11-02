@@ -11,6 +11,8 @@ from math import cos, sin,pi,hypot,sqrt,atan2,floor,log2,ceil,acos,tanh
 from random import random,randint
 from collections import deque
 import numpy as np
+from warnings import warn 
+
 import entity_manager
 
 scalar = int|float

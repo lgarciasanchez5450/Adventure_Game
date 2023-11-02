@@ -281,8 +281,9 @@ class Item:
         self.mining_speed:int = 0 
         self.fps = 0 #this is for when the ItemWrapper <Entity> needs to create the animation. 
         self.frames:list[pygame.Surface]  = [Textures.texture.get(self.tag+'.png',Textures.texture['null.png'])] # at most 60 frames 
+        self.inventory:UniversalInventory
 
-        #self.path = f'{Textures.PATH()}Images\\items\\{name}'
+        #self.path = f'{Textures.PATH()}Images\\items\\{name}' #shouldn't need this actually
         self.animation = Animation.SimpleAnimation(Camera.CSurface(self.frames[0],Vector2.zero,(0,0)),self.fps,self.frames)
 
     @property
@@ -310,10 +311,8 @@ class Item:
         assert isinstance(other,Item) 
         return self.tag is other.tag and self.name == other.name
     
-    def canStack(self,other) -> bool:
-        return self.stackCompatible(other)
-
     def __repr__(self) -> str:
+        warn('This should not be called!!')
         return self.__class__.__name__ + ": " + self.tag +": " + self.name
 
     def __eq__(self,other):
@@ -370,7 +369,7 @@ class BowBase(Item):
         assert isinstance(inventory,UniversalInventory)
         time = min(Time.time - self.startTime,self.max_pull_time)
         speed_modifier = self.getArrowSpeedFromTime(time)
-        direction = Input.m_pos_from_middle.normalized
+        direction = (Camera.world_position_from_normalized(Input.m_pos_normalized) - inventory.entity.pos).normalized
         direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
         spawn_entity(self.loaded_item(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
 
@@ -399,6 +398,17 @@ class QuickBow(BowBase):
     def getArrowInstability(self,t): # this is how much the arrow should be randomized for 
         return 1/ ( 5.0 + (3.5 * (t - 0.3))**2)+0.2
 
+class DivineBow(BowBase):
+    def __init__(self):
+        super().__init__(ITAG_DIVINE_BOW)
+        self.springyness = 10.0
+
+    def getArrowSpeedFromTime(self, t: float) -> float:
+        v = (t + 0.5)
+        return tanh(v*v)  * self.springyness
+
+    def getArrowInstability(self, t: float) -> float:
+        return 0.0
 #### BLOCKS ####
 class Block:
     @staticmethod
@@ -974,7 +984,8 @@ class Player(AliveEntity):
             place_block(TNT(Camera.world_position_from_normalized(Input.m_pos_normalized).floored()))
 
         if 'b' in Input.KDQueue:
-            spawn_entity(Bunny(self.pos.copy()))
+            b = Bunny(self.pos.copy())
+            spawn_entity(b)
     
         if 'n' in Input.KDQueue:
             velocity = (Camera.world_position_from_normalized(Input.m_pos_normalized) - self.pos).normalized
@@ -1159,7 +1170,7 @@ class Bunny(AliveEntity):
     neutral_to = set()
     def __init__(self,pos):
         super().__init__(pos,'bunny')
-        self.right_idle,self.left_idle = Textures.import_folder('Images/enemies/bamboo/idle',True,(32,32),True)
+        self.right_idle,self.left_idle = Textures.import_folder('Images/Entities/bamboo/idle',True,(32,32),True)
         self.fears = self.fears.copy()
         self.eats = self.eats.copy()
         self.enemies = self.enemies.copy()
