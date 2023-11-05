@@ -1,0 +1,1 @@
+EFFECT_SLOW_I = 'slow1'

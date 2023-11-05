@@ -4,8 +4,6 @@ gc.disable()
 from Constants.Display import *
 from Constants.Misc import *
 import pygame
-pygame.init()
-
 
 import Camera
 import Time
@@ -13,10 +11,6 @@ import Input
 import UI
 import Settings
 import Particles
-
-
-
-pygame.quit()
 pygame.init()
 import general_manager #should take care of everything that chunk/entity manager used to do
 import debug

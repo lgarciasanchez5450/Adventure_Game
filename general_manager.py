@@ -15,6 +15,7 @@ if __name__ == '__main__':
     import Camera
     Camera.init(screen)                                     
 from Errors import GenerationError
+from math import log 
 from ground import *
 import Settings
 import Input
@@ -525,8 +526,11 @@ class Entity:
         self.dead = False
 
     def onLoad(self): 
+        if _DEBUG_: Camera.add_collider(self.collider)
         Camera.add(self.image)
+
     def onLeave(self):
+        if _DEBUG_: Camera.remove_collider(self.collider)
         Camera.remove(self.image)
 
     def onDeath(self):
@@ -546,7 +550,6 @@ class Entity:
         collision_vertical(self.collider,self.vel.y)
         self.pos.from_tuple(self.collider.center)
         self.animation.animate()
-
 
     def attack(self,entity):
         assert isinstance(entity,(Entity,Block))
@@ -721,10 +724,11 @@ class ArrowExplosive(Arrow):
     def onDeath(self):
         if self.dead: return
         super().onDeath()
-        c = Collider.spawnFromCenter(self.pos.x,self.pos.y,self.energy*2,self.energy*2)
+        d = log(self.energy) + 3.5
+        c = Collider.spawnFromCenter(self.pos.x,self.pos.y,d*2,d*2)
         for x in range(5):
             Particles.spawn_animated(get_tnt_animation(self.pos+Vector2.randdir/3,38+x),False,0)
-        def damage_from_dist(dist) :
+        def damage_from_dist(dist:float) -> float:
             E = 2.718281828
             return (self.energy * E ** (-dist)).__trunc__()
         for entity in collide_entities(c):
@@ -745,19 +749,22 @@ class AliveEntity(Entity):
         #Stats
         self.stats = Settings.STATS_BY_SPECIES[species].copy()
         self.exp = 5000 #dont make attribute points (overused). make exp have another purpose. attribute points can lead to severely op setups and the player getting exactly what they want. 
+        self.max_speed = Settings.MAX_SPEED_BY_SPECIES[species] 
         speed = self.stats['speed'] 
-        self.speed = Settings.MAX_SPEED_BY_SPECIES[species] * speed / (speed + 100)
+        self.speed = self.max_speed * speed / (speed + 100)
         self.total_health = self.stats['constitution'] * 5 + self.stats['strength'] + self.stats['stamina']
+        self.defense = self.stats['defense']
         self.regen_multiplier = self.stats['constitution'] + self.stats['strength']
         self.regen_multiplier = self.regen_multiplier / (self.regen_multiplier + 100) + 1
         self.health = self.total_health
         self.strength = self.stats['strength'] * 5 + self.stats['constitution'] + self.stats['stamina']
+        self.max_energy = self.stats['energy']
         self.energy = self.stats['energy']
         self.attack_speed = self.energy / 10
         self.time_between_attacks = 1/self.attack_speed
         self.time_to_attack = self.time_between_attacks
         self.time_to_regen = 0.0 # regen timer
-        self.regen_speed = 1.0 # how long in seconds should we wait between regen ticks
+        self.regen_time = 1.0 # how long in seconds should we wait between regen ticks
         self.vision_collider = Collider(0,0,Settings.VISION_BY_SPECIES[species]*2,Settings.VISION_BY_SPECIES[species]*2)
         self.vision_squared = Settings.VISION_BY_SPECIES[species] ** 2
         self.states = []
@@ -767,7 +774,124 @@ class AliveEntity(Entity):
         self.time_til_vulnerable = 0.0
 
         self.direction = 'right'
+        
+        self.extra_speed:dict[str,float] = {}
+        self.extra_speed_sum = 0.0
 
+        self.extra_total_health:dict[str,int] = {}
+        self.extra_total_health_sum = 0.0
+
+        self.extra_regen:dict[str,float] = {}
+        self.extra_regen_sum = 0.0
+
+        self.extra_strength:dict[str,int] = {}
+        self.extra_strength_sum = 0.0
+        
+        self.extra_energy:dict[str,int] = {}
+        self.extra_energy_sum = 0.0
+
+        self.extra_defense:dict[str,int] = {}
+        self.extra_defense_sum = 0.0
+
+    ### SET STATS ###
+    
+    def setStatSpeed(self,newSpeed:int):
+        self.stats['speed'] = newSpeed
+        #update speed
+        speed = self.stats['speed'] 
+        self.speed = self.max_speed * speed / (speed + 100)
+
+    def setStatConstitution(self,newConstitution:int):
+        self.stats['constitution'] = newConstitution
+        self.strength = self.stats['strength'] * 5 +newConstitution + self.stats['stamina']
+        self.regen_multiplier = newConstitution + self.stats['strength']
+        self.regen_multiplier = self.regen_multiplier / (self.regen_multiplier + 100) + 1
+
+    def setStatStrength(self,newStrength:int):
+        self.stats['strength'] = newStrength
+        self.strength = newStrength * 5 + self.stats['constitution'] + self.stats['stamina']
+        self.regen_multiplier = self.stats['constitution'] + newStrength
+        self.regen_multiplier = self.regen_multiplier / (self.regen_multiplier + 100) + 1
+
+    def setStatStamina(self,newStamina:int):
+        self.stats['stamina'] = newStamina
+        self.strength = self.stats['strength'] * 5 + self.stats['constitution'] + newStamina // 2
+
+    def setStatEnergy(self,newEnergy:int):
+        self.stats['energy'] = newEnergy
+        self.max_energy = newEnergy
+
+    def setStatDefense(self,newDefense:int):
+        self.stats['defense'] = newDefense
+    
+    def setStatAttack(self,newAttack:int):
+        self.stats['attack'] = newAttack
+
+    ### SET ADDED STATS ###
+
+    def setExtraStatSpeed(self,tag:str,addedSpeed:float):
+        self.extra_speed[tag] = addedSpeed
+        self.extra_speed_sum = sum(self.extra_speed.values())
+
+    def setExtraStatTotalHealth(self,tag:str,addedTotalHealth:int):
+        self.extra_total_health[tag] = addedTotalHealth
+        self.extra_total_health_sum = sum(self.extra_total_health.values())
+
+    def setExtraStatRegen(self,tag:str,addedRegen:float):
+        self.extra_regen[tag] = addedRegen
+        self.extra_regen_sum = sum(self.extra_regen.values())
+
+    def setExtraStatStrength(self,tag:str,addedStrength:float):
+        self.extra_strength[tag] = addedStrength
+        self.extra_strength_sum = sum(self.extra_strength.values())
+
+    def setExtraStatEnergy(self,tag:str,addedEnergy:float):
+        self.extra_energy[tag] = addedEnergy
+        self.extra_energy_sum = sum(self.extra_energy.values())
+    
+    def setExtraStatDefense(self,tag:str,addedDefense:float):
+        self.extra_defense[tag] = addedDefense
+        self.extra_defense_sum = sum(self.extra_defense.values())
+    
+    ### REMOVE ADDED STATS ###
+   
+    def removeExtraStatSpeed(self,tag:str):
+        del self.extra_speed[tag]
+        self.extra_speed_sum = sum(self.extra_speed.values())
+
+    def removeExtraStatTotalHealth(self,tag:str):
+        del self.extra_total_health[tag]
+        self.extra_total_health_sum = sum(self.extra_total_health.values())
+
+    def removeExtraStatRegen(self,tag:str):
+        del self.extra_regen[tag]
+        self.extra_regen_sum = sum(self.extra_regen.values())
+
+    def removeExtraStatStrength(self,tag:str):
+        del self.extra_strength[tag]
+        self.extra_strength_sum = sum(self.extra_strength.values())
+
+    def removeExtraStatEnergy(self,tag:str):
+        del self.extra_energy[tag]
+        self.extra_energy_sum = sum(self.extra_energy.values())
+    
+    def removeExtraStatDefense(self,tag:str):
+        del self.extra_defense[tag]
+        self.extra_defense_sum = sum(self.extra_defense.values())
+     
+    ### GET STATS ###
+
+    def getTotalSpeed(self):
+        return self.speed + self.extra_speed_sum
+    
+    def getTotalTotalHealth(self):
+        return self.total_health + self.extra_total_health_sum
+    
+    def getTotalRegen(self):
+        return self.regen_multiplier + self.extra_speed_sum
+    
+    def getTotalTotalHealth(self):
+        return self.total_health + self.extra_total_health_sum
     @property
     def selected_item(self) -> Item|None:
         if self.inventory.spaces == 0 :return None
@@ -801,8 +925,8 @@ class AliveEntity(Entity):
         self.state = self.states[number]
         self.animation.set_state(self.state)
 
-    def set_regen_speed(self,speed:float) -> float:
-        self.regen_speed = speed
+    def set_regen_time(self,speed:float) -> float:
+        self.regen_time = speed
         if self.time_to_regen > speed:
             self.time_to_regen = speed
 
@@ -846,7 +970,7 @@ class AliveEntity(Entity):
         '''Returns damage resisted'''
         if type is INTERNAL_DAMAGE: return 0
 
-        defense:int = self.stats['defense'] + self.inventory.added_def
+        defense:int = self.defense + self.inventory.added_def
         damage_reduction = damage * defense/ (defense+100) 
         return damage_reduction.__trunc__()
     
@@ -868,13 +992,11 @@ class AliveEntity(Entity):
 
     def get_attack_damage(self) -> int:
         '''Returns final attack damage'''
-        #get base damage
-        damage:int = self.stats['attack']
+        #get total damage stat
+        damage:int =  self.getTotalRegen()
 
-        #get total inventory added damage
-        damage += self.inventory.added_atk
 
-        damage *= 1 + self.stats['strength'] / 100 * self.get_energy_multiplier()
+        damage *= 1.0 + self.strength / 100 * self.get_energy_multiplier()
 
         return damage.__trunc__()
 
@@ -885,7 +1007,7 @@ class AliveEntity(Entity):
         if self.health != self.total_health and self.time_til_vulnerable < -10: # if 10 seconds have passed since we have been dealth damage that resets our invulnerability timer
             self.time_to_regen -= Time.deltaTime
             if self.time_to_regen < 0:
-                self.time_to_regen = self.regen_speed
+                self.time_to_regen = self.regen_time
                 self.health += max(1,(self.total_health/100 *  self.regen_multiplier * self.get_energy_multiplier()).__trunc__())
                 if self.health > self.total_health:
                     self.health = self.total_health
@@ -1168,6 +1290,7 @@ class Bunny(AliveEntity):
     fears = {'spirit'}
 
     neutral_to = set()
+    #__slots__ = 'right_idle','left_idle','fears','eats','enemies','driver','mark','hunger','sprinting','states'
     def __init__(self,pos):
         super().__init__(pos,'bunny')
         self.right_idle,self.left_idle = Textures.import_folder('Images/Entities/bamboo/idle',True,(32,32),True)
@@ -1495,7 +1618,7 @@ class HotBarUI:
 active_chunks = [] 
 '''stores the x and y values of the loaded chunks'''
 
-_DEBUG_ = False
+_DEBUG_ = True
 
 def noise_to_ground(n):
   if n > 1 or n < 0: 

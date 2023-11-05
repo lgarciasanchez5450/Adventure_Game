@@ -19,9 +19,9 @@ __all__ = [
 ]
 
 try:
-    from Noise.Worley import WorleyNoise, WorleyNoiseSimple
-except: 
-    from Worley import WorleyNoise, WorleyNoiseSimple #if we are running from this script
+    from Noise.Worley import WorleyNoise, WorleyNoiseSimple,WorleyNoiseSmooth
+except Exception as err:
+    from Worley import WorleyNoise, WorleyNoiseSimple,WorleyNoiseSmooth #if we are running from this script
 
 try:
     from Perlin import noise2,noise2_array,set_seed
@@ -62,7 +62,7 @@ class LayeredNoiseMap:
         return data
     
 def noise1(x:float):
-    return noise2(2.7181,x)
+    return noise2(2.71828,x)
     
     
 def unit_smoothstep(i:ndarray):
@@ -81,29 +81,29 @@ if __name__ == '__main__':
 
 
     screen = pygame.display.set_mode((500,500))
-    scale = 0.4
-    a = (
-        lerp(
-            lerp(
-                LayeredNoiseMap((0.02 * scale, .040 * scale, .080 * scale , .080* scale ),(1.0 , 0.5 , 0.25 , 0.125)).getArr(np.arange(500),np.arange(500)), # texturing
-                inverse_rescale(WorleyNoise(0,.01* scale).getArr(np.arange(500),np.arange(500))), # continents
-                .4
-            ) ,
-            -WorleyNoise(0,.2* scale).getArr(np.arange(500),np.arange(500)), # continents
-            .1
-        )
-    )
-    for y,row in enumerate((a + 1)/2):
-        for x, height in enumerate(row):
-            if height > .5:
-                screen.set_at((x,y),(0,255,0))
-            else:
-                screen.set_at((x,y),(height*255,height*255,height*255))
-        
+    pos = np.array([0,0])
+    xs = np.arange(500) 
+    ys = np.arange(500) 
+    scale = 2.0
+
+    n  = WorleyNoiseSmooth(0,.01* scale)
+
+    def draw(a):
+        for y,row in enumerate((a + 1)/2 * 255):
+            for x, height in enumerate(row):
+                screen.set_at((x,y),(height,height,height))
     running = True
     while running:
+        print(pos,end = '\r')
+        pos = pygame.mouse.get_pos()
+
+        if pygame.mouse.get_pressed()[0]:
+            draw(
+                    inverse_rescale(n.getArr(xs + pos[0],ys + pos[1])) # continents
+                ) 
+        
         pygame.event.pump()
-        pygame.time.Clock().tick(10)
+        pygame.time.Clock().tick(60)
         pygame.display.flip()
 
 
