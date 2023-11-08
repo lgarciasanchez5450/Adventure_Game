@@ -1,4 +1,4 @@
-from typing import final
+from typing import final,Callable,Any
 try:
 	from numba import njit,prange
 except ImportError:
@@ -11,6 +11,7 @@ from math import cos, sin,pi,hypot,sqrt,atan2,floor,log2,ceil,acos,tanh
 from random import random,randint
 from collections import deque
 import numpy as np
+
 from warnings import warn 
 
 import entity_manager
@@ -76,6 +77,20 @@ def _opposite_normalized(x,y):
 		return (0,0)
 	return -x/mag,-y/mag
 
+def abstractmethod(func:Callable):
+	assert callable(func), 'abstractmethod only works on callable objects'
+
+	def default_abstract_method(*args,**kwargs):
+		raise NotImplementedError("call to abstract method " + repr(func))
+	default_abstract_method.__name__ = func.__name__
+	return default_abstract_method
+
+class Test:
+	@abstractmethod
+	def addone(self,y):
+		pass
+
+@classmethod
 
 class UnInstantiable:
 	'''Denoting that classes should not have instances.'''

@@ -45,7 +45,7 @@ class ItemSlot:
 
     def draw(self,surface:Surface):
         item:Item = self.inventory.seeIndex(self.index)
-        if hasattr(item,'animation'):
+        if hasattr(item,'animation'): # TODO remove this if all items are guaranteed to have a animation
             item.animation.animate()
         self.surface.fill(self.hover_color if self.state == self.HOVER else self.bg_color)
         if item is not None:

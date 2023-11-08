@@ -1,3 +1,4 @@
+from Constants import POSITIVE_INFINITY
 import Time
 import pygame
 import Camera
@@ -47,14 +48,14 @@ class Animation:
 class SimpleAnimation:
     '''This Animation Class is meant to provide a simpler interface and be faster than the normal Animation class'''
     __slots__ = 'csurface','frames','fps','time','_frame_in_state','max_frames_in_state','surf'
-    def __init__(self,csurf:Camera.CSurface,fps:float,frames:list):
+    def __init__(self,csurf:Camera.CSurface,fps:float,frames):
         self.csurface = csurf
         if not isinstance(frames,list):
-            frames = [frames]
-        self.setFrames(tuple(frames),fps)
+            frames = (frames,)
+        self.setFrames(frames,fps)
 
     def setFrames(self,frames:tuple[pygame.Surface,...],fps:float) -> None:
-        self.frames = list(frames)
+        self.frames = tuple(frames)
         self.fps = fps
         self.max_frames_in_state = len(self.frames)
         self.surf = frames[0]
@@ -65,7 +66,7 @@ class SimpleAnimation:
     def time_per_cycle(self) -> float:
         '''Seconds it takes to complete all frames'''
         if self.fps == 0:
-            return float('inf')
+            return POSITIVE_INFINITY
         return self.max_frames_in_state / self.fps
 
     def reset(self):
@@ -78,6 +79,15 @@ class SimpleAnimation:
         self._frame_in_state = (self.time % self.max_frames_in_state).__trunc__() # might be faster if we just increment then catch with an if statement
         self.surf = self.frames[self._frame_in_state]
         self.csurface.surf = self.surf
+
+
+    def copyTo(self,other) -> None:
+        assert isinstance(other,SimpleAnimation)
+        other.setFrames(self.frames,self.fps)
+        other.time = self.time
+        other.surf = self.surf
+        other._frame_in_state = self._frame_in_state
+
         
 
 

@@ -27,6 +27,7 @@ from Camera import CSurface
 import Particles
 from Inventory import ArmorInventory
 from UI_Elements import ItemSlot
+from Constants import EntityEffects
 dead_entities = []
 half_sqrt_2 = (2**(1/2))/2
 
@@ -297,6 +298,9 @@ class Item:
     def armour_type(self) -> str|None:
         return None if self.armour_stats is None else self.armour_stats.type
     
+    #this method is called every frame during in which is in use
+    def duringUse(self, inventory: UniversalInventory) -> None: ...
+
     #this method is called on right click down
     def startUse(self,inventory:UniversalInventory) -> None: ...
     
@@ -313,11 +317,42 @@ class Item:
         return self.tag is other.tag and self.name == other.name
     
     def __repr__(self) -> str:
-        warn('This should not be called!!')
+        if _DEBUG_: warn('This should not be called!!')
         return self.__class__.__name__ + ": " + self.tag +": " + self.name
 
     def __eq__(self,other):
         raise RuntimeError("For what purpose?!?!")
+
+class DrinkableItem(Item):
+    __slots__ = 'time_to_drink','drink_animation','animation_backup'
+    def __init__(self, tag: str,drinkAnim:Animation.SimpleAnimation):
+        '''A generic drinkable item, drink time is how long drinkAnim takes to play'''
+        super().__init__(tag)
+        self.drink_animation = drinkAnim
+        self.time_to_drink = drinkAnim.time_per_cycle
+        self.animation_backup = self.animation
+
+    @final
+    def startUse(self, inventory: UniversalInventory) -> None:
+        self.animation = self.drink_animation
+    
+    @final
+    def duringUse(self, inventory: UniversalInventory) -> None:
+        self.time_to_drink -= Time.deltaTime
+        if self.time_to_drink <= 0:
+            for i,item in enumerate(inventory.inventory):
+                if item is self:
+                    self.count -= 1
+                    inventory.checkItem(i)
+                    self.onDrunk(inventory)
+                    self.time_to_drink = self.drink_animation.time_per_cycle
+ 
+    @final
+    def stopUse(self, inventory: UniversalInventory) -> None:
+        self.time_to_drink = self.drink_animation.time_per_cycle
+
+    def onDrunk(self,inventory:UniversalInventory): ...
+
 
 class BunnyEgg(Item): 
     __slots__ = 'species',
@@ -643,7 +678,6 @@ class LiveTNT(Entity):
 
 class Arrow(Entity):
     def __init__(self,pos,velocity:Vector2,shooter:Entity):
-
         super().__init__(pos,'arrow')
         
         angle = -velocity.get_angle() 
@@ -665,9 +699,6 @@ class Arrow(Entity):
         self.penetration = 10
         self.blocks_traveled = 0
         self.stopped = False
-
-    def onDeath(self):
-        super().onDeath()
 
     def update(self):
         self.time_til_death -= Time.deltaTime
@@ -701,8 +732,7 @@ class Arrow(Entity):
     def onLeave(self):
         #Camera.remove_collider(self.collider)
         return super().onLeave()
-
-
+    
     def get_attack_damage(self) -> int:
         return( 0.5 * self.base_damage * (self.vel/2).magnitude_squared() * self.weight * max(0.01,self.penetration)).__trunc__()
 
@@ -775,23 +805,14 @@ class AliveEntity(Entity):
 
         self.direction = 'right'
         
-        self.extra_speed:dict[str,float] = {}
-        self.extra_speed_sum = 0.0
+        self.extra_speed:dict[str,float] = {}; self.extra_speed_sum = 0.0
+        self.extra_total_health:dict[str,int] = {}; self.extra_total_health_sum = 0.0
+        self.extra_regen:dict[str,float] = {}; self.extra_regen_sum = 0.0
+        self.extra_strength:dict[str,int] = {}; self.extra_strength_sum = 0.0
+        self.extra_energy:dict[str,int] = {}; self.extra_energy_sum = 0.0
+        self.extra_defense:dict[str,int] = {}; self.extra_defense_sum = 0.0
 
-        self.extra_total_health:dict[str,int] = {}
-        self.extra_total_health_sum = 0.0
-
-        self.extra_regen:dict[str,float] = {}
-        self.extra_regen_sum = 0.0
-
-        self.extra_strength:dict[str,int] = {}
-        self.extra_strength_sum = 0.0
-        
-        self.extra_energy:dict[str,int] = {}
-        self.extra_energy_sum = 0.0
-
-        self.extra_defense:dict[str,int] = {}
-        self.extra_defense_sum = 0.0
+        self.effects:list[EntityEffect] = []
 
     ### SET STATS ###
     
@@ -890,8 +911,10 @@ class AliveEntity(Entity):
     def getTotalRegen(self):
         return self.regen_multiplier + self.extra_speed_sum
     
-    def getTotalTotalHealth(self):
-        return self.total_health + self.extra_total_health_sum
+    def getTotalStrength(self):
+        return self.strength + self.extra_strength_sum
+    
+    
     @property
     def selected_item(self) -> Item|None:
         if self.inventory.spaces == 0 :return None
@@ -921,6 +944,9 @@ class AliveEntity(Entity):
         Particles.spawn(self.pos.copy(),Vector2.zero,self.animation.surf.copy(),1,self.image.offset,False,False)
 
     def set_state(self,number:int):
+        '''Returns False if failed.
+        Reasons for failing:
+            * The Entity is already in that state'''
         if self.state is self.states[number]: return False
         self.state = self.states[number]
         self.animation.set_state(self.state)
@@ -945,7 +971,7 @@ class AliveEntity(Entity):
             self.time_til_vulnerable = self.invulnerability_time
         self.time_to_attack -= Time.deltaTime
         self.time_til_vulnerable -= Time.deltaTime
-        frame_speed = (self.speed + self.inventory.added_spd) * Time.deltaTime
+        frame_speed = (self.getTotalSpeed()) * Time.deltaTime
         #move x rect 
         self.collider.move_x(self.vel.x * frame_speed) # move in world coordinates
         collision_horizontal(self.collider,self.vel.x)
@@ -964,6 +990,8 @@ class AliveEntity(Entity):
         else:
             self.ground = getGround(GROUND_DIRT)
         self.natural_regen()
+        for effect in self.effects:
+            effect.update()
         self.animation.animate()
 
     def get_damage_resisted(self,damage:int,type:str) -> int:
@@ -994,10 +1022,7 @@ class AliveEntity(Entity):
         '''Returns final attack damage'''
         #get total damage stat
         damage:int =  self.getTotalRegen()
-
-
         damage *= 1.0 + self.strength / 100 * self.get_energy_multiplier()
-
         return damage.__trunc__()
 
     def get_attack_type(self) -> str:
@@ -1012,7 +1037,6 @@ class AliveEntity(Entity):
                 if self.health > self.total_health:
                     self.health = self.total_health
                 print(self.health)
-
 
     def collect_items(self):
         for item in collide_entities_in_range(self.pos,self.pickup_range):
@@ -1117,7 +1141,7 @@ class Player(AliveEntity):
         if Input.space_d:
             spawn_item(BunnyEgg(),self.pos,Vector2.randdir)
         if self.animation.state != 'attack':
-            x,y=  set_mag(Input.d-Input.a,Input.s-Input.w,self.speed * self.ground.surface_friction)
+            x,y=  set_mag(Input.d-Input.a,Input.s-Input.w,self.getTotalSpeed() * self.ground.surface_friction)
             self.accelerate(x,y)
         else:
             self.vel.reset() #set to 0,0
@@ -1366,7 +1390,7 @@ class Bunny(AliveEntity):
         return 1.0
 
     def accelerate_with_driver(self):
-        self.accelerate(*(self.driver.getAccelerationDirection() * self.ground.surface_friction * self.speed * self.trySprinting()))
+        self.accelerate(*(self.driver.getAccelerationDirection() * self.ground.surface_friction * self.getTotalSpeed() * self.trySprinting()))
 
 
     def update(self):
@@ -1440,10 +1464,33 @@ class Driver:
 #### ENTITY EFFECTS ####
 #disclaimer : e - effects only affect alive entities sooo the name isn't perfect but whatever, I HAVE CONTROL HERE!!, mwuaa HA HA !!
 class EntityEffect: # these effects should take care of themselves in the sense that entities should only know that they exist not whats happening to them
+    __slots__ = ('name','entity')
     def __init__(self, name:str, entity:AliveEntity ) -> None:
         self.name:str = name
         self.entity = entity
+        self.entity.effects.append(self)
 
+    def update(self): ...
+    
+    def remove(self): ...
+class SuperStrength1(EntityEffect):
+    __slots__ = 'time'
+    def __init__(self, entity: AliveEntity) -> None:
+        super().__init__(EntityEffects.EFFECT_STRENGTH_I, entity)
+        self.time = 60.0
+        self.entity.setExtraStatStrength(self.name,1000.0)
+
+    def update(self):
+        self.time -= Time.deltaTime
+        if self.time <= 0:
+            self.remove()
+
+    def remove(self):
+        ## Decouple the effect and the entity so they no  longer know about each other
+        self.entity.effects.remove(self) 
+        del self.entity 
+
+########## NOTE : for custom classes that dont define __eq__ method python defaults to check identity being equal to "is"
 
 #### UI ####
 class InventoryUI(UI):
@@ -1608,6 +1655,8 @@ class HotBarUI:
         #if self.in_hand is not None:
         #    self.in_hand:Item
         #    self.surface.blit(self.in_hand.animation.surf,(self.rel_mouse_pos.x-ITEM_SIZE//2,self.rel_mouse_pos.y-ITEM_SIZE//2))
+
+
 
 
 #######################################
