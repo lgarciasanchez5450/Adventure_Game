@@ -2,15 +2,16 @@ from Constants import *
 from Settings import STACK_COUNT_BY_TAG
 from typing import Callable
 _DEBUG_ = True
-
+import Animation 
 from game_math import Array,UnInstantiable
 class ArmourStats:
     type:str
-class Item(UnInstantiable):
+class Item(UnInstantiable): 
     count:int
     tag:str
     armour_stats:ArmourStats
     durability_stats:object
+    animation:Animation.Animation
     @property
     def max_stack_count(self) -> int:...
     def canStack(self,other) -> bool: ...
@@ -19,7 +20,7 @@ class Item(UnInstantiable):
     def stackCompatible(self,other) -> bool: ...
     def stopUse(self,inventory:object): ...
     
-class InventoryInterface(UnInstantiable):
+class InventoryInterface(UnInstantiable): # type: ignore
     def seeIndex(self,index:int) -> Item: ...
 
 
@@ -135,8 +136,6 @@ class Inventory:
     def __str__(self):
         return f"{[str(item) for item in self.inventory]}, len: {self.spaces if self.spaces == len(self.inventory) else 'Error'}"
 
-
-
 class ArmorInventory:
     def __init__(self,*spaces:str):
         self.spaces = len(spaces)
@@ -213,27 +212,7 @@ class HotbarInventory(Inventory):
     
     def pop_selected(self) -> Item|None:
         return self.inventory.take(self.selected)
-    
-class InventoryUnion:
-    def __init__(self,*inventories:Inventory) -> None:
-
-        self.inventories = inventories
-        self.inventories = {
-            #0:inv1,
-            #10:inv2,
-            #30:inv3
-        }
-        self._index = 0
-        for inv in inventories:
-            self.inventories[self._index] = inv
-            self._index += inv.spaces
-    
-    def addInventory(self,inventory:Inventory):
-        if inventory.spaces < 1: raise ValueError("Inventory must have at least one space")
-        self.inventories[self._index] = inventory
-        self._index += inventory.spaces
-
-    def setItem(self,index):...
+  
 
 class UniversalInventory:
     def __init__(self,spaces:int,entity:object):
@@ -242,7 +221,7 @@ class UniversalInventory:
         self.full = False
         self.entity = entity
         self.selected:int = -1
-        self.slot_restrictions:dict[int,Callable[[Item],bool]] = {} #will store slot indexes that have restrictions via a function that will accept the item and return True only if it fits
+        self.slot_restrictions:dict[int,Callable[[Item|None],bool]] = {} #will store slot indexes that have restrictions via a function that will accept the item and return True only if it fits
 
 
     def setItem(self,item:Item|None,index:int):
@@ -250,6 +229,7 @@ class UniversalInventory:
         The implementation should prioritize combining the items, if that doesn't work it will swap them
         Should return item that is left over
         '''
+        
         #check if new item passes slot restrictions
         if index in self.slot_restrictions:
             if not self.slot_restrictions[index](item):
@@ -299,7 +279,8 @@ class UniversalInventory:
             if not self.slot_restrictions[index](self.inventory[index]):
                 return self.inventory.remove(index)
 
-    def fitItem(self,item:Item) -> Item|None:
+    def fitItem(self,item:Item|None) -> Item|None:
+        if item is None: return
         empty_slots = []
         for index, inventory_item in enumerate(self.inventory):
             if inventory_item is None:
@@ -308,6 +289,7 @@ class UniversalInventory:
                 item = self._addItem(item,index)
                 if item is None:
                     return None
+        index,inventory_item = None,None # to remove the possibility that they could be unbound
         del index, inventory_item
         #if it has reached here then there is no previously existing item of the same type but there are empty slots
         for slot in empty_slots:
@@ -315,22 +297,22 @@ class UniversalInventory:
                 if self.slot_restrictions[slot](item):
                     self.inventory[slot] = item
                     return None
+                    
         return None
-
     def get_selected(self) -> Item|None:
         return self.inventory[self.selected]
     
     def start_use_selected(self) -> None:
         item:Item = self.inventory[self.selected]
         if item is None: return
-        item.startUse();  
+        item.startUse(self.inventory);  
         if item.count == 0:
             self.inventory[self.selected] = None
 
     def stop_use_selected(self):
         item:Item = self.inventory[self.selected]
         if item is None: return
-        item.stopUse()
+        item.stopUse(self.inventory)
         if item.count == 0:
             self.inventory[self.selected] = None
     

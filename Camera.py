@@ -109,7 +109,6 @@ def init(display:Surface):
     opengl_screen.swizzle = 'BGRA'
     opengl_screen.use(0)
 
-    
 def onResize(_width,_height):
     global width,height,screen_size
     width, height = _width, _height
@@ -118,9 +117,9 @@ def onResize(_width,_height):
     screen_size.x = width-1
     screen_size.y = height-1
 add_OnResize(onResize)
-def ui_draw_method(func:Callable):
-    UIs.append(func)
-    return func
+def ui_draw_method(object):
+    UIs.append(object)
+    return object
 
 class CSurface:
     __slots__ = 'surf','pos' ,'offset'
@@ -134,9 +133,8 @@ class CSurface:
 NullCSurface = CSurface(Surface((0,0)),game_math.Vector2.zero,(0,0))
 
 '''Setting functions'''
-def set_tracking(system):
+def set_tracking(system:str):
     assert system in ('fixed','smooth')
-
     global tracking_system,camera_pos,effective_camera_pos
     match system:
         case 'fixed':
@@ -146,7 +144,6 @@ def set_tracking(system):
     tracking_system = system
     if not mouse_assisted:
         effective_camera_pos = camera_pos
-  
 
 def set_focus(position:game_math.Vector2):
     global focus,camera_pos #this works because unlike C, python 'globals' are global to a module, not across all files, unless ofcourse you add it to the builtins module
@@ -203,9 +200,8 @@ def remove(camera_surface:CSurface) -> None:
 
 
 def update():
-    global camera_offset_x,camera_offset_y,effective_camera_pos
+    global camera_offset_x,camera_offset_y,effective_camera_pos,camera_pos
     if tracking_system == 'smooth':
-        global camera_pos
         dist = focus - camera_pos 
         displacement = dist * (smooth_speed * Time.deltaTime)
         camera_pos += displacement
@@ -213,7 +209,7 @@ def update():
     elif tracking_system == 'fixed':
         pass
     else:
-        raise RuntimeError(f'Tracking System is {tracking_system} but that is not a valid system')
+        raise RuntimeError(f'Tracking System is {tracking_system} but that is not a valid system') # TODO: in prod this path should never run so it could be deletd
     if mouse_assisted:
         effective_camera_pos = camera_pos + m_pos_normalized*mouse_pull_strength/(BLOCK_SIZE)
     camera_offset_x = floor(effective_camera_pos.x*BLOCK_SIZE)
@@ -228,7 +224,6 @@ def screen_position_normalized(world_pos:game_math.Vector2):
     return ((world_pos-effective_camera_pos) * BLOCK_SIZE).vector_mul((halfscreensize-game_math.ones).inverse)
 
 def world_position(screen_pos:game_math.Vector2):
-    
     return (screen_pos - halfscreensize) / BLOCK_SIZE + effective_camera_pos
 
 def world_position_from_normalized(screen_pos:game_math.Vector2):

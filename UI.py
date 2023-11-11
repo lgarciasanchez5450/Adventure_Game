@@ -11,22 +11,6 @@ import Input
 
 
 tex_location = 1
-class EmtpyUI:
-    def __init__(self,*args,**kwargs):
-        pass
-
-    def __setattr__(self, __name: str, __value: Any) -> None:
-        pass
-
-
-    def __delattr__(self, __name: str) -> None:
-        pass
-    def update(self,*args,**kwargs):
-        pass
-
-    def draw(self):
-        pass
-
 
 class UI:
     def __init__(self,surface_size:tuple|list = (WIDTH,HEIGHT),screen_offset:tuple|list = (0,0),screen_size = (1,1)):
@@ -68,7 +52,12 @@ class UI:
         self.tex.release()
         self.render_object.release()
         self.program.release()
-
+class EmtpyUI(UI):
+    def __init__(self,*args,**kwargs): pass
+    def __setattr__(self, __name: str, __value: Any) -> None: pass
+    def __delattr__(self, __name: str) -> None: pass
+    def update(self,*args,**kwargs): pass
+    def draw(self): pass
 
 class DebugUI(UI):
     def __init__(self):

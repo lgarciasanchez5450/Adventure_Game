@@ -75,7 +75,7 @@ while True:
 
         Particles.update()
 
-        #Cameras
+        #Cameras  
         Camera.update()
         Camera.draw_background() 
         Particles.draw()
@@ -97,7 +97,7 @@ while True:
         #
         Pause_Menu.update()  
         Camera.flip()
-
+  
     elif Settings.game_state is MAIN_MENU:
         Main_Menu.update()
         if (Main_Menu.loading_for.timeElapsed() > 2): #if has been "loading" for more than 2 seconds start generating the world-

@@ -90,7 +90,6 @@ class Test:
 	def addone(self,y):
 		pass
 
-@classmethod
 
 class UnInstantiable:
 	'''Denoting that classes should not have instances.'''
@@ -488,12 +487,10 @@ def set_mag(x,y,mag:int|float) -> tuple[float,float]:
 
 def cache(func):
 	inputs = {}
-	def wrapper(*args):
-		try:
-			return inputs[tuple(args)]
-		except:
+	def wrapper(*args:Any):
+		if args not in inputs:
 			inputs[tuple(args)] = func(*args)
-			return inputs[tuple(args)]
+		return inputs[tuple(args)]
 	return wrapper
 @njit
 def arccos(x:float):

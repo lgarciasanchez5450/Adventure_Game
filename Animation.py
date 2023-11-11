@@ -48,9 +48,9 @@ class Animation:
 class SimpleAnimation:
     '''This Animation Class is meant to provide a simpler interface and be faster than the normal Animation class'''
     __slots__ = 'csurface','frames','fps','time','_frame_in_state','max_frames_in_state','surf'
-    def __init__(self,csurf:Camera.CSurface,fps:float,frames):
+    def __init__(self,csurf:Camera.CSurface,fps:float,frames:pygame.Surface|tuple[pygame.Surface,...]):
         self.csurface = csurf
-        if not isinstance(frames,list):
+        if not isinstance(frames,(list,tuple)):
             frames = (frames,)
         self.setFrames(frames,fps)
 
@@ -93,7 +93,7 @@ class SimpleAnimation:
 
 if __name__ == '__main__':
     from pympler.asizeof import asizeof
-    print(asizeof(SimpleAnimation(Camera.NullCSurface,10,[Camera.NullCSurface.surf])))
+    print(asizeof(SimpleAnimation(Camera.NullCSurface,10,(Camera.NullCSurface.surf,))))
     t = Animation(Camera.NullCSurface)
     #t.add_state('left',10,[],[])
     print(asizeof(t))

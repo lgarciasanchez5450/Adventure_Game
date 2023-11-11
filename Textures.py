@@ -75,6 +75,7 @@ def import_folder(path,alpha=True,size:None|tuple = None,return_flipped_too:bool
 			image:str
 			if not is_image(PATH() +image): continue #only will get image files
 			full_path = _root + '/' + image
+			print(full_path)
 			if size is None:
 				image_surf = load(full_path).convert_alpha() if alpha else load(full_path).convert()
 			else:
@@ -96,6 +97,7 @@ def init():
 	import_folder('Images/objects')
 	import_folder('Images/items',True,(ITEM_SIZE,ITEM_SIZE))
 	import_folder('Images/blocks',False,(BLOCK_SIZE,BLOCK_SIZE))
+	import_folder('Images/UI/hotbar')
 	s = Surface((PARTICLE_SIZE,PARTICLE_SIZE))
 	s.fill('red')
 	texture['death.png'] = s
@@ -107,9 +109,7 @@ def init():
 	texture['grey.png'] = s
 	load_item_anim(ITAG_BOW)
 	load_item_anim(ITAG_ARROW)
-	print(texture['Dirt.png'])
 	texture['entity_arrow.png'] = scale(rotate(load_image('Images/Entities/arrow/default_arrow.png').convert_alpha(),90+47),(BLOCK_SIZE,BLOCK_SIZE))
-
 	del s
 
 def flipX(surf:Surface|tuple[Surface,...]):

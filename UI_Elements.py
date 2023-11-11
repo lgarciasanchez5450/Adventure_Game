@@ -5,11 +5,7 @@ from game_math import *
 from Camera import CSurface
 from pygame import Surface,font
 from Animation import SimpleAnimation
-class Item(UnInstantiable):
-    csurface:CSurface
-    animation:SimpleAnimation 
-    count:int
-    max_stack_count:int
+
 
 
 
@@ -36,7 +32,7 @@ class ItemSlot:
         return self
 
 
-    def update(self,m_pos_normalized:Vector2) -> Item|None:
+    def update(self,m_pos_normalized:Vector2):
         if self.collider.collide_point_inclusive(m_pos_normalized.tuple):
             self.state = ItemSlot.HOVER
             
@@ -44,7 +40,7 @@ class ItemSlot:
             self.state = ItemSlot.UP
 
     def draw(self,surface:Surface):
-        item:Item = self.inventory.seeIndex(self.index)
+        item = self.inventory.seeIndex(self.index)
         if hasattr(item,'animation'): # TODO remove this if all items are guaranteed to have a animation
             item.animation.animate()
         self.surface.fill(self.hover_color if self.state == self.HOVER else self.bg_color)
