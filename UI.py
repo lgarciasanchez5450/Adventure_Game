@@ -13,6 +13,7 @@ import Input
 tex_location = 1
 
 class UI:
+    __slots__ = 'tex_location','center','size','surface','surface_size','tex','program','render_object','topleft','collider','thingy','relative_mouse_position_normalized','rel_mouse_pos'
     def __init__(self,surface_size:tuple|list = (WIDTH,HEIGHT),screen_offset:tuple|list = (0,0),screen_size = (1,1)):
         global tex_location
         
@@ -30,13 +31,11 @@ class UI:
         self.collider = Collider(self.topleft.x,self.topleft.y,screen_size[0]*2,screen_size[1]*2)
         self.thingy = Vector2(*screen_size).inverse
 
-    def _():
+    def _(self):
         pass
 
     def onResize(self,width,height):
         pass
-
-
 
     def update(self):
         self.surface.fill('grey')
@@ -66,7 +65,7 @@ class DebugUI(UI):
 
     def update(self):
         self.surface.fill((0,0,0))
-        self.surface.blit(self.font.render(str(Time.get_frameRateInt()),1,(255,255,255)),(0,0))
+        self.surface.blit(self.font.render(str(Time.get_frameRateInt()),True,(255,255,255)),(0,0))
 
 class Fake_Inventory:
     spaces:int

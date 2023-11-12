@@ -73,10 +73,10 @@ ARMOUR_SLOTS_BY_SPECIES:dict[str,tuple[str,...]] = {
     'bunny':('headwear',)
 }
 
-VISION_BY_SPECIES:dict[str,int] = {
-    'human':10,
-    'spirit': 3,
-    'bunny': 3.5
+VISION_BY_SPECIES:dict[str,float] = {
+    'human' :10.0,
+    'spirit':3.0,
+    'bunny' :3.5
 }
 INVENTORY_SPACES_BY_SPECIES = {'human':36,'spirit':0,'bamboo':0,'raccoon':1,'squid':0,'bunny':0} # should include hotbar too
 
@@ -94,7 +94,7 @@ STACK_COUNT_BY_TAG = {
 }
 
 #Variables that can change
-RenderDistance = 6
+RenderDistance = 3
  
 GenerationDistance = 10 # Should be larger than RenderDistance
 

@@ -112,9 +112,9 @@ def init():
 	texture['entity_arrow.png'] = scale(rotate(load_image('Images/Entities/arrow/default_arrow.png').convert_alpha(),90+47),(BLOCK_SIZE,BLOCK_SIZE))
 	del s
 
-def flipX(surf:Surface|tuple[Surface,...]):
+def flipX(surf:Surface|tuple[Surface,...]|list[Surface]) -> list[Surface]|Surface:
 	if isinstance(surf,(tuple,list)):
-		return [flipX(s) for s in surf]
+		return [flipX(s) for s in surf] #type: ignore
 	return flip(surf,True,False)
 
 if __name__ == "__main__":

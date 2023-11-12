@@ -249,7 +249,10 @@ def blit(surface,position,s_offset_x = 0, s_offset_y = 0):
 
 
 def blit_csurface(csurface:CSurface):
-    screen.blit(csurface.surf,(floor(csurface.pos.x*BLOCK_SIZE-camera_offset_x+HALFWIDTH+csurface.offset[0]),floor(csurface.pos.y*BLOCK_SIZE-camera_offset_y+ HALFHEIGHT+csurface.offset[1])))
+    screen.blit(csurface.surf,((csurface.pos.x*BLOCK_SIZE-camera_offset_x+HALFWIDTH+csurface.offset[0]).__floor__(),(csurface.pos.y*BLOCK_SIZE-camera_offset_y+ HALFHEIGHT+csurface.offset[1]).__trunc__()))
+
+
+
 
 def resize_screen(width:int,height:int) -> Surface:
     call_OnResize(width,height)

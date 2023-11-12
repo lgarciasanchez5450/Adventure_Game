@@ -65,6 +65,7 @@ registerGround(lambda : Ground(GROUND_STONE).setFriction(20),GROUND_STONE,'Stone
 registerGround(lambda : Ground(GROUND_WATER).setFriction(2),GROUND_WATER,'Water')
 registerGround(lambda : Ground(GROUND_DIRT).setFriction(9),GROUND_DIRT,'Dirt')
 registerGround(lambda : Ground(GROUND_GRASS).setFriction(9),GROUND_GRASS,'Grass')
+registerGround(lambda : Ground(GROUND_INVALID).setFriction(-1),GROUND_INVALID,'Invalid Ground')
 
 
 

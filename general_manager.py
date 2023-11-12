@@ -77,7 +77,7 @@ class UniversalInventory:
         assert isinstance(item,(Item,type(None)))
         #check if new item passes slot restrictions
         if index in self.slot_restrictions:
-            if not self.slot_restrictions[index](item):
+            if not self.slot_restrictions[index](item): #type: ignore
                 #test failed, return early
                 return item
             
@@ -134,18 +134,19 @@ class UniversalInventory:
         assert isinstance(item,(Item,type(None)))
         empty_slots = []
         for index, inventory_item in enumerate(self.inventory):
+            inventory_item:Item
             if inventory_item is None:
                 empty_slots.append(index)
-            elif item.stackCompatible(inventory_item):
+            elif inventory_item.stackCompatible(item):
                 item = self._addItem(item,index)
                 if item is None:
                     return None
-        index , inventory_item = None,None
-        del index, inventory_item
+
+        del index, inventory_item #type: ignore
         #if it has reached here then there is no previously existing item of the same type but there are empty slots
         for slot in empty_slots:
             if slot in self.slot_restrictions:
-                if self.slot_restrictions[slot](item):
+                if self.slot_restrictions[slot](item): #type: ignore
                     self.inventory[slot] = item
                     return None
             else:
@@ -185,8 +186,8 @@ class UniversalInventory:
         return 0
 
     @property
-    def added_def(self) -> float:
-        return 0.0
+    def added_def(self) -> int:
+        return 0
     
     def addRestriction(self,index:int,func:Callable[[Any],bool]):
         self.slot_restrictions[index] = func
@@ -237,7 +238,7 @@ class Hotbar:
             self._inv.inventory[self.selected] = None
             self.item_selected = None
 
-    def stop_use_selected(self): 
+    def stop_use_selected(self):
         if self.item_selected is None: return
         self.item_selected.stopUse(self._inv)
         if self.item_selected.count == 0:
@@ -252,8 +253,6 @@ class Hotbar:
         self.item_selected = self.seeSelected()
         self.item_selected_in_use = False
 
-
-    
     def getSelected(self):
         '''Will return the original item while removing it from the hotbar.\n
         If only using for information then use seeSelected()'''
@@ -298,7 +297,7 @@ class Item:
         self.damage:int = 0 
         self.mining_speed:int = 0 
         self.fps = 0 #this is for when the ItemWrapper <Entity> needs to create the animation. 
-        self.frames:list[pygame.Surface]  = [Textures.texture.get(self.tag+'.png',Textures.texture['null.png'])] # at most 60 frames 
+        self.frames:tuple[pygame.Surface,...]  = (Textures.texture.get(self.tag+'.png',Textures.texture['null.png']),) # at most 60 frames 
         self.inventory:UniversalInventory
 
         #self.path = f'{Textures.PATH()}Images\\items\\{name}' #shouldn't need this actually
@@ -408,12 +407,11 @@ class BowBase(Item):
         assert isinstance(inventory,UniversalInventory)
         for i,item in enumerate(inventory.inventory):
             if hasattr(item,'arrow'):
-                item:ItemArrow
-                self.loaded_item = item.arrow
-                item.count -= 1
-                inventory.checkItem(i)              
                 self.startTime = Time.time
-                return 
+                self.loaded_item = item.arrow
+                item:ItemArrow
+                item.count -= 1
+                return inventory.checkItem(i)  # return None
         self.startTime = None
     
     def stopUse(self,inventory) -> None:
@@ -424,6 +422,8 @@ class BowBase(Item):
         direction = (Camera.world_position_from_normalized(Input.m_pos_normalized) - inventory.entity.pos).normalized
         direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
         spawn_entity(self.loaded_item(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
+        self.loaded_item = None
+        self.startTime = None
 
     def getArrowSpeedFromTime(self,t:float) -> float: ...
         
@@ -783,7 +783,10 @@ class ArrowExplosive(Arrow):
         return
 
 class AliveEntity(Entity):
-        
+    __slots__ = 'actions','pickup_range','inventory','armour_inventory','stats','exp','max_speed','total_health','defense','regen_multiplier','health','strength','max_energy', \
+    'energy','attack_speed','time_between_attacks','time_to_attack','time_to_regen','regen_time','vision_collider','vision_squared','states','ground','invulnerability_time', \
+    'time_til_vulnerable','direction','extra_speed','extra_speed_sum','extra_total_health','extra_total_health_sum','extra_regen','extra_regen_sum','extra_strength' ,\
+    'extra_strength_sum','extra_energy','extra_energy_sum','extra_defense','extra_defense_sum','effects','state'
     def __init__(self,pos,species):
         super().__init__(pos,species)
         self.actions = Settings.ACTIONS_BY_SPECIES[species]
@@ -797,12 +800,14 @@ class AliveEntity(Entity):
         speed = self.stats['speed'] 
         self.speed = self.max_speed * speed / (speed + 100)
         self.total_health = self.stats['constitution'] * 5 + self.stats['strength'] + self.stats['stamina']
+        assert isinstance(self.stats['defense'],int)
         self.defense = self.stats['defense']
         self.regen_multiplier = self.stats['constitution'] + self.stats['strength']
         self.regen_multiplier = self.regen_multiplier / (self.regen_multiplier + 100) + 1
         self.health = self.total_health
         self.strength = self.stats['strength'] * 5 + self.stats['constitution'] + self.stats['stamina']
         self.max_energy = self.stats['energy']
+        assert isinstance(self.stats['energy'],int)
         self.energy = self.stats['energy']
         self.attack_speed = self.energy / 10
         self.time_between_attacks = 1/self.attack_speed
@@ -823,7 +828,7 @@ class AliveEntity(Entity):
         self.extra_total_health:dict[str,int] = {}; self.extra_total_health_sum = 0.0
         self.extra_regen:dict[str,float] = {}; self.extra_regen_sum = 0.0
         self.extra_strength:dict[str,int] = {}; self.extra_strength_sum = 0.0
-        self.  extra_energy:dict[str,int] = {}; self.extra_energy_sum = 0.0
+        self.extra_energy:dict[str,int] = {}; self.extra_energy_sum = 0.0
         self.extra_defense:dict[str,int] = {}; self.extra_defense_sum = 0.0
 
         self.effects:list[EntityEffect] = []
@@ -876,15 +881,15 @@ class AliveEntity(Entity):
         self.extra_regen[tag] = addedRegen
         self.extra_regen_sum = sum(self.extra_regen.values())
 
-    def setExtraStatStrength(self,tag:str,addedStrength:float):
+    def setExtraStatStrength(self,tag:str,addedStrength:int):
         self.extra_strength[tag] = addedStrength
         self.extra_strength_sum = sum(self.extra_strength.values())
 
-    def setExtraStatEnergy(self,tag:str,addedEnergy:float):
+    def setExtraStatEnergy(self,tag:str,addedEnergy:int):
         self.extra_energy[tag] = addedEnergy
         self.extra_energy_sum = sum(self.extra_energy.values())
     
-    def setExtraStatDefense(self,tag:str,addedDefense:float):
+    def setExtraStatDefense(self,tag:str,addedDefense:int):
         self.extra_defense[tag] = addedDefense
         self.extra_defense_sum = sum(self.extra_defense.values())
     
@@ -965,7 +970,7 @@ class AliveEntity(Entity):
         self.state = self.states[number]
         self.animation.set_state(self.state)
 
-    def set_regen_time(self,speed:float) -> float:
+    def set_regen_time(self,speed:float) -> None:
         self.regen_time = speed
         if self.time_to_regen > speed:
             self.time_to_regen = speed
@@ -1035,7 +1040,7 @@ class AliveEntity(Entity):
     def get_attack_damage(self) -> int:
         '''Returns final attack damage'''
         #get total damage stat
-        damage:int =  self.getTotalRegen()
+        damage =  self.getTotalStrength() # start with strength stat
         damage *= 1.0 + self.strength / 100 * self.get_energy_multiplier()
         return damage.__trunc__()
 
@@ -1053,17 +1058,21 @@ class AliveEntity(Entity):
                 print(self.health)
 
     def collect_items(self):
-        for item in collide_entities_in_range(self.pos,self.pickup_range):
+        for item in collide_entities_in_range_species(self.pos,self.pickup_range,'item'): # type: ignore
             item:ItemWrapper
-            if item.species == 'item' and item.pickup_time < 0 and self.inventory.add_item(item.item):
-                item.onDeath()
+            if item.pickup_time < 0 :
+                i = self.inventory.fitItem(item.item) #this will never add the same object to both hotbar and inventory becasue the or will only try to add to inventory if the item couldn't be added to the hotbar
+                if i is None:
+                    item.onDeath()
+
 
 class Player(AliveEntity):
+    __slots__ = 'cx','cy','can_move','attacking','state','showingInventory','hotbar','ui','hbui','walking_particle'
     def __init__(self,pos):
         super().__init__(pos,'human')
 
-        self.cx = self.pos.x//CHUNK_SIZE
-        self.cy = self.pos.y//CHUNK_SIZE
+        self.cx = (self.pos.x//CHUNK_SIZE).__floor__()
+        self.cy = (self.pos.y//CHUNK_SIZE).__floor__()
         recalculate_chunks(self.cx,self.cy)
         self.set_up_animation()
 
@@ -1072,7 +1081,6 @@ class Player(AliveEntity):
         # damage timer
         self.can_move = True
         self.attacking = False
-        self.hurt_time = None
         self.states = ['relaxed','focused']
         self.state = None
         self.set_state(0)
@@ -1094,7 +1102,9 @@ class Player(AliveEntity):
         idle_left = Textures.flipX(idle_right)
         attack_right = player_animations['idle']
         attack_left = Textures.flipX(attack_right)
-        
+        assert isinstance(walk_left,list)
+        assert isinstance(idle_left,list)
+        assert isinstance(attack_left,list)
         self.walking_particle = Textures.import_folder('Images/particles/Dirt',False,(PARTICLE_SIZE,PARTICLE_SIZE))[0]
         self.animation.add_state('walk',4,walk_right,walk_left)
         self.animation.add_state('idle',1.2,idle_right,idle_left)
@@ -1176,10 +1186,10 @@ class Player(AliveEntity):
             print('attacked with item',item)
         if Input.m_d3:
             self.hotbar.start_use_selected()
-        elif Input.m_3:
-            self.hotbar.during_use_selected()
         elif Input.m_u3:
             self.hotbar.stop_use_selected()
+        elif Input.m_3: pass
+            #self.hotbar.during_use_selected()
 
     def move(self):
         super().update() 
@@ -1220,7 +1230,7 @@ class Player(AliveEntity):
         self.ui.update()
 
     def collect_items(self): ## TODO : Make it so that in order to pick up items you click on them instead of just getting close to them
-        for item in collide_entities_in_range_species(self.pos,self.pickup_range,'item'):
+        for item in collide_entities_in_range_species(self.pos,self.pickup_range,'item'): # type: ignore
             item:ItemWrapper
             if item.pickup_time < 0 :
                 i = self.inventory.fitItem(item.item) #this will never add the same object to both hotbar and inventory becasue the or will only try to add to inventory if the item couldn't be added to the hotbar
@@ -1310,6 +1320,7 @@ class Spirit(AliveEntity):
         elif self.state is self.states[1]: # we are wandering
             pass
         elif self.state is self.states[2]: # we are figthing something
+            assert not isinstance(self.closest_enemy,type(None)),'closest enemy was somehow none when we were fighting something'
             if self.closest_enemy.dead: self.time_to_introspection = 0; return
             distance_to_enemy  = (self.closest_enemy.pos - self.pos)
             if distance_to_enemy.magnitude_squared() < self.attack_range_squared:
@@ -1346,7 +1357,7 @@ class Bunny(AliveEntity):
         for state in self.states:
             self.animation.add_state(state,8,self.right_idle,self.left_idle)
         self.state = self.states[0]
-        self.mark:Entity = None
+        self.mark:Entity|None = None
         self.hunger = 0
         self.sprinting = False
 
@@ -1427,7 +1438,7 @@ class Bunny(AliveEntity):
         elif self.state is self.states[3]: # we are hungry to to something
             pass'''
 
-    def take_damage(self, damage: float, type: str,appearance:Appearance = None) -> None:
+    def take_damage(self, damage: int, type: str,appearance:Appearance|None = None) -> None:
         if appearance is not None:
             self.fears.add(appearance.species)
         if self.state in ( self.states[0] , self.states[1]):
@@ -1446,7 +1457,7 @@ class Driver:
         
     def __init__(self,pos:Vector2):
         self.pos = pos
-        self.target:Vector2 = None
+        self.target:Vector2|None = None
         self.spatial_tolerance = .1
         self.mode = self.FOLLOW
 
@@ -1465,6 +1476,7 @@ class Driver:
         self.target = target.copy()
 
     def getAccelerationDirection(self):
+        if self.target is None: return Vector2.zero
         lineVec = self.target - self.pos
         if self.mode is self.AVOID:
             lineVec = -lineVec
@@ -1492,7 +1504,7 @@ class SuperStrength1(EntityEffect):
     def __init__(self, entity: AliveEntity) -> None:
         super().__init__(EntityEffects.EFFECT_STRENGTH_I, entity)
         self.time = 60.0
-        self.entity.setExtraStatStrength(self.name,1000.0)
+        self.entity.setExtraStatStrength(self.name,1000)
 
     def update(self):
         self.time -= Time.deltaTime
@@ -1508,6 +1520,8 @@ class SuperStrength1(EntityEffect):
 
 #### UI ####
 class InventoryUI(UI):
+    __slots__ = 'screen_center','inventory','armour_inventory','inventory_size','has_hotbar','inventory_dont_do','slots_width','entity','slot_spacing','slots_center',\
+    'armour_slots_center','hb_slots_center','in_hand','items_offset','slots','armour_offset','armour_slots','hb_inventory','hb_size','hotbar','hb_offset','hb_slots'
     font = pygame.font.SysFont("Arial",ITEM_COUNTER_SIZE)   
     def __init__(self,entity:AliveEntity, surface_size:tuple|list = (WIDTH, HEIGHT), hotBarIndexes:tuple[int,...]|None = None):
         screen_size = (surface_size[0]/WIDTH,surface_size[1]/HEIGHT)
@@ -1522,10 +1536,11 @@ class InventoryUI(UI):
         if self.has_hotbar:
 
             assert isinstance(entity.hotbar,Hotbar) #type: ignore
-            assert entity.hotbar._inv is self.inventory, 'the hotbar must derive from the entities\' own inventory!'#type: ignore
-            self.hb_inventory = entity.hotbar  #type: ignore
-            self.hb_size = entity.hotbar.len #type: ignore
-            self.hotbar = entity.hotbar #type: ignore
+            assert isinstance(entity,Player)
+            assert entity.hotbar._inv is self.inventory, 'the hotbar must derive from the entities\' own inventory!'
+            self.hb_inventory = entity.hotbar  
+            self.hb_size = entity.hotbar.len 
+            self.hotbar = entity.hotbar 
             self.inventory_dont_do = self.hb_inventory.spaces
 
         self.collider = Collider(self.topleft.x,self.topleft.y,screen_size[0]*2,screen_size[1]*2)
@@ -1553,17 +1568,17 @@ class InventoryUI(UI):
             # for now imma just skip them and still increment <i> to clearly show if im skpping any so any bugs will be found easily
             if i in self.inventory_dont_do: continue #there.. happy??
 
-            item = ItemSlot(((i%self.slots_width)*self.slot_spacing+self.items_offset[0],(i//self.slots_width)*self.slot_spacing+self.items_offset[1]),i,self.inventory)
+            item = ItemSlot(((i%self.slots_width)*self.slot_spacing+self.items_offset[0],(i//self.slots_width)*self.slot_spacing+self.items_offset[1]),i,self.inventory) #type: ignore
             self.slots.append(item)
         self.thingy = self.size.inverse
 
         if self.has_hotbar:
             self.hb_offset = self.screen_center+self.hb_slots_center - Vector2(self.hb_size * self.slot_spacing,self.slot_spacing)/2 
-            self.hb_slots = [ItemSlot((i*self.slot_spacing+self.hb_offset[0],self.slot_spacing+self.hb_offset[1]),i,self.hotbar) for i in range(self.hb_size)]
+            self.hb_slots = [ItemSlot((i*self.slot_spacing+self.hb_offset[0],self.slot_spacing+self.hb_offset[1]),i,self.hotbar) for i in range(self.hb_size)] #type: ignore
 
         armour_size = Vector2(self.slot_spacing,self.slot_spacing * self.armour_inventory.spaces)
         self.armour_offset = self.screen_center + self.armour_slots_center - armour_size/2
-        self.armour_slots = [ItemSlot((self.armour_offset[0],i*self.slot_spacing+self.armour_offset[1]),name,self.armour_inventory) for i,name in enumerate(self.armour_inventory.inventory)]
+        self.armour_slots = [ItemSlot((self.armour_offset[0],i*self.slot_spacing+self.armour_offset[1]),name,self.armour_inventory) for i,name in enumerate(self.armour_inventory.inventory)]#type: ignore
         for armour_slot in self.armour_slots:
             armour_slot.bg_color = (60,30,25)
 
@@ -1587,7 +1602,7 @@ class InventoryUI(UI):
                 slot.update(self.rel_mouse_pos)
                 if slot.state == slot.HOVER:
                     if Input.m_d1:
-                        self.in_hand = self.armour_inventory.set_armour(self.in_hand,slot.index)
+                        self.in_hand = self.armour_inventory.set_armour(self.in_hand,slot.index) #type: ignore
 
         else:
             if Input.m_d1 and self.in_hand is not None:
@@ -1615,6 +1630,7 @@ class InventoryUI(UI):
         super().draw()
 
 class HotBarUI:
+    __slots__ = 'selectedFrame','entity','slot_spacing','hb_inventory','background_color','surface','x','y','collider','has_mouse','slots','topleft'
     def __init__(self,entity:AliveEntity,hotbar:Hotbar):
         if not hasattr(entity,'hotbar'):
             raise RuntimeError('entity passed into HotBarUI does not seem to define its hotbar!')
@@ -1640,7 +1656,7 @@ class HotBarUI:
         self.y = Camera.HEIGHT - self.surface.get_height()
         self.topleft = Vector2(self.x,self.y)
 
-        self.slots = [ItemSlot((i*(ITEM_SIZE+self.slot_spacing)+self.slot_spacing,self.slot_spacing),i,self.hb_inventory) for i in range(self.hb_inventory.len)]
+        self.slots = [ItemSlot((i*(ITEM_SIZE+self.slot_spacing)+self.slot_spacing,self.slot_spacing),i,self.hb_inventory) for i in range(self.hb_inventory.len)] #type: ignore
         self.surface.fill(self.background_color)
 
     def onMouseLeave(self):
@@ -1674,12 +1690,6 @@ class HotBarUI:
             slot.draw(self.surface)
             Camera.screen.blit(self.surface,self.topleft.tupled_ints)
 
-        #if self.in_hand is not None:
-        #    self.in_hand:Item
-        #    self.surface.blit(self.in_hand.animation.surf,(self.rel_mouse_pos.x-ITEM_SIZE//2,self.rel_mouse_pos.y-ITEM_SIZE//2))
-
-
-
 
 #######################################
 ########### BLOCK_CHUNKS ##############
@@ -1693,7 +1703,7 @@ _DEBUG_ = True
 
 def noise_to_ground(n):
   if n > 1 or n < 0: 
-    return None
+    return getGround(GROUND_INVALID)
   if n > .85:
     return getGround(GROUND_STONE)
   if n > .45:
@@ -1718,7 +1728,7 @@ class Chunk:
             return chunk._get_ground(x,y)
         return NullGround
         
-    def __new__(cls,pos:tuple[int,int]):
+    def __new__(cls,pos:tuple[int,int]|list[int]):
         if pos in cls._insts:
             return cls._insts[pos]
         else:
@@ -1732,7 +1742,6 @@ class Chunk:
             chunk.csurf = CSurface(surf ,chunk.pos,(0,0))
             chunk.collider = Collider(pos[0]*CHUNK_SIZE,pos[1]*CHUNK_SIZE,CHUNK_SIZE,CHUNK_SIZE)
             
-            x,y = pos
             chunk.biome = PLAINS #prefferably call a function <get_biome(chunk_pos)> 
             chunk.active = False
             chunk.dead_blocks = []
@@ -1745,7 +1754,7 @@ class Chunk:
 
     __slots__ = ('chunk_pos','pos','collider','id','data','blocks','biome','active','ground','onCreationFinish','csurf','dead_blocks')
     # removed slots 'x','y','subdivision_lengths','items','items_sub',
-    def __init__(self,pos:tuple[int,int]):
+    def __init__(self,pos:tuple[int,int]|list[int]):
         self.chunk_pos = (floor(pos[0]),floor(pos[1]))
         #for drawing to screen
         #self.x,self.y = pos[0] * CHUNK_SIZE, pos[1] * CHUNK_SIZE 
@@ -1758,7 +1767,7 @@ class Chunk:
       
         self.biome:int
         self.active:bool
-        self.ground:list
+        self.ground:list[list[Ground|None]]
         self.onCreationFinish:list
         self.csurf:CSurface 
         self.dead_blocks:list[Block]
@@ -1866,21 +1875,21 @@ def _create(chunk:Chunk):
     chunk.data /= 2
     
     yield  
-    chunk.ground = make2dlist(CHUNK_SIZE)
+    chunk.ground = make2dlist(CHUNK_SIZE) #type: ignore
     #draw layered noisemap onto surface
     #note this will not be represented in real time as it will still need to get loaded into the camera, which happens at the end of the creation process
     surf = chunk.surf
     for y, row in enumerate(chunk.data):
         for x, noise in enumerate(row):
             ground = noise_to_ground(noise) 
-            chunk.ground[y][x] = ground
+            chunk.ground[y][x] = ground #type: ignore
             #pygame.draw.rect(surf,(noise*255,)*3,(x*BLOCK_SIZE,y*BLOCK_SIZE,BLOCK_SIZE,BLOCK_SIZE))
             surf.blit(Textures.texture[ground.tex],(x*BLOCK_SIZE,y*BLOCK_SIZE))
             #surf.blit(myfont.render(str((x+chunk.chunk_pos[0]*CHUNK_SIZE,y+chunk.chunk_pos[1]*CHUNK_SIZE)),True,'black'),(x*BLOCK_SIZE,y*BLOCK_SIZE))
     #yield
     
     if _DEBUG_:
-        draw.lines(chunk.surf,(255,0,0),1,((0,0),(CHUNK_SIZE*BLOCK_SIZE,0),(CHUNK_SIZE*BLOCK_SIZE,CHUNK_SIZE*BLOCK_SIZE),(0,CHUNK_SIZE*BLOCK_SIZE)),3)    
+        draw.lines(chunk.surf,(255,0,0),True,((0,0),(CHUNK_SIZE*BLOCK_SIZE,0),(CHUNK_SIZE*BLOCK_SIZE,CHUNK_SIZE*BLOCK_SIZE),(0,CHUNK_SIZE*BLOCK_SIZE)),3)    
     #to make trees we check the 8 immediately surrounding chunks if they exist and add them to a list
     cx ,cy = chunk.chunk_pos
     surrounding_chunks = [(cx-1,cy-1),(cx,cy-1),(cx+1,cy-1),(cx-1,cy),(cx+1,cy),(cx-1,cy+1),(cx,cy+1),(cx+1,cy+1)]
@@ -1903,8 +1912,8 @@ def _create(chunk:Chunk):
         return True
 
     for _ in range(CHUNK_SIZE*CHUNK_SIZE//6):
-        x = randint(chunk.pos.x, chunk.pos.x + CHUNK_SIZE - 1)
-        y = randint(chunk.pos.y, chunk.pos.y + CHUNK_SIZE - 1)
+        x = randint(chunk.pos.x, chunk.pos.x + CHUNK_SIZE - 1) #type: ignore
+        y = randint(chunk.pos.y, chunk.pos.y + CHUNK_SIZE - 1) #type: ignore
         g = chunk._get_ground(x,y)
         if Tree.spawnable_on(g) and isValid(x,y):
             chunk.blocks.append(Tree((x,y),g))
@@ -1925,9 +1934,10 @@ current_chunks:list[Chunk] = []
 
 chunk_loading_queue = deque()
 
-def queue_chunk(chunk_pos:tuple|list):
+def queue_chunk(chunk_pos:tuple[int,int]|list[int]):
     '''Will queue the chunk at the inputed pos and return it'''
     #first make some checks to make sure that its not loaded or currently being loaded
+    assert len(chunk_pos) == 2, 'chunk position must have 2 numbers!'
     assert chunk_pos not in chunks, 'chunk is already loaded'
     if chunk_pos in chunk_loaders:
         for chunk in chunk_loading_queue:
@@ -1969,7 +1979,7 @@ def step():
     chunk_loading_queue.rotate()
 
 def place_block(block:Block):
-    chunk:Chunk = chunks.get((block.pos//CHUNK_SIZE).tuple)
+    chunk:Chunk|None = chunks.get((block.pos//CHUNK_SIZE).tupled_ints)
     return False if chunk is None else chunk.add_block(block)
 
 #######################################
@@ -1979,7 +1989,7 @@ def place_block(block:Block):
 
 entity_chunks:dict[tuple[int,int],list[Entity]] = {}
 def get_entity_chunk(entity:Entity):
-    return (entity.pos//CHUNK_SIZE).to_ints()
+    return (entity.pos//CHUNK_SIZE).tupled_ints
 
 def print_entity_chunks():
     for chunk in active_chunks:
@@ -2006,12 +2016,10 @@ def get_nearest_block(pos:Vector2):
     return nearest
 
 def spawn_entity(entity:Entity):
-    chunk_pos = (entity.pos//CHUNK_SIZE).tuple
+    chunk_pos = (entity.pos//CHUNK_SIZE).tupled_ints
     chunk = entity_chunks.get(chunk_pos) #try to get the chunk its in, if not found then create a new chunk(list)
 
     if chunk_pos in active_chunks:
-
-        #print('Entity spawned is being shown!')
         entity.onLoad()
     if chunk is None: #
         entity_chunks[chunk_pos]  = chunk = []
@@ -2031,9 +2039,11 @@ def manage_chunks():
         if chunk_pos in entity_chunks:
             chunk = entity_chunks[chunk_pos]
             for entity in reversed(chunk): #could just do range(len(chunk),0,-1) and use pop instead of remove, which is faster
-                entity_chunk = (entity.pos//CHUNK_SIZE).tuple
-                if  entity_chunk != chunk_pos:            
+                entity_chunk = (entity.pos//CHUNK_SIZE).tupled_ints
+                if entity_chunk != chunk_pos:            
                     chunk.remove(entity)
+                    if not chunk: # chunk is empty
+                        del entity_chunks[chunk_pos]
 
                     new_chunk = entity_chunks.get(entity_chunk) #try to get the chunk its in, if not found then create a new chunk(list)
                     if new_chunk is None:
@@ -2047,7 +2057,7 @@ def manage_chunks():
     dead_entities.clear()
 
 def remove_entity(entity:Entity):
-    chunk_pos = (entity.pos//CHUNK_SIZE).tuple
+    chunk_pos = (entity.pos//CHUNK_SIZE).tupled_ints
     entity_chunks[chunk_pos].remove(entity)
     if not entity_chunks[chunk_pos]: #if the entity chunk is now empty
         #delete the chunk because it is not needed anymore
@@ -2113,8 +2123,8 @@ def drop_item(item:Item,pos:Vector2,vel:Vector2|None=None):
     #step 2) Spawn Itemwrapper as entity
     spawn_entity(iw)
  
-def get_chunk(cx,cy) -> Chunk:
-    chunk:Chunk = chunks.get((cx,cy))
+def get_chunk(cx:int,cy:int) -> Chunk:
+    chunk:Chunk|None = chunks.get((cx,cy))
     if chunk is None:
         chunk = queue_chunk((cx,cy))
     return chunk
@@ -2135,7 +2145,7 @@ def get_chunks_collided(collider:Collider):
         for x in inclusive_range(floor(collider.left),ceil(collider.right),CHUNK_SIZE):
             cpos = (x//CHUNK_SIZE,y//CHUNK_SIZE)
             if cpos in checked: continue
-            chunk:Chunk = chunks.get(cpos)
+            chunk:Chunk|None = chunks.get(cpos)
             if chunk is not None:
                 yield chunk
             checked.add(cpos)
@@ -2177,10 +2187,10 @@ def collision_vertical(collider:Collider,vy:float|int):
 
 all_chunks_ever_added = set()
 
-def recalculate_chunks(pcx,pcy):
+def recalculate_chunks(pcx:int,pcy:int):
     global active_chunks
     #get chunks that will be added
-    new_chunks = get_around_chunk(floor(pcx),floor(pcy))
+    new_chunks = get_around_chunk(pcx,pcy)
     added_chunks = []
     removed_chunks = []
     for chunk in new_chunks:
@@ -2197,13 +2207,13 @@ def recalculate_chunks(pcx,pcy):
     
     #get chunks that will be removed
     for old_chunk in removed_chunks:
-      if old_chunk not in all_chunks_ever_added:
-          print('Something is seriously wrong, a chunk that was never added is currently trying to be removed')
-      for entity in entity_chunks.get(old_chunk,[]):
-        entity.onLeave()
-      old_chunk = get_chunk(*old_chunk)
-      old_chunk.unload()
-      current_chunks.remove(old_chunk)
+        if old_chunk not in all_chunks_ever_added:
+            print('Something is seriously wrong, a chunk that was never added is currently trying to be removed')
+        for entity in entity_chunks.get(old_chunk,[]):
+            entity.onLeave()
+        old_chunk = get_chunk(*old_chunk)
+        old_chunk.unload()
+        current_chunks.remove(old_chunk)
 
 
 
@@ -2222,7 +2232,7 @@ def update():
         chunk.update()
 
 @njit(cache =True)
-def _sdtb(px,py,cx,cy,w,h):
+def _sdtb(px:float,py:float,cx:float,cy:float,w:float,h:float):
     offset_x = abs(px - cx) - w/2
     offset_y = abs(py - cy) - h/2
     unsignedDst = hypot(max(offset_x,0),max(offset_y,0))
@@ -2256,7 +2266,7 @@ def raycast(pos:Vector2,direction:Vector2):
         x,y = tl
         x//=CHUNK_SIZE
         y//=CHUNK_SIZE
-        chunk:Chunk = chunks.get((x,y))
+        chunk:Chunk|None = chunks.get((x,y))
         if chunk is not None:
             for obstacle in chunk.blocks:
                 d = signed_distance_to_box(px,py,obstacle.collider)
@@ -2265,7 +2275,7 @@ def raycast(pos:Vector2,direction:Vector2):
         x,y = tr
         x//=CHUNK_SIZE
         y//=CHUNK_SIZE
-        chunk:Chunk = chunks.get((x,y))
+        chunk:Chunk|None = chunks.get((x,y))
         if chunk is not None: 
             for obstacle in chunk.blocks:
                 d = signed_distance_to_box(px,py,obstacle.collider)
@@ -2274,7 +2284,7 @@ def raycast(pos:Vector2,direction:Vector2):
         x,y = bl
         x//=CHUNK_SIZE
         y//=CHUNK_SIZE
-        chunk:Chunk = chunks.get((x,y))
+        chunk:Chunk|None = chunks.get((x,y))
         if chunk is not None:
             for obstacle in chunk.blocks:
                 d = signed_distance_to_box(px,py,obstacle.collider)
@@ -2283,7 +2293,7 @@ def raycast(pos:Vector2,direction:Vector2):
         x,y = br
         x//=CHUNK_SIZE
         y//=CHUNK_SIZE
-        chunk:Chunk = chunks.get((x,y))
+        chunk:Chunk|None = chunks.get((x,y))
         if chunk is not None:
             for obstacle in chunk.blocks:
                 d = signed_distance_to_box(px,py,obstacle.collider)
@@ -2330,7 +2340,7 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
         x,y = tl
         x//=CHUNK_SIZE
         y//=CHUNK_SIZE
-        chunk:Chunk = chunks.get((x,y))
+        chunk:Chunk|None = chunks.get((x,y))
         if chunk is not None:
             for obstacle in chunk.blocks:
                 d = signed_distance_to_box(px,py,obstacle.collider)
@@ -2339,7 +2349,7 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
         x,y = tr
         x//=CHUNK_SIZE
         y//=CHUNK_SIZE
-        chunk:Chunk = chunks.get((x,y))
+        chunk:Chunk|None = chunks.get((x,y))
         if chunk is not None: 
             for obstacle in chunk.blocks:
                 d = signed_distance_to_box(px,py,obstacle.collider)
@@ -2348,7 +2358,7 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
         x,y = bl
         x//=CHUNK_SIZE
         y//=CHUNK_SIZE
-        chunk:Chunk = chunks.get((x,y))
+        chunk:Chunk|None = chunks.get((x,y))
         if chunk is not None:
             for obstacle in chunk.blocks:
                 d = signed_distance_to_box(px,py,obstacle.collider)
@@ -2357,7 +2367,7 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
         x,y = br
         x//=CHUNK_SIZE
         y//=CHUNK_SIZE
-        chunk:Chunk = chunks.get((x,y))
+        chunk:Chunk|None = chunks.get((x,y))
         if chunk is not None:
             for obstacle in chunk.blocks:
                 d = signed_distance_to_box(px,py,obstacle.collider)

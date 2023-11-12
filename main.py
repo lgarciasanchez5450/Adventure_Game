@@ -74,7 +74,11 @@ while True:
         general_manager.manage_chunks()
 
         Particles.update()
-
+        if Input.KDQueue:
+            if 'p' in Input.KDQueue:
+                from pympler.asizeof import asizeof
+                print(asizeof(general_manager.entity_chunks))
+                print(len(general_manager.entity_chunks))
         #Cameras  
         Camera.update()
         Camera.draw_background() 
@@ -108,9 +112,9 @@ while True:
     elif Settings.game_state is GENERATING_WORLD:
             try:
                 Main_Menu.update()
-                chunks_finished, _ = next(gen)
+                chunks_finished, _ = next(gen) #type: ignore
                 print(chunks_finished)
-                Main_Menu.lb.setDone(chunks_finished) #type: ignore
+                Main_Menu.lb.setDone(chunks_finished) 
             except StopIteration:
                 Main_Menu.close()
                 onGameStart()
