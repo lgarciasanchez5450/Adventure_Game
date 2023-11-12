@@ -1065,7 +1065,6 @@ class AliveEntity(Entity):
                 if i is None:
                     item.onDeath()
 
-
 class Player(AliveEntity):
     __slots__ = 'cx','cy','can_move','attacking','state','showingInventory','hotbar','ui','hbui','walking_particle'
     def __init__(self,pos):
@@ -1647,9 +1646,7 @@ class HotBarUI:
         Camera.ui_draw_method(self)
         self.has_mouse = False
         self.collider = Collider(self.x / WINDOW_WIDTH,self.y / WINDOW_HEIGHT,self.surface.get_width()/WINDOW_WIDTH,self.surface.get_height()/WINDOW_HEIGHT)# this is a normalized collider e.g. its values are from [0,1] so that they work with the input
-    
-        #self.recalc_slots()
-        pass
+        self.surface.blit(self.selectedFrame,(self.hb_inventory.selected * (ITEM_SIZE + self.slot_spacing) ,0))
 
     def recalc_slots(self):
         self.x = Camera.halfscreensize.x - self.surface.get_width()/2

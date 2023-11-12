@@ -467,7 +467,7 @@ class Array(list,typing.Generic[T]):
 def is_collider(object) -> bool:
 	return isinstance(object,Collider)
 
-def make2dlist(x,y = None):
+def make2dlist(x,y = None) -> list[list[None]]:
 	y = x if y is None else y
 	return [[None] * x for _ in range(y)]
 
