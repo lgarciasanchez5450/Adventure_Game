@@ -41,7 +41,7 @@ def modifier(i):
 
 
 @njit
-def getAt(x:float,y:float,global_hash):
+def getAt(x:float,y:float,global_hash:int):
     cell_x = floor(x)
     cell_y = floor(y)
     shortest = 999999.9

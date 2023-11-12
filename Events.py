@@ -13,10 +13,10 @@ def call_OnResize(width,height):
 
 class Event:
     def __init__(self, *types:Any):
-        self.listeners:list[Callable[[*types],None]] = []
+        self.listeners:list = []
         self.types = types
     
-    def register(self, func:Callable[[Any],None]) -> Callable[[Any],None]:
+    def register(self, func:Callable) -> Callable:
         self.listeners.append(func)
         return func
     

@@ -11,10 +11,11 @@ def init(display:pygame.Surface):
 
 font = pygame.font.SysFont('Arial',30,1)
 font15 = pygame.font.SysFont('Arial',15)
-surf:pygame.Surface = None
+surf:pygame.Surface|None = None
 def debug(info,pos = (10,10)):
     global surf
-    surf.blit(font.render(str(info),1,(255,255,255)),pos)
+    if surf is None:return
+    surf.blit(font.render(str(info),True,(255,255,255)),pos)
 
 times:dict[str,list] = {}
 def profile(func):
@@ -83,6 +84,7 @@ class MemoryTracker:
 
 
     def draw(self):
+        if surf is None: return
         surf.blit(self.surface,self.screen_pos)
 class VecTracker:
     X_COLOR = (60,60,255)
@@ -97,9 +99,9 @@ class VecTracker:
         self.setMode(mode)
         self.vec = vec
         self.t_size = tracking_size
-        self.trackx = deque([0]*tracking_size,tracking_size)
-        self.tracky = deque([0]*tracking_size,tracking_size)
-        self.trackmag = deque([0]*tracking_size,tracking_size)
+        self.trackx = deque([0.0]*tracking_size,tracking_size)
+        self.tracky = deque([0.0]*tracking_size,tracking_size)
+        self.trackmag = deque([0.0]*tracking_size,tracking_size)
         self.min = float('inf')
         self.max = float('-inf')
         self.screen_pos = screen_pos
@@ -172,4 +174,5 @@ class VecTracker:
 
 
     def draw(self):
+        if surf is None: return
         surf.blit(self.surface,self.screen_pos)

@@ -4,7 +4,7 @@ if __name__=='__main__':
     import Textures
     Textures.init()
 from Constants import *
-from Settings import ENTITY_MAX_LIFESPAN,BLOCK_SIZE,ITEM_SIZE, SLEEP_VELOCITY_THRESHOLD
+from Settings import BLOCK_SIZE,ITEM_SIZE, SLEEP_VELOCITY_THRESHOLD
 import Textures
 from Camera import NullCSurface
 from game_math import cache,Vector2,Collider,get_most_sig_bits
@@ -81,13 +81,13 @@ class Item:
         self.damage = 0 
         self.mining_speed = 0 
         self.fps = 0 #this is for when the ItemWrapper <Entity> needs to create the animation. 
-        self.frames:list[pygame.Surface]  = [Textures.texture.get(name+'.png',nullFrame)] # at most 60 frames 
+        self.frames:tuple[pygame.Surface]  = (Textures.texture.get(name+'.png',nullFrame),) # at most 60 frames 
         #self.path = f'{Textures.PATH()}Images\\items\\{name}'
         self.animation = Animation.SimpleAnimation(NullCSurface,self.fps,self.frames)
-        self.left_click:Callable[[Item],None] = lambda : None
-        self.right_click:Callable[[Item],None] = lambda : None
-        self.left_hold:Callable[[Item],None] = lambda : None
-        self.right_hold:Callable[[Item],None] = lambda : None
+        self.left_click:Callable[[Item],None] = lambda t: None
+        self.right_click:Callable[[Item],None] = lambda t : None
+        self.left_hold:Callable[[Item],None] = lambda t: None
+        self.right_hold:Callable[[Item],None] = lambda t: None
 
     def take_one(self):
         '''Splits an instance of a specific item (that has a count > 1) in two, one that it returns that has a count of 1 and it decrements the count of this item by 1'''

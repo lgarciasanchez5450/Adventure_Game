@@ -1,6 +1,7 @@
 #for date time
 from time import time,perf_counter
 from math import sin,pi,sqrt
+from typing import Literal
 from Noise import noise1
 try:
     from numba import njit
@@ -69,8 +70,7 @@ day:int
 hour:int
 minute:int
 second:int
-temperature:int
-meridian_designation:bool
+meridian_designation:Literal['AM','PM']
 
 def start():
     global _time,_start_time
@@ -108,7 +108,7 @@ def day_temperature() -> float:
     return sin(2*pi*_day_passed-pi/2)
 
 def temperature():
-    return average_global_temperature + 10*day_temperature + 30*season_temperature
+    return average_global_temperature + 10*day_temperature() + 30*season_temperature()
 
 
 

@@ -1,13 +1,14 @@
 #define PY_SSIZE_T_CLEAN 
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <C:\Users\Leo\AppData\Local\Programs\Python\Python310\include\Python.h>
+
 // Steps 
 // 1) Open Python IDLE
 // 2) import numpy
 // 3) Run numpy.get_include()
+// 4) From there navigate to arrayobject.h
 #include <C:\Users\Leo\AppData\Local\Programs\Python\Python310\Lib\site-packages\numpy\core\include\numpy\arrayobject.h> // You have to check where yours is
-
-#include <limits.h>
+#include <limits.h>  // intellisense doesn't seem to think this one is necessary 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

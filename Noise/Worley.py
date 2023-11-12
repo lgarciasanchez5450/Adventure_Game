@@ -22,7 +22,7 @@ class WorleyNoise:
         self.island_mod = i_mod
 
     def getAt(self,x:float,y:float):
-        return modifier(getAt(x*self.scale,y*self.scale,self.global_hash),self.island_mod)
+        return modifier(getAt(x*self.scale,y*self.scale,self.global_hash))
 
     def getArrShifted(self,xs,ys):
         return getArr(xs,ys,self.scale,self.global_hash,self.island_mod)

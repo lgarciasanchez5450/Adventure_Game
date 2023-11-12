@@ -208,7 +208,7 @@ def geta1(t,a0) -> float:
     * Lookup Tables & Gradients
 '''
 
-GRADIENTS_2D:list[float] = [None] * N_GRADS_2D * 2
+GRADIENTS_2D:list[float] = [0.0] * N_GRADS_2D * 2
 grad2 = [
         0.38268343236509,   0.923879532511287,
         0.923879532511287,  0.38268343236509,
@@ -238,14 +238,14 @@ grad2 = [
 ]
 for i in range(len(grad2)):
     grad2[i] = grad2[i] / NORMALIZER_2D
-del i
+del i #type:ignore
 
 j = 0
 for i in range(len(GRADIENTS_2D)):
     if (j == len(grad2)): j = 0
     GRADIENTS_2D[i] = grad2[j]
     j+=1
-del j,i
+del j,i #type: ignore
     
 def list_is_close_to(list1,list2):
     return max([abs(a-b) for a,b in zip(list1,list2)]) < .0000001    
