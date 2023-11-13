@@ -7,6 +7,7 @@ PARTICLE_SIZE = BLOCK_SIZE // 8
 ZERO = 0
 POSITIVE_INFINITY = float('inf')
 NEGATIVE_INFINITY = float('-inf')
+DEBUG = True
 
 '''Game States'''
 MAIN_MENU = 0
@@ -18,7 +19,7 @@ WORLD_SELECT = 5
 
 
 '''Types of Ground'''
-GROUND_INVALID = 63
+GROUND_INVALID = 0
 GROUND_DIRT = 1
 GROUND_STONE = 2
 GROUND_WATER = 3

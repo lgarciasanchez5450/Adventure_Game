@@ -105,7 +105,7 @@ def init(display:Surface):
     program = ctx.program(vertex_shader=vertex_src, fragment_shader=fragment_src)
     render_object = ctx.vertex_array(program,[(quad_buffer,'2f 2f', 'vert', 'texcoord')],mode = moderngl.TRIANGLE_STRIP)
     opengl_screen = ctx.texture((WIDTH,HEIGHT),4)
-    opengl_screen.filter = moderngl.LINEAR,moderngl.LINEAR # type: ignore
+    opengl_screen.filter = moderngl.BLEND,moderngl.BLEND # type: ignore
     opengl_screen.swizzle = 'BGRA'
     opengl_screen.use(0)
 

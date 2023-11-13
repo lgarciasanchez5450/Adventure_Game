@@ -11,10 +11,12 @@ from math import cos, sin,pi,hypot,sqrt,atan2,floor,log2,ceil,acos,tanh
 from random import random,randint
 from collections import deque
 import numpy as np
+from Constants.Misc import DEBUG
 
 from warnings import warn 
 
 import entity_manager
+half_sqrt_2 = (2**(1/2))/2
 
 scalar = int|float
 @njit(cache = True)
@@ -31,6 +33,10 @@ def restrainMagnitude(x:float,y:float,mag:float):
 		x *= mult
 		y *= mult
 	return x,y
+
+def getNamesOfObject(object):
+	
+	return [local for local in dir(object) if not local.startswith('__')]
 
 @njit(cache = True)
 def randomNudge(x:float,y:float,nudgeMag:float): #this random nudge prefers smaller nudges than bigger ones
@@ -78,17 +84,16 @@ def _opposite_normalized(x,y):
 	return -x/mag,-y/mag
 
 def abstractmethod(func:Callable):
-	assert callable(func), 'abstractmethod only works on callable objects'
+	if DEBUG: 
+		assert callable(func), 'abstractmethod only works on callable objects'
 
-	def default_abstract_method(*args,**kwargs):
-		raise NotImplementedError("call to abstract method " + repr(func))
-	default_abstract_method.__name__ = func.__name__
-	return default_abstract_method
+		def default_abstract_method(*args,**kwargs):
+			raise NotImplementedError("call to abstract method " + repr(func))
+		default_abstract_method.__name__ = func.__name__
+		return default_abstract_method
+	else:
+		return func
 
-class Test:
-	@abstractmethod
-	def addone(self,y):
-		pass
 
 
 class UnInstantiable:

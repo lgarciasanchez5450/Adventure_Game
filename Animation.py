@@ -58,7 +58,7 @@ class SimpleAnimation:
         self.frames = tuple(frames)
         self.fps = fps
         self.max_frames_in_state = len(self.frames)
-        self.surf = frames[0]
+        self.csurface.surf = self.surf = frames[0]
         self.time:float = 0.0
         self._frame_in_state:int = 0
 

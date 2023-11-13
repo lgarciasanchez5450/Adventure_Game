@@ -10,9 +10,14 @@ from game_math import cache
 
 def PATH():
   return dirname(realpath(__file__)) + '\\'
+########################################################
+#  MAIN DICTIONARY THAT HOLDS ALL TEXTURES USED IN GAME#
+texture:dict[str,Surface] = {} 
+########################################################
 
-texture:dict[str,Surface] = {}
+
 item_textures:dict[str,Surface] = {}
+
 def scale_image(surface,newSize):
 	return scale(surface,newSize)
 accepted_image_extentions = {'png','jpg','jpeg','bmp'}
@@ -98,6 +103,7 @@ def init():
 	import_folder('Images/items',True,(ITEM_SIZE,ITEM_SIZE))
 	import_folder('Images/blocks',False,(BLOCK_SIZE,BLOCK_SIZE))
 	import_folder('Images/UI/hotbar')
+	
 	s = Surface((PARTICLE_SIZE,PARTICLE_SIZE))
 	s.fill('red')
 	texture['death.png'] = s
@@ -111,6 +117,26 @@ def init():
 	load_item_anim(ITAG_ARROW)
 	texture['entity_arrow.png'] = scale(rotate(load_image('Images/Entities/arrow/default_arrow.png').convert_alpha(),90+47),(BLOCK_SIZE,BLOCK_SIZE))
 	del s
+
+def importItemTextures():
+	import os
+	from game_math import getNamesOfObject
+	from Constants import Items
+	path = f'{PATH()}Images\\Items'
+	items =[Items.__dict__[n] for n in getNamesOfObject(Items) if n.startswith("ITAG")]
+	item_texture_implemented = os.listdir(path)
+	missing_items = []
+	for item in items:
+		if item not in item_texture_implemented:
+			missing_items.append(item)
+
+	print("Items Without Textures:", missing_items)
+
+	
+
+if __name__ == '__main__':
+	importItemTextures()
+	quit()
 
 def flipX(surf:Surface|tuple[Surface,...]|list[Surface]) -> list[Surface]|Surface:
 	if isinstance(surf,(tuple,list)):

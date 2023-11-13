@@ -6,7 +6,7 @@ import debug
 from game_math import *
 from Noise import WorleyNoiseSimple,LayeredNoiseMap, rescale, unit_smoothstep
 import Textures
-from game_math import Vector2
+from game_math import Vector2, half_sqrt_2
 if __name__ == '__main__':
     import pygame
     display = pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT),pygame.OPENGL| pygame.DOUBLEBUF|pygame.RESIZABLE) # can be Resizable with no problems
@@ -29,7 +29,6 @@ from Inventory import ArmorInventory
 from UI_Elements import ItemSlot
 from Constants import EntityEffects
 dead_entities = []
-half_sqrt_2 = (2**(1/2))/2
 
 @cache
 def get_tnt_list():
@@ -288,7 +287,7 @@ class Item:
         return self
 
     __slots__ = 'tag', 'name',  'count', 'durability_stats', 'armour_stats', 'damage', 'mining_speed', 'fps', 'animation','frames','inventory'
-    def __init__(self,tag:str):
+    def __init__(self,tag:str,frames:tuple[Surface,...]|None = None):
         self.tag = tag #all the same types of items should have the same tag
         self.name = tag # display name should start as default tag
         self.count = 1
@@ -297,7 +296,10 @@ class Item:
         self.damage:int = 0 
         self.mining_speed:int = 0 
         self.fps = 0 #this is for when the ItemWrapper <Entity> needs to create the animation. 
-        self.frames:tuple[pygame.Surface,...]  = (Textures.texture.get(self.tag+'.png',Textures.texture['null.png']),) # at most 60 frames 
+        if frames:
+            self.frames = frames
+        else:
+            self.frames:tuple[pygame.Surface,...]  = (Textures.texture.get(self.tag+'.png',Textures.texture['null.png']),) # at most 60 frames 
         self.inventory:UniversalInventory
 
         #self.path = f'{Textures.PATH()}Images\\items\\{name}' #shouldn't need this actually
@@ -339,9 +341,11 @@ class Item:
         raise RuntimeError("For what purpose?!?!")
 
 class DrinkableItem(Item):
+    '''A generic drinkable item, drink time is how long drinkAnim takes to play
+    all subclasses must define a onDrunk method'''
+
     __slots__ = 'time_to_drink','drink_animation','animation_backup'
     def __init__(self, tag: str,drinkAnim:Animation.SimpleAnimation):
-        '''A generic drinkable item, drink time is how long drinkAnim takes to play'''
         super().__init__(tag)
         self.drink_animation = drinkAnim
         self.time_to_drink = drinkAnim.time_per_cycle
@@ -368,7 +372,14 @@ class DrinkableItem(Item):
 
     @abstractmethod
     def onDrunk(self,inventory:UniversalInventory): ...
- 
+
+class StrengthPotion(DrinkableItem):
+    def __init__(self):
+        anim = Animation.SimpleAnimation(Camera.CSurface(Camera.NullCSurface,Vector2.zero,(0,0)),10,)
+        super().__init__(ITAG_STR_POTION, drinkAnim)
+
+    def onDrunk(self,inventory:UniversalInventory):...
+
 class BunnyEgg(Item): 
     __slots__ = 'species',
     def __init__(self):
