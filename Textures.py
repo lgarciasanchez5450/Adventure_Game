@@ -103,6 +103,7 @@ def init():
 	import_folder('Images/items',True,(ITEM_SIZE,ITEM_SIZE))
 	import_folder('Images/blocks',False,(BLOCK_SIZE,BLOCK_SIZE))
 	import_folder('Images/UI/hotbar')
+	import_folder('Images/particles',True, )
 	
 	s = Surface((PARTICLE_SIZE,PARTICLE_SIZE))
 	s.fill('red')

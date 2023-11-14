@@ -375,8 +375,9 @@ class DrinkableItem(Item):
 
 class StrengthPotion(DrinkableItem):
     def __init__(self):
-        anim = Animation.SimpleAnimation(Camera.CSurface(Camera.NullCSurface,Vector2.zero,(0,0)),10,)
-        super().__init__(ITAG_STR_POTION, drinkAnim)
+        #anim = Animation.SimpleAnimation(Camera.CSurface(Camera.NullCSurface,Vector2.zero,(0,0)),10,)
+        #super().__init__(ITAG_STR_POTION, drinkAnim)
+        pass
 
     def onDrunk(self,inventory:UniversalInventory):...
 
@@ -664,15 +665,13 @@ class LiveTNT(Entity):
     
     def __init__(self,pos:Vector2,time:float|int,energy:int):
         super().__init__(pos,'tnt')
-        self.animation.add_state('1',1,[Textures.texture['tnt.png'],self.whited],[Textures.texture['tnt.png'],self.whited])
+        self.animation.add_state('1',1,[Textures.texture['tnt.png'],self.whited])
         self.animation.set_state('1')
         self.animation.animate()
         self.timer = time
         self.energy = energy
-        self.particle_timer= .15
+        self.particle_timer = .15
         self.particle_emit = Vector2(0,-0.7)
-
-
 
     def onDeath(self):
         c = Collider.spawnFromCenter(self.pos.x,self.pos.y,self.energy*2,self.energy*2)
@@ -680,7 +679,7 @@ class LiveTNT(Entity):
             Particles.spawn_animated(get_tnt_animation(self.pos+Vector2.randdir/3,38+x),False,0)
         damage_function = self.damage_func_getter(self.energy)
         for entity in collide_entities(c):
-            if entity.species == 'tnt':continue #tnt in entity form will be immune to other exploding tnt
+            if entity.species == 'tnt': continue #tnt in entity form will be immune to other exploding tnt
             entity.take_damage(damage_function((self.pos - entity.pos).magnitude()),self.get_attack_type(),None)   
         for block in collide_blocks(c):
             block.take_damage(damage_function((self.pos-block.pos).magnitude()),self.get_attack_type(),None)     
@@ -1115,7 +1114,8 @@ class Player(AliveEntity):
         assert isinstance(walk_left,list)
         assert isinstance(idle_left,list)
         assert isinstance(attack_left,list)
-        self.walking_particle = Textures.import_folder('Images/particles/Dirt',False,(PARTICLE_SIZE,PARTICLE_SIZE))[0]
+        #self.walking_particle = Textures.import_folder('Images/particles/Dirt',False,(PARTICLE_SIZE,PARTICLE_SIZE))[0]
+        self.walking_particle = Textures.texture['dirt_particle.png']
         self.animation.add_state('walk',4,walk_right,walk_left)
         self.animation.add_state('idle',1.2,idle_right,idle_left)
         self.animation.add_state('attack',5,attack_right,attack_left)

@@ -496,6 +496,8 @@ def cache(func):
 		if args not in inputs:
 			inputs[tuple(args)] = func(*args)
 		return inputs[tuple(args)]
+	wrapper.__name__ = func.__name__
+	wrapper.__annotations__ = func.__annotations__
 	return wrapper
 @njit
 def arccos(x:float):

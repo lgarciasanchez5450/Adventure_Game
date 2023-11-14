@@ -17,9 +17,12 @@ class Animation:
         self.frame_in_frame = 0
         self.on_animation_done = lambda : None
 
-    def add_state(self,state:str,fps:float,frames_right:list[pygame.Surface],frames_left:list[pygame.Surface]):
+    def add_state(self,state:str,fps:float,frames_right:list[pygame.Surface],frames_left:list[pygame.Surface]|None = None):
         self.anim_fps[state] = fps
-        self.frames.update({state+'_right':frames_right,state+'_left':frames_left})
+        self.frames[state+'_right'] = frames_right
+        if frames_left is not None:
+           self.frames[state+'_left'] = frames_left
+
 
     def set_state(self,state:str) -> None:  
         self.time:float = 0.0
