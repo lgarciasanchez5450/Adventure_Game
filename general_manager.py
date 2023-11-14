@@ -20,6 +20,7 @@ from ground import *
 import Settings
 import Input
 import Time
+from Game_Typing import assert_type
 import Events
 from UI import *
 import Animation
@@ -1106,15 +1107,12 @@ class Player(AliveEntity):
     def set_up_animation(self):
         player_animations = Textures.load_entity_anim('player')
         walk_right = player_animations['walk']
-        walk_left = Textures.flipX(walk_right)
+        walk_left = Textures.flipXArray(walk_right)
         idle_right = player_animations['idle']
-        idle_left = Textures.flipX(idle_right)
+        idle_left = Textures.flipXArray(idle_right)
         attack_right = player_animations['idle']
-        attack_left = Textures.flipX(attack_right)
-        assert isinstance(walk_left,list)
-        assert isinstance(idle_left,list)
-        assert isinstance(attack_left,list)
-        #self.walking_particle = Textures.import_folder('Images/particles/Dirt',False,(PARTICLE_SIZE,PARTICLE_SIZE))[0]
+        attack_left = Textures.flipXArray(attack_right)
+
         self.walking_particle = Textures.texture['dirt_particle.png']
         self.animation.add_state('walk',4,walk_right,walk_left)
         self.animation.add_state('idle',1.2,idle_right,idle_left)
@@ -2166,7 +2164,8 @@ def collide_blocks(collider:Collider):
                 yield obstacle
                 
 def collision_horizontal(collider:Collider,vx:int|float) -> bool:
-    if not is_collider(collider): raise RuntimeError("<collider> argument must be of type<settings.Collider>")
+    '''Returns whether the collider collided with any block'''
+    assert_type(collider,Collider)
     if not vx: return False
     hit_smthng = False
     for chunk in get_chunks_collided(collider):
@@ -2179,11 +2178,12 @@ def collision_horizontal(collider:Collider,vx:int|float) -> bool:
                 hit_smthng = True   
     return hit_smthng
 
-def collision_vertical(collider:Collider,vy:float|int):
-    if not is_collider(collider): raise RuntimeError("<collider> argument must be of type<settings.Collider>")
+def collision_vertical(collider:Collider,vy:float|int) -> bool:
+    '''Returns whether the collider collided with any block'''
+    assert_type(collider,Collider)
     if not vy: return False
     hit_smthng = False
-    for chunk in get_chunks_collided(collider):
+    for chunk in get_chunks_collided(collider): # TODO: maybe as an optimization if we collide with one thing then we can break early so we dont have to keep the hit_smthng variable and directly return
         for obstacle in chunk.blocks:
             if collider.collide_collider(obstacle.collider):
                 if vy > 0: # moving down

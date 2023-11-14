@@ -1,4 +1,6 @@
-from typing import final,Callable,Any
+from __future__ import annotations
+
+from typing import final,Callable,Any,Generic
 try:
 	from numba import njit,prange
 except ImportError:
@@ -12,11 +14,19 @@ from random import random,randint
 from collections import deque
 import numpy as np
 from Constants.Misc import DEBUG
+from typing import Callable,ParamSpec,TypeVar
 
 from warnings import warn 
 
 import entity_manager
 half_sqrt_2 = (2**(1/2))/2
+from os.path import dirname,realpath
+GAME_PATH = dirname(realpath(__file__)) + '\\'
+del dirname,realpath
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
 
 scalar = int|float
 @njit(cache = True)
@@ -45,7 +55,7 @@ def randomNudge(x:float,y:float,nudgeMag:float): #this random nudge prefers smal
 	nudgeX = 2*random()-1
 	nudgeY = 2*random()-1
 	nudgeX, nudgeY = restrainMagnitude(nudgeX,nudgeY,1)
-	x += nudgeMag * nudgeX #TODO make it so that it nudges equally in all directions using restrainMagnitude
+	x += nudgeMag * nudgeX
 	y += nudgeMag * nudgeY
 	return  set_mag(x,y,mag)
 	
@@ -94,15 +104,6 @@ def abstractmethod(func:Callable):
 	else:
 		return func
 
-
-
-class UnInstantiable:
-	'''Denoting that classes should not have instances.'''
-	def __new__(cls,*args,**kwargs):
-		raise RuntimeError(f"{cls} shouldn't be instantiated")
-
-class ImplementsDraw:
-	def draw(self): ...
 
 class Vector2:
 	__slots__  = ('x','y')
@@ -422,11 +423,7 @@ class Collider:
 	def __str__(self):
 		return f'Collider(x: {self.x:.2f}, y: {self.y:.2f}, w: {self.width:.2}, h: {self.height:.2f})'
 
-class Has_Collider:
-	collider:Collider
-import typing
-T = typing.TypeVar('T')
-class Array(list,typing.Generic[T]):
+class Array(list,Generic[T]):
 	@staticmethod
 	def none_range(stop:int):
 		a = -1
@@ -469,9 +466,6 @@ class Array(list,typing.Generic[T]):
 		return item
 
 
-def is_collider(object) -> bool:
-	return isinstance(object,Collider)
-
 def make2dlist(x,y = None) -> list[list[None]]:
 	y = x if y is None else y
 	return [[None] * x for _ in range(y)]
@@ -488,23 +482,23 @@ def set_mag(x,y,mag:int|float) -> tuple[float,float]:
 	ux,uy = normalize(x,y)
 
 	return  (ux*mag,uy*mag)
-
-
-def cache(func):
-	inputs = {}
-	def wrapper(*args:Any):
+from functools import wraps
+def cache(func:Callable[P,T]) -> Callable[P,T]:
+	inputs:dict[tuple,T] = {}
+	@wraps(func)
+	def wrapper(*args: P.args,**kwargs:P.kwargs) -> T:
+		if kwargs: raise ValueError("Functions that are being cached to no support key word arguments")
 		if args not in inputs:
-			inputs[tuple(args)] = func(*args)
+			inputs[tuple(args)] = func(*args,**kwargs)
 		return inputs[tuple(args)]
-	wrapper.__name__ = func.__name__
-	wrapper.__annotations__ = func.__annotations__
 	return wrapper
+
 @njit
 def arccos(x:float):
 	'''Uses degrees'''
 	return 180/pi * acos(x)
 
-
+@njit
 def rgb_to_hsv(r,g,b): 
 	M = max(r, g, b)
 	m = min(r, g, b)
@@ -562,5 +556,5 @@ def hsv_to_rgb(h,s,v):
 		B = z + m
 	return R,G,B
 
-if __name__ == '__main__':
+
 	pass

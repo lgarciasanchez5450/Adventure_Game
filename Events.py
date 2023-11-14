@@ -23,7 +23,7 @@ class Event:
     def __call__(self,*data:Any):
         assert len(data) == len(self.types) and all([isinstance(d,ty) for d,ty in zip(data,self.types)]), 'wrong args buddy' # TODO when project is finished and it is guaranteed that no events will raise errors then the checks can be deleted  
         for subscriber in self.listeners:
-            try: #this try catch statement can be deleted tooo
+            try: #TODO this try catch statement can be deleted tooo
                 subscriber(*data)
             except TypeError as err:
                 raise TypeError('Subsciber accepts incorrect arguments')

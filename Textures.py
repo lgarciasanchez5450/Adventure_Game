@@ -5,38 +5,33 @@ from pygame.image import load
 from pygame.transform import scale,flip,rotate
 from pygame import Surface
 from Constants.Items import *
-from game_math import cache
+from game_math import cache,GAME_PATH
 
-
-def PATH():
-  return dirname(realpath(__file__)) + '\\'
 ########################################################
 #  MAIN DICTIONARY THAT HOLDS ALL TEXTURES USED IN GAME#
-texture:dict[str,Surface] = {} 
+texture:dict[str,Surface] = {}
 ########################################################
 
 
 item_textures:dict[str,Surface] = {}
+entity_textures:dict[str,Surface] = {}
+particle_textures:dict[str,Surface] = {}
 
 def scale_image(surface,newSize):
 	return scale(surface,newSize)
-accepted_image_extentions = {'png','jpg','jpeg','bmp'}
 def is_image(path:str):
 	extension = path.split('.')[-1]
-	if extension.lower() in accepted_image_extentions:
-		return True
-	else:
-		return False
-	
+	return extension.lower() in {'png','jpg','jpeg','bmp'}
+
 @cache
 def load_image(path:str):
-	return load(PATH()+path)
+	return load(GAME_PATH+path)
 
 @cache
 def load_item_anim(tag,alpha=True):
 	# the directory path should be as follows:
 	# C:\\ ... Adventure_Game\\Images\\items\\<tag>\\
-	path = f'{PATH()}Images\\Items\\{tag}'
+	path = f'{GAME_PATH}Images\\Items\\{tag}'
 	item_images = []
 	for root,_dirs,files in walk(path):
 		for image in files:
@@ -54,7 +49,7 @@ def load_entity_anim(species:str,subspecies:str = ''):
 	Only supports single depth of folders past the entity folder'''
 	anims:dict[str,tuple[Surface,...]] = dict()
 
-	path = f"{PATH()}Images\\Entities\\{species}"
+	path = f"{GAME_PATH}Images\\Entities\\{species}"
 	if subspecies != '':#if a subspecies exists then append it to the path 
 		path += "\\"+subspecies
 		
@@ -71,14 +66,14 @@ def load_entity_anim(species:str,subspecies:str = ''):
 
 
 @cache
-def import_folder(path,alpha=True,size:None|tuple = None,return_flipped_too:bool = False):
+def import_folder(path:str,alpha=True,size:None|tuple[int,int] = None,return_flipped_too:bool = False):
 	surface_list = []
 	flipped_list = []
-	for _root,_dirs,img_files in walk(PATH() + path):
+	for _root,_dirs,img_files in walk(GAME_PATH + path):
 		#print(_root)
 		for image in img_files:
 			image:str
-			if not is_image(PATH() +image): continue #only will get image files
+			if not is_image(GAME_PATH +image): continue #only will get image files
 			full_path = _root + '/' + image
 			print(full_path)
 			if size is None:
@@ -91,19 +86,28 @@ def import_folder(path,alpha=True,size:None|tuple = None,return_flipped_too:bool
 			if return_flipped_too:
 				flipped_list.append(flip(image_surf,True,False))
 			texture[image] = image_surf
-	if len(surface_list) == 0: print('Empty List! Trying to get',PATH() +path)
+	if len(surface_list) == 0: print('Empty List! Trying to get',GAME_PATH +path)
 
 	if return_flipped_too:
-		return surface_list, flipped_list
+		return tuple(surface_list), tuple(flipped_list)
 	else:
-		return surface_list
+		return tuple(surface_list)
 	
+
+def getSpriteAnimation(entityTag:str,animationName:str): # assumes that the entity's assets have been loaded into the game
+
+	pass
+	
+
+
 def init():
-	import_folder('Images/objects')
-	import_folder('Images/items',True,(ITEM_SIZE,ITEM_SIZE))
-	import_folder('Images/blocks',False,(BLOCK_SIZE,BLOCK_SIZE))
-	import_folder('Images/UI/hotbar')
-	import_folder('Images/particles',True, )
+	import_folder('Images\\objects')
+	import_folder('Images\\items',True,(ITEM_SIZE,ITEM_SIZE))
+	import_folder('Images\\blocks',False,(BLOCK_SIZE,BLOCK_SIZE))
+	import_folder('Images\\UI\\hotbar')
+	import_folder('Images\\particles\\Transparent',True,(PARTICLE_SIZE,PARTICLE_SIZE))
+	import_folder('Images\\particles\\Opaque',False,(PARTICLE_SIZE,PARTICLE_SIZE))
+	
 	
 	s = Surface((PARTICLE_SIZE,PARTICLE_SIZE))
 	s.fill('red')
@@ -123,7 +127,7 @@ def importItemTextures():
 	import os
 	from game_math import getNamesOfObject
 	from Constants import Items
-	path = f'{PATH()}Images\\Items'
+	path = f'{GAME_PATH}Images\\Items'
 	items =[Items.__dict__[n] for n in getNamesOfObject(Items) if n.startswith("ITAG")]
 	item_texture_implemented = os.listdir(path)
 	missing_items = []
@@ -139,10 +143,11 @@ if __name__ == '__main__':
 	importItemTextures()
 	quit()
 
-def flipX(surf:Surface|tuple[Surface,...]|list[Surface]) -> list[Surface]|Surface:
-	if isinstance(surf,(tuple,list)):
-		return [flipX(s) for s in surf] #type: ignore
+def flipX(surf:Surface)-> Surface:
 	return flip(surf,True,False)
+
+def flipXArray(surfs:tuple[Surface,...]|list[Surface]) -> tuple[Surface,...]:
+	return tuple(flipX(s) for s in surfs)
 
 if __name__ == "__main__":
 	print('Running Tests on Module Textures')
@@ -154,7 +159,7 @@ if __name__ == "__main__":
 	print('All Tests Passed')
 
 
-	
+
 
 
 
@@ -163,11 +168,14 @@ if __name__ == "__main__":
 
 def load_top(path:str):
 	surfs:list[Surface] = []
-	if not path.endswith(('\\','/')): path += '\\' #make sure our path ends with a "\"
-	for file in listdir(path):
-		surfs.append(load(path+file))
-	return tuple(surfs) #to save memory we make it a tuple
-		
+	path = path.replace('/','\\')
+	if not path.endswith('\\'): path += '\\' #make sure our path ends with a "\"
+	return tuple((load(path+file) for file in listdir(path)))
+	
+
+
+
+'''
 def _compress_and_save():
 	from pygame.image import load,save
 	p = 'Images\\Entities\\player\\walk'
@@ -177,3 +185,4 @@ def _compress_and_save():
 	for csurf,usurf,x in zip(c,unc,range(100000)):
 		save(csurf,f"{p}\\{x}.png",'png')
 		save(usurf,f"{o}\\{x}.png",'png')
+'''

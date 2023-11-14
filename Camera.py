@@ -8,6 +8,7 @@ from array import array
 from Events import add_OnResize, call_OnResize
 from pygame import Surface
 from game_math import floor
+from Game_Typing import ImplementsDraw
 #####Variables#####
 
 ##### OPENGL MAGIC #####
@@ -59,7 +60,7 @@ HALFHEIGHT:int
 queue = []
 collider_queue = []
 background_queue = []
-UIs:list[Callable[[],game_math.ImplementsDraw]] = []
+UIs:list[Callable[[],ImplementsDraw]] = []
 focus = game_math.Vector2.zero
 halfscreensize:game_math.Vector2
 screen_size:game_math.Vector2

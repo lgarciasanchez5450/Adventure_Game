@@ -3,7 +3,8 @@ from Settings import STACK_COUNT_BY_TAG
 from typing import Callable
 _DEBUG_ = True
 import Animation 
-from game_math import Array,UnInstantiable
+from game_math import Array
+from Game_Typing import UnInstantiable
 class ArmourStats:
     type:str
 class Item(UnInstantiable): 

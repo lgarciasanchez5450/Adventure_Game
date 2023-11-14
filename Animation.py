@@ -7,7 +7,7 @@ class Animation:
     __slots__ = 'csurface','frames','anim_fps','_frame_in_state','max_frames_in_state','direction','time','frames_in_state','frame_in_frame','surf','state','on_animation_done','previous_frame_in_state'
     def __init__(self,csurf:Camera.CSurface):
         self.csurface = csurf
-        self.frames:dict[str,list[pygame.Surface]] = {}
+        self.frames:dict[str,tuple[pygame.Surface,...]] = {}
         self.anim_fps:dict[str,float] = {}
         self._frame_in_state:int = 0
         self.max_frames_in_state:int = 0
@@ -17,7 +17,7 @@ class Animation:
         self.frame_in_frame = 0
         self.on_animation_done = lambda : None
 
-    def add_state(self,state:str,fps:float,frames_right:list[pygame.Surface],frames_left:list[pygame.Surface]|None = None):
+    def add_state(self,state:str,fps:float,frames_right:tuple[pygame.Surface,...],frames_left:tuple[pygame.Surface,...]|None = None):
         self.anim_fps[state] = fps
         self.frames[state+'_right'] = frames_right
         if frames_left is not None:
