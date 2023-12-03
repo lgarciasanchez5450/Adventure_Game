@@ -13,6 +13,7 @@ def is_sound(file:str) -> bool:
 def get_all_music() -> list[str]:
   for _,_,files in walk(PATH()+MUSIC_FOLDER):
     return list(filter(is_sound,files))
+  return []
 sounds = {}
 def import_sounds(folder_path:str):
     sounds_found = []
@@ -33,8 +34,8 @@ def import_sounds(folder_path:str):
 
 
 def init():
-    pygame.MUSICEND = pygame.USEREVENT + 1
-    mixer.music.set_endevent(pygame.MUSICEND)
+    pygame.MUSICEND = pygame.USEREVENT + 1 #type: ignore
+    mixer.music.set_endevent(pygame.MUSICEND) #type: ignore
     import_sounds(SOUND_FOLDER)
 
 

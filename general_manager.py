@@ -1,5 +1,5 @@
 from Constants import *
-from typing import final, Generator
+from typing import final, Generator, Union
 from pygame import Surface,draw
 from UI import Vector2
 import debug
@@ -31,12 +31,9 @@ from UI_Elements import ItemSlot
 from Constants import EntityEffects
 dead_entities = []
 
-@cache
-def get_tnt_list():
-    return Textures.import_folder('Images/particles/Explosion',True,(BLOCK_SIZE,BLOCK_SIZE))
 
 def get_tnt_animation(pos:Vector2,fps=40):
-    return Particles.Cheap_Animation(pos.copy(),get_tnt_list(),fps,None)
+    return Particles.Cheap_Animation(pos.copy(),Textures.tnt,fps,None)
 
 class Actions:
     def __init__(self):
@@ -69,7 +66,7 @@ class UniversalInventory:
         self.selected:int = -1
         self.slot_restrictions:dict[int,Callable[[Item],bool]] = {} #will store slot indexes that have restrictions via a function that will accept the item and return True only if it fits
 
-    def setItem(self,item,index:int):
+    def setItem(self,item: Union[ "Item" , None],index:int):
         '''
         The implementation should prioritize combining the items, if that doesn't work it will swap them
         Should return item that is left over or None if nothing is left over
@@ -100,7 +97,7 @@ class UniversalInventory:
         # in all cases where the items arent compatible or if they are the but something went wrong
         return self.inventory.swap(index,item)
 
-    def _addItem(self,item,index:int):
+    def _addItem(self,item: "Item",index:int):
         '''Does not check if item & i_item are compatible, this should be done beforehand 
         returns item left over or none'''
         assert isinstance(item,Item)
@@ -117,7 +114,7 @@ class UniversalInventory:
         else: 
             return item
 
-    def checkItem(self,index):
+    def checkItem(self,index:int):
         '''
            *Run checks on item to make sure that it is valid
            *Runs slot restriction, Checks item count and removes it accordingly'''
@@ -127,17 +124,21 @@ class UniversalInventory:
             if not self.slot_restrictions[index](self.inventory[index]):
                 return self.inventory.remove(index)
    
+    def getItem(self,index: int):
+        '''Returns the original reference to the item inside the inventory, relinquishing its own reference to it'''
+        return self.inventory.take(index)
+
     def slotCompatible(self,item,index):
         return self.slot_restrictions.get(index,lambda x: True)(item)
   
-    def fitItem(self,item):
-        assert isinstance(item,(Item,type(None)))
+    def fitItem(self,item :Union["Item" , None]):
         empty_slots = []
         for index, inventory_item in enumerate(self.inventory):
             inventory_item:Item
             if inventory_item is None:
                 empty_slots.append(index)
             elif inventory_item.stackCompatible(item):
+                assert not isinstance(item, type(None)) #for typechecking purposes only! 
                 item = self._addItem(item,index)
                 if item is None:
                     return None
@@ -198,9 +199,10 @@ class UniversalInventory:
         index = self.slot_restrictions.__len__() - dict.__len__()
         for i,string in enumerate(dict.values(),start = index):
             self.addRestriction(i,lambda item : item.armour_type == string)
-
+    def swapIndex(self,index1:int,index2:int) -> None:
+        self.inventory.swapIndices(index1,index2)
 class Hotbar:
-    def __init__(self,inventory:UniversalInventory,*spaces):
+    def __init__(self,inventory:UniversalInventory,*spaces:int):
         '''Spaces should be indexes  '''
         self._inv = inventory
         self.len = len(spaces)
@@ -214,7 +216,11 @@ class Hotbar:
     def __len__(self) -> int:
         return self.len
     
-    def setItem(self,item,index):
+    def setItem(self,item:Union["Item" , None],index:int):
+        '''
+        The implementation should prioritize combining the items, if that doesn't work it will swap them
+        Should return item that is left over or None if nothing is left over
+        '''
         return self._inv.setItem(item,self.spaces[index])
 
     def seeIndex(self,hotbarIndex:int):
@@ -300,7 +306,7 @@ class Item:
         if frames:
             self.frames = frames
         else:
-            self.frames:tuple[pygame.Surface,...]  = (Textures.texture.get(self.tag+'.png',Textures.texture['null.png']),) # at most 60 frames 
+            self.frames:tuple[pygame.Surface,...]  = Textures.items.get(self.tag,(Textures.NULL,))# at most 60 frames 
         self.inventory:UniversalInventory
 
         #self.path = f'{Textures.PATH()}Images\\items\\{name}' #shouldn't need this actually
@@ -325,7 +331,7 @@ class Item:
     #This function will also be called when the item stops being in main hand or on right click up
     def stopUse(self,inventory:UniversalInventory) -> None: ...
     
-    def stackCompatible(self,other) -> bool:
+    def stackCompatible(self,other :Union["Item",None]) -> bool:
         '''
         Returns whether the items can possibly be stacked
         with no regard if the item is fully stacked
@@ -666,7 +672,7 @@ class LiveTNT(Entity):
     
     def __init__(self,pos:Vector2,time:float|int,energy:int):
         super().__init__(pos,'tnt')
-        self.animation.add_state('1',1,[Textures.texture['tnt.png'],self.whited])
+        self.animation.add_state('1',1,(Textures.texture['tnt.png'],self.whited))
         self.animation.set_state('1')
         self.animation.animate()
         self.timer = time
@@ -708,7 +714,7 @@ class Arrow(Entity):
         if shooter: 
             velocity += shooter.vel # add the shooters velocity to our own because its relative to the shooters vel in real life
         tex = Textures.rotate(Textures.texture['entity_arrow.png'],angle * 180 / pi)
-        self.animation.add_state('going',0,[tex],[Textures.texture['entity_arrow.png']])
+        self.animation.add_state('going',0,(tex,),(Textures.texture['entity_arrow.png'],))
         self.image.offset = (-tex.get_width()/2,-tex.get_height()/2)
         self.animation.set_state('going')
         self.vel = velocity.copy()
@@ -1595,17 +1601,41 @@ class InventoryUI(UI):
         if self.collider.collide_point_inclusive(Input.m_pos_normalized.tuple): 
             self.relative_mouse_position_normalized = (Input.m_pos_normalized - self.center).vector_mul(self.thingy)
             self.rel_mouse_pos = (self.relative_mouse_position_normalized+ones).vector_mul(self.surface_size/2)
+            current_inventory_hover_index = -1
             for slot in self.slots:
                 slot.update(self.rel_mouse_pos)
                 if slot.state == slot.HOVER:
+                    current_inventory_hover_index = slot.index
                     if Input.m_d1 and self.inventory is not None:
                         self.in_hand = self.inventory.setItem(self.in_hand,slot.index)
             if self.has_hotbar:
                 for slot in self.hb_slots:
                     slot.update(self.rel_mouse_pos)
                     if slot.state == slot.HOVER:
+                        current_inventory_hover_index = self.hotbar.spaces[slot.index]
                         if Input.m_d1:
-                            self.in_hand = self.hotbar.setItem(self.in_hand,slot.index)            
+                            self.in_hand = self.hotbar.setItem(self.in_hand,slot.index)   
+           
+            if current_inventory_hover_index != -1 and self.inventory is not None:
+                if '1' in Input.KDQueue: #and current_inventory_hover_index != self.hotbar.spaces[0]:
+                    self.inventory.swapIndex(current_inventory_hover_index,self.hotbar.spaces[0])
+                    #self.inventory.inventory[current_inventory_hover_index] = self.hotbar.setItem(self.inventory.getItem(current_inventory_hover_index),0)
+                if '2' in Input.KDQueue:
+                    self.inventory.swapIndex(current_inventory_hover_index,self.hotbar.spaces[1])
+                if '3' in Input.KDQueue:
+                    self.inventory.swapIndex(current_inventory_hover_index,self.hotbar.spaces[2])
+                if '4' in Input.KDQueue:
+                    self.inventory.swapIndex(current_inventory_hover_index,self.hotbar.spaces[3])
+                if '5' in Input.KDQueue:
+                    self.inventory.swapIndex(current_inventory_hover_index,self.hotbar.spaces[4])
+                if '6' in Input.KDQueue:
+                    self.inventory.swapIndex(current_inventory_hover_index,self.hotbar.spaces[5])
+                if '7' in Input.KDQueue:
+                    self.inventory.swapIndex(current_inventory_hover_index,self.hotbar.spaces[6])
+                if '8' in Input.KDQueue:
+                    self.inventory.swapIndex(current_inventory_hover_index,self.hotbar.spaces[7])
+                if '9' in Input.KDQueue:
+                    self.inventory.swapIndex(current_inventory_hover_index,self.hotbar.spaces[8])
             for slot in self.armour_slots:
                 slot.update(self.rel_mouse_pos)
                 if slot.state == slot.HOVER:
@@ -2140,7 +2170,6 @@ def get_around_chunk(cx,cy,xbuffer = 1):
     return [(cx+x,cy + y) for x in range(-Settings.RenderDistance,Settings.RenderDistance+1,1) for y in range(-Settings.RenderDistance,Settings.RenderDistance+1,1)] 
 
 def get_loaded_chunks_collided(collider:Collider):
-    if _DEBUG_ and not is_collider(collider): raise RuntimeError("<collider> argument must be of type<settings.Collider>")
     for chunk in current_chunks:
         if collider.collide_collider(chunk.collider):
             yield chunk
@@ -2157,7 +2186,6 @@ def get_chunks_collided(collider:Collider):
             checked.add(cpos)
 
 def collide_blocks(collider:Collider): 
-    if not is_collider(collider): raise RuntimeError("<collider> argument must be of type<settings.Collider>")
     for chunk in get_chunks_collided(collider):
         for obstacle in chunk.blocks:
             if collider.collide_collider(obstacle.collider):

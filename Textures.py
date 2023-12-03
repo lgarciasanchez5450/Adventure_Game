@@ -1,114 +1,97 @@
 from Constants import BLOCK_SIZE,PARTICLE_SIZE,WIDTH,HEIGHT,HALFHEIGHT,HALFWIDTH,ITEM_SIZE
 from os import walk,listdir
-from os.path import dirname,realpath
 from pygame.image import load
 from pygame.transform import scale,flip,rotate
 from pygame import Surface
 from Constants.Items import *
-from game_math import cache,GAME_PATH
+from game_math import GAME_PATH
 
-########################################################
-#  MAIN DICTIONARY THAT HOLDS ALL TEXTURES USED IN GAME#
-texture:dict[str,Surface] = {}
-########################################################
+NULL = Surface((BLOCK_SIZE,BLOCK_SIZE))
+## Make NULL the recognizable ugly purple
+from pygame import draw
+draw.rect(NULL,(255,0,255),(0,0,BLOCK_SIZE//2,BLOCK_SIZE//2))
+draw.rect(NULL,(255,0,255),(BLOCK_SIZE//2,BLOCK_SIZE//2,BLOCK_SIZE//2,BLOCK_SIZE//2))
+del draw
 
+player_attack:tuple[Surface,...]
+player_death:tuple[Surface,...]
+player_destruction:tuple[Surface,...]
+player_idle:tuple[Surface,...]
+player_run:tuple[Surface,...]
+player_walk:tuple[Surface,...]
 
-item_textures:dict[str,Surface] = {}
-entity_textures:dict[str,Surface] = {}
-particle_textures:dict[str,Surface] = {}
+tnt:tuple[Surface,Surface]
+
+items:dict[str,tuple[Surface,...]] = {}
+blocks:dict[str,tuple[Surface,...]] = {}
+
+entity_arrow:Surface
+enitity_spirit_idle:tuple[Surface,...]
+
 
 def scale_image(surface,newSize):
 	return scale(surface,newSize)
 def is_image(path:str):
-	extension = path.split('.')[-1]
-	return extension.lower() in {'png','jpg','jpeg','bmp'}
+	return path.split('.')[-1].lower() in {'png','jpg','jpeg','bmp'}
 
-@cache
-def load_image(path:str):
-	return load(GAME_PATH+path)
-
-@cache
-def load_item_anim(tag,alpha=True):
-	# the directory path should be as follows:
-	# C:\\ ... Adventure_Game\\Images\\items\\<tag>\\
-	path = f'{GAME_PATH}Images\\Items\\{tag}'
-	item_images = []
-	for root,_dirs,files in walk(path):
-		for image in files:
-			image_path = root + '\\' + image
-			print(image_path)
-			surf = load(image_path)
-			surf = surf.convert_alpha() if alpha else surf.convert()
-			item_images.append(surf)
-	return item_images
-
-@cache
-def load_entity_anim(species:str,subspecies:str = ''):
-	'''Will return a dictionary with each key being a folder holding a list of the 
-	Images stored in the folders
-	Only supports single depth of folders past the entity folder'''
-	anims:dict[str,tuple[Surface,...]] = dict()
-
-	path = f"{GAME_PATH}Images\\Entities\\{species}"
-	if subspecies != '':#if a subspecies exists then append it to the path 
-		path += "\\"+subspecies
-		
-	dirpath,dirnames,filenames = next(walk(path),(None,None,None))
-
-	if dirnames is None or dirpath is None or filenames is None: #the path doesn't exist
-		raise RuntimeError(f"Entity Animation does not exist in path {path}")
-	
-	#if we reach here then we should be in a directory holding a bunch of folders, each having an array of surfaces
-	for folder in dirnames:
-		anims[folder] = load_top(f'{path}\\{folder}')
-	
-	return anims
+def importTexture(path:str,alpha = True,size:None|tuple[int,int] = None):
+	full_path = GAME_PATH + path
+	image_surf = load(full_path)
+	## Handle image conversion
+	image_surf = image_surf.convert_alpha() if alpha else image_surf.convert()
+	## Handle Resizing
+	if size is not None:
+		image_surf = scale(image_surf,size)
+	return image_surf
 
 
-@cache
-def import_folder(path:str,alpha=True,size:None|tuple[int,int] = None,return_flipped_too:bool = False):
-	surface_list = []
-	flipped_list = []
+def importFolderRecursive(path:str,alpha=True,size:None|tuple[int,int] = None):
+	surfs:dict[str,Surface] = {}
 	for _root,_dirs,img_files in walk(GAME_PATH + path):
-		#print(_root)
-		for image in img_files:
-			image:str
-			if not is_image(GAME_PATH +image): continue #only will get image files
-			full_path = _root + '/' + image
+		for image in filter(lambda x: x.split('.')[-1] in {'png','jpg','jpeg','bmp'} ,img_files):
+			full_path = _root + '\\' + image
 			print(full_path)
-			if size is None:
-				image_surf = load(full_path).convert_alpha() if alpha else load(full_path).convert()
-			else:
-				image_surf = scale(load(full_path).convert_alpha(),size) if alpha else scale(load(full_path).convert(),size)
-		
-
-			surface_list.append(image_surf)
-			if return_flipped_too:
-				flipped_list.append(flip(image_surf,True,False))
-			texture[image] = image_surf
-	if len(surface_list) == 0: print('Empty List! Trying to get',GAME_PATH +path)
-
-	if return_flipped_too:
-		return tuple(surface_list), tuple(flipped_list)
-	else:
-		return tuple(surface_list)
-	
-
-def getSpriteAnimation(entityTag:str,animationName:str): # assumes that the entity's assets have been loaded into the game
-
-	pass
-	
-
+			image_surf = load(full_path)
+			#remove the file type suffix
+			image = '.'.join(image.split('.')[:-1]) 
+			## Handle image conversion
+			image_surf = image_surf.convert_alpha() if alpha else image_surf.convert()
+			## Handle Resizing
+			if size is not None:
+				image_surf = scale(image_surf,size)
+			assert image not in surfs, 'duplicate fount in files: '  + image
+			surfs[image] = image_surf
+	assert len(surfs),'Empty Texture Path!'
+	return surfs
 
 def init():
-	import_folder('Images\\objects')
-	import_folder('Images\\items',True,(ITEM_SIZE,ITEM_SIZE))
-	import_folder('Images\\blocks',False,(BLOCK_SIZE,BLOCK_SIZE))
-	import_folder('Images\\UI\\hotbar')
-	import_folder('Images\\particles\\Transparent',True,(PARTICLE_SIZE,PARTICLE_SIZE))
-	import_folder('Images\\particles\\Opaque',False,(PARTICLE_SIZE,PARTICLE_SIZE))
+
+	'''PLAYER ASSETS'''
+	global player_attack,player_death,player_destruction,player_idle,player_run,player_walk
+	player_attack = tuple(importFolderRecursive('Images\\Entities\\player\\attack').values())
+	player_death = tuple(importFolderRecursive('Images\\Entities\\player\\death').values())
+	player_destruction = tuple(importFolderRecursive('Images\\Entities\\player\\destruction').values())
+	player_idle = tuple(importFolderRecursive('Images\\Entities\\player\\idle').values())
+	player_run = tuple(importFolderRecursive('Images\\Entities\\player\\run').values())
+	player_walk = tuple(importFolderRecursive('Images\\Entities\\player\\walk').values())
+
+	'''TNT ASSETS'''
+	global tnt
+	tnt = (importTexture('Images\\objects\\tnt.png',False),importTexture('Images\\objects\\tnt1.png',False))
+
+	global entity_arrow
+	entity_arrow = scale(rotate(importTexture('Images/Entities/arrow/default_arrow.png').convert_alpha(),90+47),(BLOCK_SIZE,BLOCK_SIZE))
+
+	global enitity_spirit_idle
+	enitity_spirit_idle = tuple(importFolderRecursive('Images\\Entities\\spirit\\idle').values())
 	
-	
+	'''ITEMS ASSETS'''
+	for item_folder in listdir(GAME_PATH + 'Images\\Items'):
+		items[item_folder] = tuple(importFolderRecursive("Images\\Items\\"+item_folder,True,(ITEM_SIZE,ITEM_SIZE)).values())
+
+	for item_folder in listdir(GAME_PATH + 'Images\\Items'):
+		items[item_folder] = tuple(importFolderRecursive("Images\\Items\\"+item_folder,True,(ITEM_SIZE,ITEM_SIZE)).values())
+
 	s = Surface((PARTICLE_SIZE,PARTICLE_SIZE))
 	s.fill('red')
 	texture['death.png'] = s
@@ -137,8 +120,8 @@ def importItemTextures():
 
 	print("Items Without Textures:", missing_items)
 
-	
 
+	print("Items Without Textures:", missing_items)
 if __name__ == '__main__':
 	importItemTextures()
 	quit()

@@ -78,6 +78,7 @@ def get_frameRateInt() -> int:
     return (1/deltaTime).__trunc__()
 
 def set_fixedDeltaTime(fdt:float):
+    assert fdt >= 0
     if fdt < 0: return 
     global fixedDeltaTime
     fixedDeltaTime = fdt

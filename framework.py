@@ -26,6 +26,7 @@ from os.path import dirname, realpath
 from pygame import error as PygameEngineError
 from pygame import transform
 from pygame import time as pg_time
+from typing import Callable
 import debug
 import sys
 if sys.platform == 'win32':
@@ -40,6 +41,7 @@ def arccos(x):
   return acos(x) * 180 / pi
 
 def rgb_to_hsv(r,g,b): 
+
   M = max(r, g, b)
   m = min(r, g, b)
 
@@ -51,8 +53,7 @@ def rgb_to_hsv(r,g,b):
   #As in the HSI and HSL color schemes, the hue H is defined by the equations
   d = sqrt(r*r+g*g+b*b-r*g-r*b-g*b)
   H = arccos((r - g/2 - b/2)/d)  if g >= b else 360 - arccos( (r - g/2 - b/2)/d)  
-  return H/360,S,V
-
+  
 def hsv_to_rgb(h,s,v): 
   h *= 360
   M = 255*v
@@ -92,6 +93,10 @@ def hsv_to_rgb(h,s,v):
     R = M
     G = m
     B = z + m
+  else:
+    R = 0
+    G = 0
+    B = 0
   return round(R),round(G),round(B)
 
 '''
@@ -185,11 +190,11 @@ symbolCharacters = {',','`','~','!','@','#','$','%','^','&','*','(',')','_','+',
 fileNameFriendlyCharacters = allLetters.union(numbers).union(miscCharacters).union(symbolCharacters).difference({'<','>','|','/','\\','*',':','?','"'})
 AllCharacters = allLetters.union(numbers).union(symbolCharacters).union(miscCharacters)
 preInitiated = 0
-mixer.music.paused = 0
+mixer.music.paused = 0 #type: ignore
 WIDTH, HEIGHT = (0,0)
 minScreenX,minScreenY = 0,0
 inputBoxSelected = False
-fps = None
+fps:int = 60
 clock:pg_time.Clock
 keysThatIgnoreBoxSelected = set()
 PATH = filePath()
@@ -246,10 +251,7 @@ def py_line(surface, color, start_pos, end_pos, width=1):
 class SoundError(BaseException):
   '''Error with pygame.mixer.music module'''
   pass
-class function:
-  '''A function or method'''
-  #Just a class to increase readability
-  pass
+
 
 class Input:
   '''
@@ -263,16 +265,16 @@ class Input:
       self.Events = set(Events)    
       self.KDQueue = KQueues[0]
       self.KUQueue = KQueues[1]
-      self.mpos  =  mState[0]
-      self.mousex  = mState[0][0]
-      self.mousey  = mState[0][1]
-      self.mb1  =  mState[1][0]
-      self.mb2  =  mState[1][1]
-      self.mb3  =  mState[1][2]
-      self.wheel  = mState[2]
-      self.mb1down  =  mState[3][0]
-      self.mb2down  =  mState[3][1]
-      self.mb3down  =  mState[3][2]
+      self.mpos:tuple[int,int]  =  mState[0]
+      self.mousex:int  = mState[0][0]
+      self.mousey:int  = mState[0][1]
+      self.mb1:bool  =  mState[1][0]
+      self.mb2:bool  =  mState[1][1]
+      self.mb3:bool  =  mState[1][2]
+      self.wheel:int  = mState[2]
+      self.mb1down:bool  =  mState[3][0]
+      self.mb2down:bool  =  mState[3][1]
+      self.mb3down:bool  =  mState[3][2]
       self.mb1up = mState[4][0]
       self.mb2up = mState[4][1]
       self.mb3up = mState[4][2]
@@ -289,7 +291,7 @@ class Input:
 
 class QuickWheel:
   @classmethod
-  def accepts(self):
+  def accepts(cls):
     return ('KDQueue','KUQueue','mpos','mb1down','mb1up')
   def __init__(self,pos:tuple,options:tuple|list,key:str,radius:int,rot:float):
     self.pos = pos
@@ -319,12 +321,12 @@ class QuickWheel:
       option.draw()
 
 class TitleScreen:
-  def __init__(self,screen_time:int = None,fps = 60):
+  def __init__(self,screen_time:int|None = None,fps = 60):
     self._fps = fps
     self._background_color = (0,0,0)
     self._rect = Rect(0,0,WIDTH,HEIGHT)
-    self._defaults = None
     self._screen_time = screen_time
+    self._defaults = {}
     self._start_time = None
     self._title_done = False
     ###self._defaults setter should go last
@@ -381,7 +383,7 @@ class TitleScreen:
 
 class Image:
   @classmethod
-  def accepts(self) -> tuple:
+  def accepts(cls) -> tuple:
     return ()
   
   def __init__(self,pos:tuple,image:Surface):
@@ -416,7 +418,7 @@ class Image:
   
 class ScreenSurface:
   @classmethod
-  def accepts(self) -> tuple:
+  def accepts(cls) -> tuple:
     return ()
   def __init__(self,pos,size,color = (0,0,0)):
     self.pos = pos
@@ -439,7 +441,7 @@ class ScreenSurface:
 
 class Debug:
   @classmethod
-  def accepts(self) -> tuple:
+  def accepts(cls) -> tuple:
     return ()
   def __init__(self,measureFunc = time.perf_counter,performanceImpact = 30):
     self.frameCount = 0
@@ -472,7 +474,7 @@ class Debug:
 
 class TextBox:
   @classmethod
-  def accepts(self) -> tuple:
+  def accepts(cls) -> tuple:
     return ()
   def __init__(self,pos,font,text,words_color,showing:bool = True):
     self.pos = pos
@@ -522,13 +524,13 @@ class Options: #In Development
   def update(self):
     for num,option in enumerate(self.options):
       draw.rect(screen,(10,10,10),Rect(self.pos[0],self.pos[1]+num*30,70,30))
-      screen.blit(self.font.render(option,1,(255,255,255)),(self.pos[0],self.pos[1]+num*30))
+      screen.blit(self.font.render(option,True,(255,255,255)),(self.pos[0],self.pos[1]+num*30))
 
 class Slider:
   @classmethod
-  def accepts(self) -> tuple:
+  def accepts(cls) -> tuple:
     return ('mpos','mb1down','mb1up')
-  def __init__(self,x,y,xlen,ylen,min,max,save_function,slider_color,ball_color,acceptsInput:bool = True,type:int = 1,passed_color = None,starting_value:int = None):
+  def __init__(self,x,y,xlen,ylen,min,max,save_function,slider_color,ball_color,acceptsInput:bool = True,type:int = 1,passed_color:tuple[int,int,int]|None = (0,0,0),starting_value:int|None = None):
     self.x = x
     self.y = y
     self.xlen = xlen
@@ -556,7 +558,7 @@ class Slider:
     self.mouse_active = 0
     self.own_background = True if not isinstance(slider_color,Surface) else False
 
-  def changeSliderLimits(self,newMin:int = None,newMax:int = None):
+  def changeSliderLimits(self,newMin:int|None = None,newMax:int|None = None):
     if newMin is not None and newMin != self.max:
       self.min = newMin
     if newMax is not None and newMax != self.min:
@@ -626,7 +628,8 @@ class Slider:
     if self.type == 1: #always show ball
       draw.circle(screen,self.ball_color,self.ball_pos,self.ylen)
     else: # show passed rect
-      draw.rect(screen,self.passed_color,self.passed_rect,0,2)
+      if self.passed_color:
+        draw.rect(screen,self.passed_color,self.passed_rect,0,2) 
       if self.mouse_active: #show ball when mouse hovering
         draw.circle(screen,self.ball_color,self.ball_pos,self.ylen)
       
@@ -785,7 +788,8 @@ class Dropdown:
     top = self.mpos[1]-(self.pos[1]+self._offSetPos[1])+self.yscroll
     if self.spacing != 1: top +=1 
     bottom = self.size[1]*self.spacing
-    self.rightClickCommand(top//bottom)
+    if self.rightClickCommand:
+      self.rightClickCommand(top//bottom)
 
   def recalculate_options(self):
     self.captions = list(self.captions_command())
@@ -850,7 +854,7 @@ class Dropdown:
     
 class LoadingBar:
   @classmethod
-  def accepts(self):
+  def accepts(cls):
     return ()
   def __init__(self,pos,size,background_color,bar_color,border_color):
     self.pos = pos
@@ -894,13 +898,13 @@ class LoadingBar:
     draw.rect(screen,self.bar_color,self.loadedRect,0,2)
 class InputBox:
   @classmethod
-  def accepts(self) -> tuple:
+  def accepts(cls) -> tuple:
     return ('mpos','mb1down','KDQueue')
   def __init__(self,pos,size,caption = '',box_color = (100,100,100),max_chars=500,save_function = lambda x:x,restrict_input = None,fontSize = 21):
     self.pos = pos
     self.size = size
     self.font = font.SysFont('Courier New',fontSize)
-    character = self.font.render('H',1,(0,0,0))
+    character = self.font.render('H',True,(0,0,0))
     self.character_x,self.character_y = character.get_size()
     del character
     self.active = False
@@ -998,7 +1002,7 @@ class InputBox:
 
 class RoundButton:
     @classmethod
-    def accepts(self) -> tuple:
+    def accepts(cls) -> tuple:
       return ('mpos','mb1','mb3down','KDQueue')
     def __init__(self,pos,radius,OnDownCommand,down_color,up_color,idle_color,surface = Surface((0,0)),textx = 0,texty = 0,rightClickCommand = None,key = None,accepts_mb3:bool = False, downCommand = None, OnUpCommand = None,keyCommand = 'OnDownCommand'):
       self.pos = pos
@@ -1070,7 +1074,7 @@ class RoundButton:
 
 class ButtonSwitch:
   @classmethod
-  def accepts(self) -> tuple:
+  def accepts(cls) -> tuple:
     return ('mpos','mb1down')
 
   def __init__(self,pos,size,start_state,state_pics,big_hitbox:bool = False):
@@ -1094,7 +1098,7 @@ class CheckBox:
   def accepts(cls) -> tuple:
     return ('mpos','mb1down')
   __slots__ = ('pos','size','func','_rect','_offSetPos','box_color','font','txt','tpos','_selected','onlyOn')
-  def __init__(self,pos:tuple,size:number,func:function,box_color:tuple = (110,110,110),txt:str = '',font = None,tpos = (20,0),onlyOn:bool = False) -> None:
+  def __init__(self,pos:tuple,size:number,func:Callable,box_color:tuple = (110,110,110),txt:str = '',font = None,tpos = (20,0),onlyOn:bool = False) -> None:
     self.onlyOn = onlyOn
     self.pos = pos
     self.size = (size,size)
@@ -1107,7 +1111,7 @@ class CheckBox:
       self.font = font
       if self.font is None:
         self.font = makeFont('Arial',size)
-      self.txt = self.font.render(txt,1,(0,0,0))
+      self.txt = self.font.render(txt,True,(0,0,0))
     else:
       self.txt = None
     self.tpos = tpos
@@ -1160,7 +1164,7 @@ class KeyBoundFunction:
     return ('KDQueue',)
   
   __slots__ = ('func','keys','offSetPos')
-  def __init__(self,func:function,*keys):
+  def __init__(self,func:Callable,*keys):
     self.func = func
     self.keys = set(keys)
 
@@ -1211,7 +1215,7 @@ class Button:
   def accepts(cls) -> tuple:
     return ('mpos','mb1down','mb3down','KDQueue','mb1up')
   #__slots__ = ('x','y','xlen','ylen','OnDownCommand','OnUpCommand','down_color','up_color','down','previous_state','idle_color','text','textx','texty','idle','state','key','text_color','accepts_mb3','rightClickCommand','keyCommand','_offSetPos','_offsetY','_rect','pidle')
-  def __init__(self,pos,xlen,ylen,OnDownCommand,down_color,up_color,idle_color,text = Surface((0,0)),textx:int = 0,texty:int = 0,rightClickCommand:function = None,key:str = None,accepts_mb3:bool = False, OnUpCommand:function = None,keyCommand:str = 'OnDownCommand',text_color:tuple = (0,0,0)):
+  def __init__(self,pos,xlen,ylen,OnDownCommand,down_color,up_color,idle_color,text:Surface|str = Surface((0,0)),textx:int = 0,texty:int = 0,rightClickCommand:Callable|None = None,key:str|None = None,accepts_mb3:bool = False, OnUpCommand:Callable|None = None,keyCommand:str = 'OnDownCommand',text_color:tuple = (0,0,0)):
     self.x = pos[0]
     self.y = pos[1]
     self.xlen = xlen
@@ -1223,13 +1227,16 @@ class Button:
     self.down = False
     self.previous_state = False
     self.idle_color = idle_color
-    self.text = text
+    self.text_color = text_color
+    if isinstance(text,str):
+      self.text = self.default_font.render(text,True,self.text_color)
+    else:
+      self.text = text
     self.textx = textx
     self.texty = texty
     self.idle = False
     self.state = False
     self.key = key
-    self.text_color = text_color
     self.accepts_mb3 = accepts_mb3
     self.rightClickCommand = rightClickCommand if rightClickCommand is not None else lambda:None
     self.keyCommand = keyCommand
@@ -1237,10 +1244,9 @@ class Button:
     self._offsetY = 0
     self.offSetPos = (0,0)
     self.offsetY = 0
-    self._rect = Rect(self.x,self.y,self.xlen,self.ylen)
-    if not isinstance(self.text,Surface):
-      self.text = self.default_font.render(self.text,1,self.text_color)
     self.pidle = 0
+    self._rect = Rect(self.x,self.y,self.xlen,self.ylen)
+   
   @property
   def offSetPos(self):
     return self._offSetPos
@@ -1307,7 +1313,7 @@ class Button:
     self.pidle = self.idle
 
 class MiniWindow:
-  def __init__(self,name,pos,size,color =(70,70,70),exit_command:function = lambda:1,force_focus:bool = True):
+  def __init__(self,name,pos,size,color =(70,70,70),exit_command:Callable = lambda:1,force_focus:bool = True):
     self._offset = tuple(pos)
     self._size = tuple(size)
     if self._size[1] < 100: raise TypeError("Cannot Make A MiniWindow that small")
@@ -1374,7 +1380,7 @@ class MiniWindow:
 
 class Empty:
   @classmethod
-  def accepts(self) -> tuple:
+  def accepts(cls) -> tuple:
     return ()
   def __init__(self):
     pass
@@ -1440,7 +1446,7 @@ class Stopwatch:
 ##########################
 class Main_Space:
     @classmethod
-    def accepts(self) -> tuple:
+    def accepts(cls) -> tuple:
       return ()
     def __init__(self):
         pass
@@ -1455,13 +1461,15 @@ class Main_Space:
         pass
 
 class Border:
+    _draw_need:int
+    _rect:Rect
     def __init__(self):
         pass
 
-    def update():
+    def update(self):
         pass
 
-    def draw():
+    def draw(self):
         pass
 
 class Window_Space:
@@ -1477,7 +1485,7 @@ class Window_Space:
       self._activeMainSpace = 0
       self._mainSpacePos = [0,0]
       self._mainSpaceSize = [WIDTH,HEIGHT]
-      self._borders = {"top":None,"bottom":None,"left":None,"right":None}  
+      self._borders:dict[str,None|Border] = {"top":None,"bottom":None,"left":None,"right":None}  
       self._miniWindows = {}     
       self._debug = Main_Space()
       self._miniwindowactive = False
@@ -1486,17 +1494,17 @@ class Window_Space:
       self._msRect = self._rect
       self._mpos = (0,0)
       self._pmpos = (0,0)
-      self._activeMiniWindow = None
+      self._activeMiniWindow:MiniWindow
       
   
 
-    def addMiniWindow(self,name:str,pos:tuple,size:tuple,bg_color=None,exit_command:function=None,force_focus:bool = True) -> None:
+    def addMiniWindow(self,name:str,pos:tuple,size:tuple,bg_color=None,exit_command:Callable|None=None,force_focus:bool = True) -> None:
       if bg_color == None:
         bg_color = (70,70,70)
       if exit_command == None:
         exit_command = self.deactivateMiniWindow
       self._miniWindows[name] = MiniWindow(name,pos,size,bg_color,exit_command,force_focus)
-    def activateMiniWindow(self,name,passFunc:bool = 0) -> None|function:
+    def activateMiniWindow(self,name,passFunc:bool = False) -> None|Callable:
       if passFunc: return lambda :self.activateMiniWindow(name)
       assert name in self._miniWindows.keys(), "That miniwindow does not exist"
       #if not name in self._miniWindows.keys(): raise TypeError('That miniwindow does not exist')
@@ -1508,22 +1516,24 @@ class Window_Space:
       self._activeMiniWindow = self._miniWindows[name]
     def deactivateMiniWindow(self) -> None:
       self._miniwindowactive = False
-      self._activeMiniWindow = None
+      self._activeMiniWindow = None #type: ignore
       self._currentMS = self.mainSpace
       self.first_draw()
     def miniWindow(self,name) -> MiniWindow:
       return self._miniWindows[name]
     @property
-    def top(self) -> Border: return self._borders['top']
+    def top(self) -> Border|None: return self._borders['top']
     @property
-    def left(self) -> Border: return self._borders['left']
+    def left(self) -> Border|None: return self._borders['left']
     @property
-    def right(self) -> Border: return self._borders['right']
+    def right(self) -> Border|None: return self._borders['right']
     @property 
-    def bottom(self) -> Border: return self._borders['bottom']
+    def bottom(self) -> Border|None: return self._borders['bottom']
     @property
-    def mainSpace(self) -> Main_Space:
-      return self._mainSpaces[self._activeMainSpace]
+    def mainSpace(self):
+      t = self._mainSpaces[self._activeMainSpace]
+      assert isinstance(t,ScrollingMS)
+      return t
     @property
     def MSSize(self) -> tuple:
       return self._mainSpaceSize
@@ -1667,19 +1677,19 @@ class Window_Space:
       self._live_borders = tuple([x for x in self._borders.values() if x != None])
 
     def update(self,input:Input) -> None:
-      self._activeMiniWindow:MiniWindow
       self._mpos = input.mpos
       if not self._miniwindowactive:
         self.mainSpace.update(input)
-        for border in self._live_borders:
+        for border in self._live_borders: #type: ignore
           border:Top_Border #just an example to help autocorrect
           border.update(input)
+
       elif not self._activeMiniWindow._force_focus:  #miniwindow active, but not forced focus 
         if self._activeMiniWindow._rect.collidepoint(self._mpos) or self._activeMiniWindow._rect.collidepoint(self._pmpos):
           self._activeMiniWindow.update(input)
         else:
           self.mainSpace.update(input)
-          for border in self._live_borders:
+          for border in self._live_borders: #type: ignore
             border:Top_Border #just an example to help autocorrect
             border.update(input)
       else:
@@ -1731,9 +1741,9 @@ class Window_Space:
 class Top_Border(Border):
     def __init__(self,color,draw_need,border_color:tuple = (0,0,0),border_width:int = 0):
       self._color = color
-      self._pos = tuple
-      self._size = tuple
-      self._rect = Rect
+      self._pos:tuple
+      self._size:tuple
+      self._rect:Rect
       self._draw_need = draw_need
       self._active = 0
       self._pactive = 0
@@ -1871,9 +1881,9 @@ class Left_Border(Border):
 class Right_Border(Border):
     def __init__(self,color,draw_need,border_color:tuple = (0,0,0),border_width:int = 0):
       self._color = color
-      self._pos = tuple
-      self._size = tuple
-      self._rect = Rect
+      self._pos: tuple
+      self._size: tuple
+      self._rect: Rect
       self._draw_need = draw_need
       self._active = 0
       self._pactive = 0
@@ -2014,7 +2024,7 @@ class ScrollingMS(Main_Space):
       self._background_color = (0,0,0)
       self._rect = Rect(self._offset[0],self._offset[1],self._size[0],self._size[1])
       self._draw_need = draw_need
-      self._defaults = None
+      self._defaults = {}
       self._active = 0
       self._pactive = 0
       self._update_need = update_need
@@ -2114,8 +2124,7 @@ def log(_log:str):
 
 
 def tick() -> int:
-  global fps
-  global dt 
+  global fps, dt 
   dt = clock.tick(fps)
   return dt
 
@@ -2225,20 +2234,20 @@ def stopSound() -> None:
   mixer.music.stop()
 
 def pauseSound() -> None:
-  mixer.music.paused = 1
+  mixer.music.paused = 1 #type: ignore
   mixer.music.pause()
 
 def unpauseSound() -> None:
-  mixer.music.paused = 0
+  mixer.music.paused = 0 #type: ignore
   mixer.music.unpause()
 
 def PauseUnPauseSound() -> None:
-  if mixer.music.paused:
+  if mixer.music.paused: #type: ignore
     unpauseSound()
-  elif not mixer.music.paused:
+  elif not mixer.music.paused: #type: ignore
     pauseSound()
   else:
-    raise IndexError(f"Value mixer.music.paused is not a bool instead it is a {type(mixer.music.paused)}: {mixer.music.paused}")
+    raise IndexError(f"Value mixer.music.paused is not a bool instead it is a {type(mixer.music.paused)}: {mixer.music.paused}") #type: ignore
 
 def SetSoundVolume(newVal:float) -> None:
   if not isinstance(newVal,float):
@@ -2264,15 +2273,15 @@ def onSoundLoad():
 def onSoundPlay():
   pass
 
-def setOnSoundLoad(func:function) -> None:
+def setOnSoundLoad(func:Callable) -> None:
   global onSoundLoad
   onSoundLoad = func
 
-def setOnSoundPlay(func:function) -> None:
+def setOnSoundPlay(func:Callable) -> None:
   global onSoundPlay
   onSoundPlay = func
 
-def setSoundEndEvent(func:function):
+def setSoundEndEvent(func:Callable):
   global endEventFunction
   endEventFunction = func
 
@@ -2286,7 +2295,7 @@ def getSoundPos() -> int:
   return mixer.music.get_pos()
 
 def getSoundPause() -> bool:
-  return True if mixer.music.paused else False
+  return mixer.music.paused  #type: ignore
 
 def setWindowIcon(surf:Surface) -> None:
   display.set_icon(surf)
@@ -2298,7 +2307,7 @@ def loadImg(FileName:str,useAlpha:bool = False,usePath:bool = True) -> Surface:
   fullFilePath = '/'.join([PATH,FileName]) if usePath else FileName
   if useAlpha:
     return image.load(fullFilePath).convert_alpha()
-  elif not useAlpha:
+  else:
     return image.load(fullFilePath).convert()
 
 def flipSurface(surface:Surface,x:bool,y:bool) -> Surface:
@@ -2322,18 +2331,21 @@ def rotateSurface(surface:Surface,angle:float) -> Surface:
 def isValidScreenSize(screenSize:tuple) -> bool:
   global minScreenX,minScreenY
   if screenSize[0] < minScreenX:
-    return 0
+    return False
   if screenSize[1] < minScreenY:
-    return 0
-  return 1
+    return False
+  return True
 
-def get_clipboard(raw:bool = False) -> str | bytes:
+def get_clipboard(raw:bool = False) -> str | bytes|None:
   for _type in scrap.get_types():
     if SCRAP_TEXT in _type:
       if raw:
         return scrap.get(SCRAP_TEXT)
       else:
-        return scrap.get(SCRAP_TEXT).decode('utf-8')
+        s = scrap.get(SCRAP_TEXT)
+        if s:
+          return s.decode('utf-8')
+        return s
   return ''
 def resizeToBecomeValid(screenSize:tuple) -> tuple[int,int]:
   global minScreenX,minScreenY,WIDTH,HEIGHT
@@ -2359,7 +2371,7 @@ def getAllInput() -> Input:
     elif event.type == KEYDOWN:
       keyDownQueue.append(event.unicode)
       if event.unicode == paste_unicode:
-        for letter in get_clipboard():
+        for letter in get_clipboard(): #type: ignore
           keyDownQueue.append(letter)
     elif event.type == KEYUP:
       keyUpQueue.append(event.unicode)  

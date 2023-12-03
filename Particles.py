@@ -5,22 +5,22 @@ import pygame
 import Textures
 import Time
 from Animation import SimpleAnimation
+from Game_Typing import *
 
 class Cheap_Animation:
-    def __init__(self,pos,images:list[pygame.Surface]|tuple,fps:int,onDone):
+    __slots__ = 'images','onDone','fps','time','frame','inv_fps','max_frames','csurf','done'
+    def __init__(self,pos:game_math.Vector2,images:list[pygame.Surface]|tuple[pygame.Surface,...],fps:int|float,onDone: Callable[[],None] | None):
+        assert len(images), 'cant have empty images list!'
         self.images = images
         self.onDone = onDone
-        #self.total_time = len(images) * 1/fps
         self.fps = fps
         self.time = 0.0
         self.frame:int = 0
         self.inv_fps = 1/fps
-        self.max_frames = len(images)
+        self.max_frames = (images).__len__()
         self.csurf = Camera.CSurface(self.images[0],pos,(-self.images[0].get_width()//2,-self.images[0].get_height()//2))
         self.done = False
 
-
-    def onDone(self): ...
 
 
     def animate(self):
@@ -32,14 +32,11 @@ class Cheap_Animation:
             self.frame += 1
             if self.frame == self.max_frames:
                 self.done= True
-                self.onDone()
+                if self.onDone is not None:
+                    self.onDone()
                 return
             self.csurf.surf = self.images[self.frame]
             
-        
-
-
-
 gravity = game_math.Vector2(0,1)
 
 particles = []

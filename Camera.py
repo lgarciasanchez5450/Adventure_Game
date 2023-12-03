@@ -206,15 +206,14 @@ def update():
         dist = focus - camera_pos 
         displacement = dist * (smooth_speed * Time.deltaTime)
         camera_pos += displacement
-        
     elif tracking_system == 'fixed':
         pass
     else:
         raise RuntimeError(f'Tracking System is {tracking_system} but that is not a valid system') # TODO: in prod this path should never run so it could be deletd
     if mouse_assisted:
         effective_camera_pos = camera_pos + m_pos_normalized*mouse_pull_strength/(BLOCK_SIZE)
-    camera_offset_x = floor(effective_camera_pos.x*BLOCK_SIZE)
-    camera_offset_y = floor(effective_camera_pos.y*BLOCK_SIZE)
+    camera_offset_x = (effective_camera_pos.x*BLOCK_SIZE).__floor__()
+    camera_offset_y = (effective_camera_pos.y*BLOCK_SIZE).__floor__()
     
 
 

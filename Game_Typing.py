@@ -1,5 +1,5 @@
 from Constants import DEBUG
-from typing import Protocol,Any
+from typing import Protocol,Any, Union, Callable
 from Errors import return_error,UnInstantiableError
 
 class ImplementsDraw(Protocol):

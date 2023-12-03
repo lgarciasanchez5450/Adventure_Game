@@ -96,7 +96,6 @@ def _opposite_normalized(x,y):
 def abstractmethod(func:Callable):
 	if DEBUG: 
 		assert callable(func), 'abstractmethod only works on callable objects'
-
 		def default_abstract_method(*args,**kwargs):
 			raise NotImplementedError("call to abstract method " + repr(func))
 		default_abstract_method.__name__ = func.__name__
@@ -134,18 +133,21 @@ class Vector2:
 	def opposite_normalized(self):
 		return Vector2(*_opposite_normalized(self.x,self.y))
 
-	def __eq__(self,__object):
+	def __eq__(self,__object: "Vector2"):
 		return self.x == __object.x and self.y == __object.y
 	
-	def __add__(self,__object):
+	def __add__(self,__object: "Vector2"):
 		return Vector2(self.x + __object.x,self.y + __object.y)
 	
-	def __sub__(self,__object):
+	def __sub__(self,__object: "Vector2"):
 		return Vector2(self.x - __object.x,self.y - __object.y)
 	
 	def __mul__(self,__object:scalar):
 		return Vector2(self.x *__object,self.y * __object)
 	
+	def __rmul__(self,__object:scalar):
+		return Vector2(self.x *__object,self.y * __object)
+
 	def __truediv__(self,__object:scalar):
 		return Vector2(self.x / __object, self.y / __object)
 	
@@ -160,22 +162,22 @@ class Vector2:
 	def moved_by(self,x:scalar,y:scalar):
 		return Vector2(self.x + x, self.y + y)
 
-	def dot(self,__object):
+	def dot(self,__object: "Vector2"):
 		assert isinstance(__object,Vector2)
 		return self.x*__object.x+self.y*__object.y
 	
-	def vector_mul(self,__object):
+	def vector_mul(self,__object: "Vector2"):
 		return Vector2(self.x*__object.x,self.y*__object.y)
 	
 	def __getitem__(self,__index:int) -> scalar:
 		return [self.x,self.y][__index]
 	
-	def __iadd__(self,__object):
+	def __iadd__(self,__object: "Vector2"):
 		self.x += __object.x
 		self.y += __object.y
 		return self
 
-	def __isub__(self,__object):
+	def __isub__(self,__object: "Vector2"):
 		self.x -= __object.x
 		self.y -= __object.y
 		return self
@@ -268,6 +270,7 @@ class Vector2:
 	def restrain_magnitude(self,mag:float): 
 		self.from_tuple(restrainMagnitude(self.x,self.y,mag))
 		return self
+
 ones= Vector2(1,1)
 
 
@@ -465,6 +468,9 @@ class Array(list,Generic[T]):
 		item,self[__index] = self[__index],__object
 		return item
 
+
+	def swapIndices(self,__index1:int, __index2:int):
+		self[__index1],self[__index2] = self[__index2],self[__index1]
 
 def make2dlist(x,y = None) -> list[list[None]]:
 	y = x if y is None else y
