@@ -3,6 +3,7 @@ import gc
 gc.disable()
 from Constants.Display import *
 from Constants.Misc import *
+import Constants
 import pygame
 
 import Camera
@@ -14,19 +15,20 @@ import Particles
 pygame.init()
 import general_manager #should take care of everything that chunk/entity manager used to do
 import debug
-from game_math import Vector2
+from game_math import Vector2, GAME_PATH
+
 import Music,Sounds 
 import Game_Time
 import Main_Menu
 Main_Menu.start()
 import Events
 import Pause_Menu
+import Textures
 
 
 def onGameAwake():
     global gen
-    import Textures
-    Textures.init()
+    Textures.initInThread()
     Time.init()
     Music.init()
     Pause_Menu.init()
@@ -105,16 +107,31 @@ while True:
     elif Settings.game_state is MAIN_MENU:
         Main_Menu.update()
         if (Main_Menu.loading_for.timeElapsed() > 2): #if has been "loading" for more than 2 seconds start generating the world-
-            gen = general_manager.generate_world()
-
+            Main_Menu.lb.setMax(108)
             onGameAwake()
             Settings.game_state = GENERATING_WORLD
     elif Settings.game_state is GENERATING_WORLD:
             try:
+                #First try to see if we need to import Textures
+                
+                if not Textures.done_loading:
+                    Main_Menu.lt.setText(Textures.current_load_name.removeprefix(GAME_PATH))
+                    Main_Menu.lb.setDone(Textures.loaded_counter)
+                    
+
+                    Textures.ready_for_next = True
+
+                else: 
+                    if Textures.loaded_counter:
+                        print('changing to generation')
+                        gen = general_manager.generate_world()
+                        Main_Menu.lb.setMax(Constants.TOTAL_GENERATED_CHUNKS).setDone(0)
+                        Main_Menu.lt.setText('')
+                        Textures.loaded_counter = 0
+                    chunks_finished, _ = next(gen) #type: ignore
+                    print(chunks_finished)
+                    Main_Menu.lb.setDone(chunks_finished) 
                 Main_Menu.update()
-                chunks_finished, _ = next(gen) #type: ignore
-                print(chunks_finished)
-                Main_Menu.lb.setDone(chunks_finished) 
             except StopIteration:
                 Main_Menu.close()
                 onGameStart()

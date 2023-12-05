@@ -523,24 +523,26 @@ class Block:
     def update(self) -> None: ...
 
 class Tree(Block):
-    oak_tex = '03.png'
+    oak_frames_directory = '03.png'
+    oak_fps = 0
+
     @staticmethod
     def spawnable_on(ground:Ground) -> bool:
         return ground.name is GROUND_DIRT
     #this class is an "obstacle" 
-    __slots__ = 'surf',
+    __slots__ = 'surf','animation'
     def __init__(self,pos,ground:Ground):
         assert Tree.spawnable_on(ground), f"Tree was spawned on illegal block: {ground}"
         super().__init__(pos,'tree')
-        self.surf = Textures.texture[Tree.oak_tex]
+        self.animation = Animation.SimpleAnimation(self.csurface,self.oak_fps,Textures.blocks[self.oak_frames_directory])
+        self.surf = self.csurface.surf = self.animation.frames[0]
         self.csurface.surf = self.surf
         self.blast_resistance = 10
-
+        
     def update(self):
-        pass
+        self.animation.animate()
 
 class TNT(Block):
-    tnt_tex = 'tnt.png'
     @staticmethod
     def spawnable_on(ground:Ground):
         return ground.name is GROUND_DIRT
@@ -548,7 +550,7 @@ class TNT(Block):
     def __init__(self, pos):
         super().__init__(pos, 'tnt')
         self.blast_resistance = 10
-        self.surf = Textures.texture[TNT.tnt_tex]
+        self.surf = Textures.tnt[0]
         self.csurface.surf = self.surf
         self.timer = 4
         self.energy = 15
@@ -561,10 +563,8 @@ class TNT(Block):
 
         return super().take_damage(damage, type,entity)
 
-
-     
     def onDeath(self):
-        spawn_entity(LiveTNT(self.pos,4,15))
+        spawn_entity(LiveTNT(self.pos,4.0,15))
         return super().onDeath()
 
 class WoodenPlank(Block):
@@ -585,7 +585,7 @@ class Entity:
         self.vel = Vector2.zero
         species = intern(species) # use intern to keep memory usage down and also be able to use "is" when compating entities
         self.species = species
-        self.image = CSurface(Textures.texture['null.png'],self.pos,Settings.SURFACE_OFFSET[species])
+        self.image = CSurface(Textures.NULL,self.pos,Settings.SURFACE_OFFSET[species])
         self.collider = Collider(0,0,*Settings.HITBOX_SIZE[species])
         self.collider.setCenter(*self.pos)
         self.animation = Animation.Animation(self.image)
@@ -664,15 +664,14 @@ class ItemWrapper(Entity):
                 self.vel += self.vel.opposite_normalized() * friction
 
 class LiveTNT(Entity):
-    whited = Textures.load_image('Images/objects/tnt1.png')
     @staticmethod
     def damage_func_getter(joules:float) -> Callable[[float],int]:
         E = 2.718281828
         return lambda dist : (joules * E ** (-dist)).__trunc__()
     
-    def __init__(self,pos:Vector2,time:float|int,energy:int):
+    def __init__(self,pos:Vector2,time:float,energy:int):
         super().__init__(pos,'tnt')
-        self.animation.add_state('1',1,(Textures.texture['tnt.png'],self.whited))
+        self.animation.add_state('1',1,Textures.tnt)
         self.animation.set_state('1')
         self.animation.animate()
         self.timer = time
@@ -1920,7 +1919,7 @@ def _create(chunk:Chunk):
             ground = noise_to_ground(noise) 
             chunk.ground[y][x] = ground #type: ignore
             #pygame.draw.rect(surf,(noise*255,)*3,(x*BLOCK_SIZE,y*BLOCK_SIZE,BLOCK_SIZE,BLOCK_SIZE))
-            surf.blit(Textures.texture[ground.tex],(x*BLOCK_SIZE,y*BLOCK_SIZE))
+            surf.blit(Textures.ground[ground.name],(x*BLOCK_SIZE,y*BLOCK_SIZE))
             #surf.blit(myfont.render(str((x+chunk.chunk_pos[0]*CHUNK_SIZE,y+chunk.chunk_pos[1]*CHUNK_SIZE)),True,'black'),(x*BLOCK_SIZE,y*BLOCK_SIZE))
     #yield
     
@@ -2442,7 +2441,7 @@ def generate_world():
 
     if len(Chunk._insts) != 0 or len(chunks) != 0: # if we have tried to create some chunks previously
         raise GenerationError('The game has tried to generate a world that already has chunks!??!??!')
-    yield 1,TOTAL_GENERATED_CHUNKS
+    yield 0,TOTAL_GENERATED_CHUNKS
     checkIsGen()
     to_generate = set()
     for cy in range(INITIAL_GEN_SIZE):
@@ -2467,7 +2466,7 @@ def generate_world():
                 chunk_loading_queue.popleft()
                 done += 1
 
-        chunk_loading_queue.rotate()
+        #chunk_loading_queue.rotate()
 
 if __name__ == '__main__':
     from pympler.asizeof import asizeof

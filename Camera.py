@@ -124,7 +124,7 @@ def ui_draw_method(object):
 
 class CSurface:
     __slots__ = 'surf','pos' ,'offset'
-    def __init__(self,surface,position:game_math.Vector2,offset):
+    def __init__(self,surface,position:game_math.Vector2,offset:tuple[int,int]):
         assert isinstance(surface,Surface), f'got {type(surface)}'
         assert isinstance(position,game_math.Vector2), f'got {type(position)}'
         self.surf = surface

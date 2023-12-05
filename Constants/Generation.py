@@ -10,7 +10,7 @@ MAPHEIGHT = 700
 SCALE     = .1 #should be .001 for production
 
 '''Initial Generation Variables'''
-INITIAL_GEN_SIZE = 2 #for both x and y
+INITIAL_GEN_SIZE = 10 #for both x and y
 TOTAL_GENERATED_CHUNKS = INITIAL_GEN_SIZE * INITIAL_GEN_SIZE
 
 '''Biomes that exist'''

@@ -3,7 +3,7 @@ import Camera
 import Input
 from game_math import Collider,Vector2
 from typing import Callable, Literal
-from pygame import Surface, draw
+from pygame import Surface, draw,Font
 from Time import Stopwatch
 from Constants.Generation import BLOCK_SIZE,HALF_BLOCK_SIZE
 
@@ -16,7 +16,7 @@ class Button:
         self.inner_csurf = Camera.CSurface(Surface((self.size * BLOCK_SIZE).tupled_ints),Vector2.zero,(0,0))
         self.inner_csurf.surf.fill('red')
         self.csurf = Camera.CSurface(Surface((self.size * BLOCK_SIZE).tupled_ints),self.center,(-self.size * HALF_BLOCK_SIZE).tupled_ints)
-        self.animation:Animation.SimpleAnimation = Animation.SimpleAnimation(self.inner_csurf,0,[self.inner_csurf.surf])
+        self.animation:Animation.SimpleAnimation = Animation.SimpleAnimation(self.inner_csurf,0,self.inner_csurf.surf)
         self.state:Literal['up','down','idle'] = 'up'
 
         # Make collider
@@ -68,7 +68,7 @@ class Picture:
         self.center = center.copy()
         self.size = size.copy()
         self.csurf = Camera.CSurface(Surface((self.size).tupled_ints),self.center,(-self.size//2).tupled_ints)
-        self.animation:Animation.SimpleAnimation = Animation.SimpleAnimation(self.csurf,0,[self.csurf.surf])
+        self.animation:Animation.SimpleAnimation = Animation.SimpleAnimation(self.csurf,0,self.csurf.surf)
         self.state:Literal['up','down','idle'] = 'up'
 
         # Make collider
@@ -106,8 +106,8 @@ class LoadingBar:
         self._percentDone:float = 0.0
         Camera.add(self.csurf)
 
-    def setDone(self,partsDone:int = 0):
-        if partsDone == 0: partsDone = self.max
+    def setDone(self,partsDone:int = -1):
+        if partsDone == -1: partsDone = self.max
         if partsDone > self.max: partsDone = self.max
         elif partsDone < 0: partsDone = 0
         self.partsDone = partsDone
@@ -135,3 +135,26 @@ class LoadingBar:
         self.max = max
         return self
     
+class Textbox:
+    def __init__(self,center:Vector2,font:Font):
+        self.font = font
+        self.center = center.copy()
+        self.csurf = Camera.CSurface(Surface((0,0)),self.center,(0,0))
+        self.text = ''
+        self.onLoad()
+
+
+    def setText(self,text:str):
+        if text == self.text: return self
+        self.text = text
+        self.csurf.surf = self.font.render(text,True,'white')
+        #self.csurf.offset = (0,0)
+        return self
+
+    def onLoad(self):
+        Camera.add(self.csurf)
+    
+    def onLeave(self):
+        Camera.remove(self.csurf)
+    
+   

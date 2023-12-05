@@ -15,7 +15,7 @@ class Ground:
 
     @property
     def tex(self):
-        return self.name+'.png'
+        return self.name
 
     def setFriction(self,friction:float):
         self.surface_friction = friction

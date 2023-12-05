@@ -1,17 +1,31 @@
 from Constants import BLOCK_SIZE,PARTICLE_SIZE,WIDTH,HEIGHT,HALFHEIGHT,HALFWIDTH,ITEM_SIZE
-from os import walk,listdir
-from pygame.image import load
-from pygame.transform import scale,flip,rotate
+from os import walk,listdir,scandir
+from time import sleep
 from pygame import Surface
-from Constants.Items import *
+from Constants.Misc import TEXTURE_FANCY_IMPORT
+if TEXTURE_FANCY_IMPORT:
+	from pygame.image import load as _load
+	### INNER VARIABLES ###
+	loaded_counter = 0
+	done_loading = False
+	ready_for_next = True
+	current_load_name:str = ''
+	def load(file) -> Surface:
+		global ready_for_next,current_load_name,loaded_counter
+		while (not ready_for_next):
+			sleep(0.001)
+		ready_for_next = False
+		current_load_name = file
+		loaded_counter += 1
+		return _load(file)
+else: 
+	from pygame.image import load
+from pygame.transform import scale,flip,rotate
 from game_math import GAME_PATH
+from typing import Union,Dict
+PATH_DICT_TYPE = Union[Surface,Dict[str,"PATH_DICT_TYPE"]]
 
 NULL = Surface((BLOCK_SIZE,BLOCK_SIZE))
-## Make NULL the recognizable ugly purple
-from pygame import draw
-draw.rect(NULL,(255,0,255),(0,0,BLOCK_SIZE//2,BLOCK_SIZE//2))
-draw.rect(NULL,(255,0,255),(BLOCK_SIZE//2,BLOCK_SIZE//2,BLOCK_SIZE//2,BLOCK_SIZE//2))
-del draw
 
 player_attack:tuple[Surface,...]
 player_death:tuple[Surface,...]
@@ -25,14 +39,34 @@ tnt:tuple[Surface,Surface]
 items:dict[str,tuple[Surface,...]] = {}
 blocks:dict[str,tuple[Surface,...]] = {}
 
+entities:PATH_DICT_TYPE = {} #this will be totaly, and dynamically created by the order of the filing system
+
 entity_arrow:Surface
 enitity_spirit_idle:tuple[Surface,...]
 
+particles_opaque:dict[str,Surface]
+particles_transparent:dict[str,Surface]  
 
-def scale_image(surface,newSize):
-	return scale(surface,newSize)
-def is_image(path:str):
-	return path.split('.')[-1].lower() in {'png','jpg','jpeg','bmp'}
+ground:dict[str,Surface]
+
+
+### HELPER FUNCTIONS ###
+def getFolders(path:str):
+	for f in scandir(GAME_PATH+path):
+		if f.is_dir():
+			yield f.path.split('\\')[-1]
+def getFiles(path:str):
+	for f in scandir(GAME_PATH+path):
+		if f.is_file():
+			yield f.path.split('\\')[-1]
+def isImage(path:str):
+	return path.split('.')[-1] in {'png','jpg','jpeg','bmp'}
+### END HELPER FUNCTIONS ###
+
+
+##############################
+### IMAGE IMPORT FUNCTIONS ###
+##############################
 
 def importTexture(path:str,alpha = True,size:None|tuple[int,int] = None):
 	full_path = GAME_PATH + path
@@ -44,13 +78,11 @@ def importTexture(path:str,alpha = True,size:None|tuple[int,int] = None):
 		image_surf = scale(image_surf,size)
 	return image_surf
 
-
-def importFolderRecursive(path:str,alpha=True,size:None|tuple[int,int] = None):
+def importFolders(path:str,alpha=True,size:None|tuple[int,int] = None):
 	surfs:dict[str,Surface] = {}
 	for _root,_dirs,img_files in walk(GAME_PATH + path):
-		for image in filter(lambda x: x.split('.')[-1] in {'png','jpg','jpeg','bmp'} ,img_files):
+		for image in filter(isImage ,img_files):
 			full_path = _root + '\\' + image
-			print(full_path)
 			image_surf = load(full_path)
 			#remove the file type suffix
 			image = '.'.join(image.split('.')[:-1]) 
@@ -61,93 +93,102 @@ def importFolderRecursive(path:str,alpha=True,size:None|tuple[int,int] = None):
 				image_surf = scale(image_surf,size)
 			assert image not in surfs, 'duplicate fount in files: '  + image
 			surfs[image] = image_surf
-	assert len(surfs),'Empty Texture Path!'
+
+	assert len(surfs),'Empty Texture Path: '+path
 	return surfs
 
-def init():
+def recursivelyImportPath(path:str) -> PATH_DICT_TYPE: # this will assume that images ARE ALPHA and SIZE IS NATIVE
+	maths:PATH_DICT_TYPE = {}
+	for dir in getFolders(path):
+		maths[dir] = recursivelyImportPath(path+'\\'+dir)
+	
+	for file in getFiles(path):
+		if isImage(file):
+			maths['.'.join(file.split('.')[:-1])] = importTexture(path+'\\'+file)
+	
+	return maths
 
+##############################
+# END IMAGE IMPORT FUNCTIONS #
+##############################
+
+def initInThread():
+	import threading
+	t = threading.Thread(target=_init,daemon=True)
+	t.start()
+
+
+
+def _init():
 	'''PLAYER ASSETS'''
 	global player_attack,player_death,player_destruction,player_idle,player_run,player_walk
-	player_attack = tuple(importFolderRecursive('Images\\Entities\\player\\attack').values())
-	player_death = tuple(importFolderRecursive('Images\\Entities\\player\\death').values())
-	player_destruction = tuple(importFolderRecursive('Images\\Entities\\player\\destruction').values())
-	player_idle = tuple(importFolderRecursive('Images\\Entities\\player\\idle').values())
-	player_run = tuple(importFolderRecursive('Images\\Entities\\player\\run').values())
-	player_walk = tuple(importFolderRecursive('Images\\Entities\\player\\walk').values())
+	player_attack = tuple(importFolders('Images\\Entities\\player\\attack').values())
+	player_death = tuple(importFolders('Images\\Entities\\player\\death').values())
+	player_destruction = tuple(importFolders('Images\\Entities\\player\\destruction').values())
+	player_idle = tuple(importFolders('Images\\Entities\\player\\idle').values())
+	#player_run = tuple(importFolders('Images\\Entities\\player\\run').values())
+	player_walk = tuple(importFolders('Images\\Entities\\player\\walk').values())
 
-	'''TNT ASSETS'''
-	global tnt
-	tnt = (importTexture('Images\\objects\\tnt.png',False),importTexture('Images\\objects\\tnt1.png',False))
 
 	global entity_arrow
-	entity_arrow = scale(rotate(importTexture('Images/Entities/arrow/default_arrow.png').convert_alpha(),90+47),(BLOCK_SIZE,BLOCK_SIZE))
+	entity_arrow = scale(rotate(importTexture('Images\\Entities\\arrow\\default_arrow.png').convert_alpha(),90+47),(BLOCK_SIZE,BLOCK_SIZE))
 
 	global enitity_spirit_idle
-	enitity_spirit_idle = tuple(importFolderRecursive('Images\\Entities\\spirit\\idle').values())
+	enitity_spirit_idle = tuple(importFolders('Images\\Entities\\spirit\\idle').values())
 	
 	'''ITEMS ASSETS'''
-	for item_folder in listdir(GAME_PATH + 'Images\\Items'):
-		items[item_folder] = tuple(importFolderRecursive("Images\\Items\\"+item_folder,True,(ITEM_SIZE,ITEM_SIZE)).values())
+	for item_folder in getFolders('Images\\Items'):
+		items[item_folder] = tuple(importFolders("Images\\Items\\"+item_folder,True,(ITEM_SIZE,ITEM_SIZE)).values())
 
-	for item_folder in listdir(GAME_PATH + 'Images\\Items'):
-		items[item_folder] = tuple(importFolderRecursive("Images\\Items\\"+item_folder,True,(ITEM_SIZE,ITEM_SIZE)).values())
+	'''BLOCK ASSETS'''
+	for block_folder in getFolders('Images\\Blocks'):
+		items[block_folder] = tuple(importFolders("Images\\Blocks\\"+block_folder,False,(BLOCK_SIZE,BLOCK_SIZE)).values())
 
-	s = Surface((PARTICLE_SIZE,PARTICLE_SIZE))
-	s.fill('red')
-	texture['death.png'] = s
-	s = Surface((PARTICLE_SIZE,PARTICLE_SIZE))
-	s.fill('white')
-	texture['white.png'] = s
-	s = Surface((PARTICLE_SIZE,PARTICLE_SIZE))
-	s.fill('grey')
-	texture['grey.png'] = s
-	load_item_anim(ITAG_BOW)
-	load_item_anim(ITAG_ARROW)
-	texture['entity_arrow.png'] = scale(rotate(load_image('Images/Entities/arrow/default_arrow.png').convert_alpha(),90+47),(BLOCK_SIZE,BLOCK_SIZE))
-	del s
+	'''ENTITY ASSETS'''
+	global entities
+	entities = recursivelyImportPath('Images\\Entities')
 
-def importItemTextures():
-	import os
-	from game_math import getNamesOfObject
-	from Constants import Items
-	path = f'{GAME_PATH}Images\\Items'
-	items =[Items.__dict__[n] for n in getNamesOfObject(Items) if n.startswith("ITAG")]
-	item_texture_implemented = os.listdir(path)
-	missing_items = []
-	for item in items:
-		if item not in item_texture_implemented:
-			missing_items.append(item)
+	'''PARTICLE ASSETS'''
+	## just pretends its here ##
 
-	print("Items Without Textures:", missing_items)
+	'''GROUND ASSETS'''
+	global ground
+	ground = importFolders('Images\\Ground')
+
+	global done_loading
+	done_loading = True
+	#global 
+	#del importTexture,importFolders, recursivelyImportPath,getFolders,getFiles,isImage
 
 
-	print("Items Without Textures:", missing_items)
-if __name__ == '__main__':
-	importItemTextures()
-	quit()
-
+### EXPORTED FUNCTIONS ###
 def flipX(surf:Surface)-> Surface:
 	return flip(surf,True,False)
 
 def flipXArray(surfs:tuple[Surface,...]|list[Surface]) -> tuple[Surface,...]:
 	return tuple(flipX(s) for s in surfs)
+### END EXPORTED FUNCTIONS ###
+
+## Make NULL the recognizable ugly purple
+from pygame import draw
+draw.rect(NULL,(255,0,255),(0,0,BLOCK_SIZE//2,BLOCK_SIZE//2))
+draw.rect(NULL,(255,0,255),(BLOCK_SIZE//2,BLOCK_SIZE//2,BLOCK_SIZE//2,BLOCK_SIZE//2))
+del draw
 
 if __name__ == "__main__":
 	print('Running Tests on Module Textures')
 	import pygame
 	pygame.init()
 	pygame.display.set_mode((1,1),pygame.NOFRAME)
-	print(len(load_item_anim('bow')) == 0)
-	init()
+	_init()
 	print('All Tests Passed')
 
 
 
 
 
-
-
-#### HELPER FUNCTIONS ####
+#### LEGACY FUNCTIONS ####
+'''
 
 def load_top(path:str):
 	surfs:list[Surface] = []
@@ -158,7 +199,6 @@ def load_top(path:str):
 
 
 
-'''
 def _compress_and_save():
 	from pygame.image import load,save
 	p = 'Images\\Entities\\player\\walk'

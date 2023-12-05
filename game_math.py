@@ -562,5 +562,9 @@ def hsv_to_rgb(h,s,v):
 		B = z + m
 	return R,G,B
 
-
-	pass
+if __name__ == '__main__':
+	from pympler.asizeof import asizeof
+	print(asizeof(Vector2.zero))
+	print(asizeof((0,0)))
+	print(asizeof(Collider(0,0,0,0)))
+	print(asizeof(Vector2(1,1)))

@@ -1,3 +1,4 @@
+from typing import Final
 from .Generation import BLOCK_SIZE
 '''Miscalleneous Variables'''
 SLEEP_VELOCITY_THRESHOLD = .0001
@@ -8,6 +9,7 @@ ZERO = 0
 POSITIVE_INFINITY = float('inf')
 NEGATIVE_INFINITY = float('-inf')
 DEBUG = True
+TEXTURE_FANCY_IMPORT:Final = True
 
 '''Game States'''
 MAIN_MENU = 0
