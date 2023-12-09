@@ -2,13 +2,13 @@ from typing import Final
 from .Generation import BLOCK_SIZE
 '''Miscalleneous Variables'''
 SLEEP_VELOCITY_THRESHOLD = .0001
-ITEM_PICKUP_TIME = 3.0
+ITEM_PICKUP_TIME = 3.0 #time to wait between pickups
 ITEM_SIZE = BLOCK_SIZE//2
 PARTICLE_SIZE = BLOCK_SIZE // 8
 ZERO = 0
 POSITIVE_INFINITY = float('inf')
 NEGATIVE_INFINITY = float('-inf')
-DEBUG = True
+DEBUG:Final = True
 TEXTURE_FANCY_IMPORT:Final = True
 
 '''Game States'''

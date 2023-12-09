@@ -1,6 +1,6 @@
 from Constants import *
 
-from Inventory import InventoryInterface
+
 from game_math import *
 from Camera import CSurface
 from pygame import Surface,font
@@ -14,7 +14,7 @@ class ItemSlot:
     HOVER = 1
     PRESSED = 2
     font = font.SysFont("Arial",ITEM_COUNTER_SIZE)   
-    def __init__(self,pos:tuple|list,index:int,inventory:InventoryInterface):
+    def __init__(self,pos:tuple|list,index:int,inventory):
         self.index = index
         self.inventory = inventory
         self.pos = pos
@@ -24,7 +24,7 @@ class ItemSlot:
         self.state = 0
         self.hover_color = (70,90,90)
 
-    def set_inventory(self,inventory:InventoryInterface):
+    def set_inventory(self,inventory):
         self.inventory = inventory
 
     def set_bgc(self,color:tuple):

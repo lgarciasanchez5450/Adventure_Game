@@ -8,7 +8,7 @@ from array import array
 from Events import add_OnResize, call_OnResize
 from pygame import Surface
 from game_math import floor
-from Game_Typing import ImplementsDraw
+from Game_Typing import ImplementsDraw, assert_type
 #####Variables#####
 
 ##### OPENGL MAGIC #####
@@ -124,9 +124,8 @@ def ui_draw_method(object):
 
 class CSurface:
     __slots__ = 'surf','pos' ,'offset'
-    def __init__(self,surface,position:game_math.Vector2,offset:tuple[int,int]):
-        assert isinstance(surface,Surface), f'got {type(surface)}'
-        assert isinstance(position,game_math.Vector2), f'got {type(position)}'
+    def __init__(self,surface:Surface,position:game_math.Vector2,offset:tuple[int,int]):
+        assert_type(position,game_math.Vector2)
         self.surf = surface
         self.pos = position
         self.offset = offset

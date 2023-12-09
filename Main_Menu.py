@@ -19,6 +19,7 @@ def start():
     Camera.program['light'] = 1.0
     Camera.program['tex'] = 0 
     Time.init()
+    Camera.set_focus(main_view_pos)
         
     def startLoad():
         Camera.set_focus(play_view_pos)

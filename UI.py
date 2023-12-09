@@ -57,6 +57,7 @@ class EmtpyUI(UI):
     def __delattr__(self, __name: str) -> None: pass
     def update(self,*args,**kwargs): pass
     def draw(self): pass
+    def __del__(self): pass
 
 class DebugUI(UI):
     def __init__(self):

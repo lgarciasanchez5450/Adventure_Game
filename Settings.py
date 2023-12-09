@@ -8,19 +8,19 @@ SURFACE_FRICTION_BY_GROUND = {
     GROUND_STONE:20,
     GROUND_WATER:2
 }
-HITBOX_SIZE = {
+HITBOX_SIZE:dict[str,tuple[float,float]]= {
     'player':(.5,.6),
-    'object':(1,1),
-    'tree':(.6,1),
+    'object':(1.0,1.0),
+    'tree':(.6,1.0),
     'enemy':(.3,.3),
     'spirit':(.3,.3),
-    'tnt':(1,1),
+    'tnt':(1.0,1.0),
     'human':(.5,.6),
     'bunny':(.3,.2),
     'arrow':(.1,.1),
     'item':(.4,.4)
 }
-SURFACE_OFFSET = {
+SURFACE_OFFSET:dict[str,tuple[int,int]] = {
     'player'    : (-32,-45),
     'object'    : (0,0),
     'grass'     : (0,0),
@@ -39,8 +39,6 @@ SURFACE_OFFSET = {
 ENEMIES_TYPES = ['spirit','bamboo','raccoon','squid']
 SPECIES = ENEMIES_TYPES + ['human']
 BASE_STATS = {'health':1,'base_attack':1,'defense':0,'speed':1,'base_attack_cooldown':1000,}
-#ENEMY_STATS = {	'spirit': {'base_attack':15,'defense':3,'speed':.7,'base_attack_cooldown':1500,'health':100,'vision':4,'vision_time':1000,'range': .4},
-#				'bamboo': {'base_attack':10,'defense':5,'speed':1,'base_attack_cooldown':1500,'health':100,'vision':5,'vision_time':1000,'range': .3}}
 ACTION_ENERGY_CONSUMPTION = {
     'RUN':1,
 }

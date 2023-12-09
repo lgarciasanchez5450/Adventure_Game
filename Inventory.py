@@ -4,138 +4,228 @@ from typing import Callable
 _DEBUG_ = True
 import Animation 
 from game_math import Array
-from Game_Typing import UnInstantiable
-class ArmourStats:
-    type:str
-class Item(UnInstantiable): 
-    count:int
-    tag:str
-    armour_stats:ArmourStats
-    durability_stats:object
-    animation:Animation.Animation
-    @property
-    def max_stack_count(self) -> int:...
-    def canStack(self,other) -> bool: ...
-    def split(self): ...
-    def startUse(self,inventory:object): ...
-    def stackCompatible(self,other) -> bool: ...
-    def stopUse(self,inventory:object): ...
-    
-class InventoryInterface(UnInstantiable): # type: ignore
-    def seeIndex(self,index:int) -> Item: ...
-
-
-class Inventory:
-    def __init__(self,spaces:int):
+from Game_Typing import UnInstantiable, TYPE_CHECKING, Optional, Any
+if TYPE_CHECKING: 
+    from general_manager import Item,AliveEntity
+class UniversalInventory:
+    def __init__(self,spaces:int,entity):
         self.spaces = spaces
         self.inventory:Array[Item] = Array.new(spaces)
         self.full = False
-        self._any_empty = True
+        self.entity:'AliveEntity' = entity
+        self.selected:int = -1
+        self.slot_restrictions:dict[int,Callable[['Item'],bool]] = {} #will store slot indexes that have restrictions via a function that will accept the item and return True only if it fits
 
-    @property
-    def added_def(self):
-        return 0
-
-    @property
-    def added_atk(self):
-        return 0
-     
-    @property
-    def added_dmg(self):
-        return 0
-    
-    @property
-    def added_spd(self):
-        return 0
-    
-    @property
-    def added_maxhp(self):
-        return 0
-    
-    def any_empty(self) -> bool:
-        if self._any_empty is not None: return self._any_empty
-        for item in self.inventory:
-            if item is None:
-                self._any_empty = True
-                return True
-        self._any_empty = False
-        return False
-        #could be rewritten as any([item is None for item in self.inventory])
-
-    
-    def add_item(self,item:Item) -> bool:
-        '''Returns True if the item that was checked is FULLY picked up, and is safe to remove from the camera'''
-        self._any_empty = None
-        first_empty = None
-        for index, inventory_item in enumerate(self.inventory):
-            if inventory_item is None and first_empty is None:
-                first_empty = index
-            elif item.canStack(inventory_item):
-                inventory_item:Item
-                if inventory_item.count + item.count <= inventory_item.max_stack_count:
-                    inventory_item.count += item.count
-                    item.count = 0
-                    return True
-                elif inventory_item.count < inventory_item.max_stack_count:
-                    #it is guaranteed that item.count will be above 0
-                    to_take = min(inventory_item.max_stack_count-inventory_item.count,item.count)
-                    inventory_item.count += to_take
-                    item.count -= to_take
-                    return False
-
-        if first_empty is not None:
-            #if it has reached here then there is no previously existing item of the same type but there is an empty slot   
-            self.inventory[first_empty] = item
-            return True
-        return False
-    
-
-    def set_item(self,item:Item|None,index:int) -> Item|None:
-        if _DEBUG_ and not isinstance(index,int): raise TypeError('Incorrect argument type')
-        return self.inventory.swap(index,item)
-
-    def place_item(self,item:Item|None,index:int) -> Item|None:
-        '''This is essentially what happens when you left click
-        if the types are the same then the item should try to add itself to the slot, else then it should just call set_item
-        Return value is the item that should be what is left in the players hand after clicking'''
-
-        i_item:Item = self.inventory[index]
-        if item is None:
-            return self.inventory.take(index)
-
-        if  item.canStack(i_item):
-            if i_item.count + item.count <= i_item.max_stack_count:
-                i_item.count += item.count
-                i_item.count = 0
-
-                return None
-            elif i_item.count < i_item.max_stack_count:
-                to_take = min(i_item.max_stack_count-i_item.count,item.count)
-                i_item.count += to_take
-                item.count -= to_take
-                #it is guaranteed that item.count will be above 0 (if my maths are correct)
+    def setItem(self,item: Optional[ "Item"],index:int):
+        '''
+        The implementation should prioritize combining the items, if that doesn't work it will swap them
+        Should return item that is left over or None if nothing is left over
+        '''
+        assert isinstance(item,(Item,type(None)))
+        #check if new item passes slot restrictions
+        if index in self.slot_restrictions:
+            if not self.slot_restrictions[index](item): #type: ignore
+                #test failed, return early
                 return item
             
-        else:
-            return self.set_item(item,index)
+        # the test is passed or there was no test
+        if item is None: #we can just skip to swapping immediately
+            return self.inventory.swap(index,item)
+        
+        if item.stackCompatible(self.inventory[index]): #if the objects can be combined
+            # here i_item is guaranteed to not be None 
+            i_item = self.inventory[index]
+            if TYPE_CHECKING:
+                assert isinstance(i_item,Item)
 
-    def take_one(self,slot:int):
-        self._any_empty = None #next time any_empty method is called it must recalculate it.
-        #first if there is a count of one then just take the rest, else if more than one take one
-        item = self.inventory[slot]
-        if item is None: return None
-        if item.count == 1:
-            return self.take_stack(slot)
-        else:
-            return item.split()
+            if i_item.count == i_item.max_stack_count:
+                return item
+            to_transfer = min(i_item.max_stack_count - i_item.count,item.count) # we take the smaller value of how much the i_item needs to be full and how much item can give
+            item.count -= to_transfer
+            i_item.count += to_transfer
+            if item.count == 0:
+                return None
+            else: 
+                return item
+        # in all cases where the items arent compatible or if they are the but something went wrong
+        return self.inventory.swap(index,item)
 
-    def take_stack(self,slot) -> object|None:
-        self._any_empty = None #next time any_empty method is called it must recalculate it.
-        #first check if there is anything in that slot
-        return self.inventory.take(slot)
+    def _addItem(self,item: "Item",index:int):
+        '''Does not check if item & i_item are compatible, this should be done beforehand 
+        returns item left over or none'''
+
+        i_item = self.inventory[index]
+        if TYPE_CHECKING:
+            assert isinstance(i_item,Item)
+        if i_item.count == i_item.max_stack_count:
+            return item
+        
+        to_transfer = min(i_item.max_stack_count - i_item.count,item.count) # we take the smaller value of how much the i_item needs to be full and how much item can give
+        item.count -= to_transfer
+        i_item.count += to_transfer
+        if item.count == 0:
+            return None
+        else: 
+            return item
+
+    def checkItem(self,index:int):
+        '''
+           *Run checks on item to make sure that it is valid
+           *Runs slot restriction, Checks item count and removes it accordingly
+           *Assumes that the index is not an empty slot '''
+        item = self.inventory[index]
+        if TYPE_CHECKING: assert isinstance(item,Item)
+        if item.count <= 0:
+            return self.inventory.remove(index)
+        if index in self.slot_restrictions:
+            if not self.slot_restrictions[index](item):
+                return self.inventory.remove(index)
+   
+    def getItem(self,index: int):
+        '''Returns the original reference to the item inside the inventory, relinquishing its own reference to it'''
+        return self.inventory.take(index)
+
+    def slotCompatible(self,item: "Item",index:int):
+        return self.slot_restrictions.get(index,lambda x: True)(item)
+  
+    def fitItem(self,item :Optional["Item"]):
+        empty_slots = []
+        for index, inventory_item in enumerate(self.inventory):
+            inventory_item:Item
+            if inventory_item is None:
+                empty_slots.append(index)
+            elif inventory_item.stackCompatible(item):
+                assert not isinstance(item, type(None)) #for typechecking purposes only! 
+                item = self._addItem(item,index)
+                if item is None:
+                    return None
+
+        del index, inventory_item #type: ignore
+        #if it has reached here then there is no previously existing item of the same type but there are empty slots
+        for slot in empty_slots:
+            if slot in self.slot_restrictions:
+                if self.slot_restrictions[slot](item): #type: ignore
+                    self.inventory[slot] = item
+                    return None
+            else:
+                self.inventory[slot] = item
+                return 
+        return item
+    '''
+    def get_selected(self) -> None:
+        return self.inventory[self.selected]
     
-    def __str__(self):
-        return f"{[str(item) for item in self.inventory]}, len: {self.spaces if self.spaces == len(self.inventory) else 'Error'}"
+    def start_use_selected(self) -> None:
+        item:Item = self.inventory[self.selected]
+        if item is None: return
+        item.startUse(self);  
+        if item.count == 0:
+            self.inventory[self.selected] = None
+
+    def stop_use_selected(self):
+        item:Item = self.inventory[self.selected]
+        if item is None: return
+        item.stopUse(self)
+        if item.count == 0:
+            self.inventory[self.selected] = None
+    
+    def setSelected(self,newSelected:int) -> None:
+        self.stop_use_selected()
+        self.selected = newSelected
+    
+    def pop_selected(self) -> None:
+        return self.inventory.take(self.selected)          
+    '''
+    def seeIndex(self,index:int):
+        return self.inventory[index]
+
+    @property
+    def added_spd(self) -> float:
+        return 0
+
+    @property
+    def added_def(self) -> int:
+        return 0
+    
+    def addRestriction(self,index:int,func:Callable[[Any],bool]):
+        self.slot_restrictions[index] = func
+        return self
+    
+    def addArmourRestrictionsFromDictionary(self,dict:dict[int,tuple[str,...]]):
+        '''Will add it to the end of the slots'''
+        index = self.slot_restrictions.__len__() - dict.__len__()
+        for i,string in enumerate(dict.values(),start = index):
+            self.addRestriction(i,lambda item : item.armour_type == string)
+    def swapIndex(self,index1:int,index2:int) -> None:
+        self.inventory.swapIndices(index1,index2)
+
+
+class Hotbar:
+    def __init__(self,inventory:UniversalInventory,*spaces:int):
+        '''Spaces should be indexes  '''
+        self._inv = inventory
+        self.len = len(spaces)
+        self.spaces = spaces # offers a level of indirection to map hotbar indexes to inventory indexs
+        self.selected:int =  0 # this is a hotbar index
+        self.using_selected:bool = False
+        # helper variables for item use
+
+    def __len__(self) -> int:
+        return self.len
+    
+    def setItem(self,item:Optional["Item"],index:int):
+        '''
+        The implementation should prioritize combining the items, if that doesn't work it will swap them
+        Should return item that is left over or None if nothing is left over
+        '''
+        return self._inv.setItem(item,self.spaces[index])
+
+    def seeIndex(self,hotbarIndex:int):
+        return self._inv.inventory[self.spaces[hotbarIndex]]
+    
+    @property
+    def item_selected(self):
+        return self._inv.inventory[self.spaces[self.selected]]
+
+    def seeSelected(self):
+        return self.seeIndex(self.selected)
+    
+    def start_use_selected(self) -> None:
+        if self.item_selected is None: return
+        self.item_selected.startUse(self._inv);  
+        self.using_selected = True
+        #if self.item_selected.count == 0:
+        #    self._inv.inventory[self.selected] = None
+        #    self.item_selected = None
+        #    self.using_selected = False        
+
+    def during_use_selected(self) -> None:
+        print(self.item_selected,self.using_selected)
+        if self.item_selected is None or not self.using_selected: return
+        self.item_selected.duringUse(self._inv)
+        if self.item_selected.count == 0:
+            self._inv.inventory[self.selected] = None
+            self.using_selected = False
+
+    def stop_use_selected(self):
+        if self.item_selected is None: return
+        self.item_selected.stopUse(self._inv)
+        self.using_selected = False
+        if self.item_selected.count == 0:
+            self._inv.inventory[self.selected] = None
+    
+    def setSelected(self,newSelected:int) -> None:
+        if self.using_selected:
+            self.stop_use_selected()
+        self.selected = newSelected
+        if self.using_selected:
+            self.start_use_selected()
+
+    def getSelected(self):
+        '''Will return the original item while removing it from the hotbar.\n
+        If only using for information then use seeSelected()'''
+        return self._inv.inventory.take(self.spaces[self.selected])          
+
 
 class ArmorInventory:
     def __init__(self,*spaces:str):
@@ -146,7 +236,7 @@ class ArmorInventory:
     def seeIndex(self,index:str):
         return self.inventory[index]
 
-    def set_armour(self,armour:Item|None,body_space:str) -> Item|None:
+    def set_armour(self,armour:Optional['Item'],body_space:str) ->Optional['Item']:
         '''
         Should return the armour that is left in the hand of the player when tried to put on
         First argument is the Armour <Item> that needs to be equipped, and the next is where 
@@ -183,149 +273,3 @@ class ArmorInventory:
     def added_maxhp(self):
         return 0
 
-class HotbarInventory(Inventory):
-    def __init__(self,spaces):
-        super().__init__(spaces)
-        self.selected:int = 0 #should be a number from [0,spaces-1]
-
-    def get_selected(self) -> Item|None:
-        return self.inventory[self.selected]
-    
-    def start_use_selected(self) -> None:
-        item:Item = self.inventory[self.selected]
-        if item is None: return
-        item.startUse(self);  
-        if item.count == 0:
-            self.inventory[self.selected] = None
-
-    def stop_use_selected(self):
-        item:Item = self.inventory[self.selected]
-        if item is None: return
-        item.stopUse(self)
-        if item.count == 0:
-            self.inventory[self.selected] = None
-    
-    def setSelected(self,newSelected:int) -> None:
-        self.stop_use_selected()
-        self.selected = newSelected
-
-
-    
-    def pop_selected(self) -> Item|None:
-        return self.inventory.take(self.selected)
-  
-
-class UniversalInventory:
-    def __init__(self,spaces:int,entity:object):
-        self.spaces = spaces
-        self.inventory:Array[Item] = Array.new(spaces)
-        self.full = False
-        self.entity = entity
-        self.selected:int = -1
-        self.slot_restrictions:dict[int,Callable[[Item|None],bool]] = {} #will store slot indexes that have restrictions via a function that will accept the item and return True only if it fits
-
-
-    def setItem(self,item:Item|None,index:int):
-        '''
-        The implementation should prioritize combining the items, if that doesn't work it will swap them
-        Should return item that is left over
-        '''
-        
-        #check if new item passes slot restrictions
-        if index in self.slot_restrictions:
-            if not self.slot_restrictions[index](item):
-                #test failed, return early
-                return item
-        # the test is passed
-        if item is None: #we can just skip to swapping immediately
-            return self.inventory.swap(index,item)
-        
-        if item.stackCompatible(self.inventory[index]): #if the objects can be combined
-            # here i_item is guaranteed to not be None 
-            i_item = self.inventory[index]
-            if i_item.count == i_item.max_stack_count:
-                return item
-            to_transfer = min(i_item.max_stack_count - i_item.count,item.count) # we take the smaller value of how much the i_item needs to be full and how much item can give
-            item.count -= to_transfer
-            i_item.count += to_transfer
-            if item.count == 0:
-                return None
-            else: 
-                return item
-        # in all cases where the items arent compatible or if they are the but something went wrong
-        return self.inventory.swap(index,item)
-
-    def _addItem(self,item:Item,index:int) -> Item|None:
-        '''Does not check if item & i_item are compatible, this should be done beforehand 
-        returns item left over or none'''
-        i_item = self.inventory[index]
-        if i_item.count == i_item.max_stack_count:
-            return item
-        
-        to_transfer = min(i_item.max_stack_count - i_item.count,item.count) # we take the smaller value of how much the i_item needs to be full and how much item can give
-        item.count -= to_transfer
-        i_item.count += to_transfer
-        if item.count == 0:
-            return None
-        else: 
-            return item
-
-    def checkItem(self,index):
-        '''
-           *Run checks on item to make sure that it is valid
-           *Runs slot restriction, Checks item count and removes it accordingly'''
-        if self.inventory[index].count <= 0:
-            return self.inventory.remove(index)
-        if index in self.slot_restrictions:
-            if not self.slot_restrictions[index](self.inventory[index]):
-                return self.inventory.remove(index)
-
-    def fitItem(self,item:Item|None) -> Item|None:
-        if item is None: return
-        empty_slots = []
-        for index, inventory_item in enumerate(self.inventory):
-            if inventory_item is None:
-                empty_slots.append(index)
-            elif item.stackCompatible(inventory_item):
-                item = self._addItem(item,index)
-                if item is None:
-                    return None
-        index,inventory_item = None,None # to remove the possibility that they could be unbound
-        del index, inventory_item
-        #if it has reached here then there is no previously existing item of the same type but there are empty slots
-        for slot in empty_slots:
-            if slot in self.slot_restrictions:
-                if self.slot_restrictions[slot](item):
-                    self.inventory[slot] = item
-                    return None
-                    
-        return None
-    def get_selected(self) -> Item|None:
-        return self.inventory[self.selected]
-    
-    def start_use_selected(self) -> None:
-        item:Item = self.inventory[self.selected]
-        if item is None: return
-        item.startUse(self.inventory);  
-        if item.count == 0:
-            self.inventory[self.selected] = None
-
-    def stop_use_selected(self):
-        item:Item = self.inventory[self.selected]
-        if item is None: return
-        item.stopUse(self.inventory)
-        if item.count == 0:
-            self.inventory[self.selected] = None
-    
-    def setSelected(self,newSelected:int) -> None:
-        self.stop_use_selected()
-        self.selected = newSelected
-    
-    def pop_selected(self) -> Item|None:
-        return self.inventory.take(self.selected)     
-        
-if __name__ == '__main__':
-    inv1 = Inventory(10)
-    
-
-    print(inv1)

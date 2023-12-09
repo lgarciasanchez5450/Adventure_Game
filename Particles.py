@@ -58,7 +58,7 @@ def after_spawn(pos:game_math.Vector2,vel,surf,time:float|int,offset = (0,0),has
 
 def spawn_hit_particles(pos:game_math.Vector2,time:float,amount:int = 5):
     for x in range(amount):
-        spawn(pos+game_math.Vector2.random/10,game_math.Vector2.random,Textures.texture['death.png'],time,(0,0),True)
+        spawn(pos+game_math.Vector2.random/10,game_math.Vector2.random,Textures.particles_opaque['death'],time,(0,0),True)
 
 def update_list(myList:list):
     to_remove = []

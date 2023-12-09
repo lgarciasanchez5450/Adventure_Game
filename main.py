@@ -1,9 +1,10 @@
 
-import gc 
-gc.disable()
+#import gc 
+#gc.disable()
 from Constants.Display import *
 from Constants.Misc import *
 import Constants
+
 import pygame
 
 import Camera
@@ -42,11 +43,11 @@ def onGameStart():
     debug.init(screen)
     Music.start()
     Camera.set_mouse_assist(False)
-    player = general_manager.Player((0,0))
+    player = general_manager.Player(Vector2(0,0))
     general_manager.spawn_entity(player)
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,0),general_manager.DivineBow()))
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(-2,0),general_manager.Bow()))
-    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),general_manager.ItemArrowExplosive().setCount(64)))
+    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),general_manager.ItemArrow().setCount(64)))
     Camera.set_focus(player.pos)
     Camera.set_mouse_pull_strength(13)
     #Events.call_OnResize(WINDOW_WIDTH,WINDOW_HEIGHT)
@@ -57,9 +58,9 @@ def onGameStart():
     Camera.resize_screen(WINDOW_WIDTH,WINDOW_HEIGHT)
     #pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT),pygame.OPENGL| pygame.DOUBLEBUF|pygame.RESIZABLE) # can be Resizable with no problems
 # can be set outside of the game loop
-t = gc.collect()
-print(t)
-del t
+#t = gc.collect()
+#print(t)
+#del t
 while True:
     if Settings.game_state is RUNNING:
         #update each module in order
@@ -117,10 +118,7 @@ while True:
                 if not Textures.done_loading:
                     Main_Menu.lt.setText(Textures.current_load_name.removeprefix(GAME_PATH))
                     Main_Menu.lb.setDone(Textures.loaded_counter)
-                    
-
                     Textures.ready_for_next = True
-
                 else: 
                     if Textures.loaded_counter:
                         print('changing to generation')
@@ -129,7 +127,7 @@ while True:
                         Main_Menu.lt.setText('')
                         Textures.loaded_counter = 0
                     chunks_finished, _ = next(gen) #type: ignore
-                    print(chunks_finished)
+                    #print(chunks_finished)
                     Main_Menu.lb.setDone(chunks_finished) 
                 Main_Menu.update()
             except StopIteration:

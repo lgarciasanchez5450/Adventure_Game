@@ -11,7 +11,6 @@ if __name__ == '__main__':
     import pygame
     display = pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT),pygame.OPENGL| pygame.DOUBLEBUF|pygame.RESIZABLE) # can be Resizable with no problems
     screen = pygame.Surface((WIDTH,HEIGHT))
-    Textures.init()
     import Camera
     Camera.init(screen)                                     
 from Errors import GenerationError
@@ -29,6 +28,7 @@ import Particles
 from Inventory import ArmorInventory
 from UI_Elements import ItemSlot
 from Constants import EntityEffects
+from Inventory import UniversalInventory, Hotbar
 dead_entities = []
 
 
@@ -49,220 +49,12 @@ class Appearance:
         self.shape = shape
         self.species = species
 
-    def looks_like(self,other,tolerance): 
+    def looks_like(self,other:"Appearance",tolerance:float): 
         '''A very simple model function to tell what others would look like in the future'''
-        assert isinstance(other,Appearance)
         return abs(other.color - self.color) < tolerance and abs(other.size - self.size) < tolerance and abs(other.size - self.size) < tolerance
 
     def copy(self):
         return Appearance(self.color,self.size,self.shape,self.species)
-
-class UniversalInventory:
-    def __init__(self,spaces:int,entity):
-        self.spaces = spaces
-        self.inventory:Array[Item] = Array.new(spaces)
-        self.full = False
-        self.entity:AliveEntity = entity
-        self.selected:int = -1
-        self.slot_restrictions:dict[int,Callable[[Item],bool]] = {} #will store slot indexes that have restrictions via a function that will accept the item and return True only if it fits
-
-    def setItem(self,item: Union[ "Item" , None],index:int):
-        '''
-        The implementation should prioritize combining the items, if that doesn't work it will swap them
-        Should return item that is left over or None if nothing is left over
-        '''
-        assert isinstance(item,(Item,type(None)))
-        #check if new item passes slot restrictions
-        if index in self.slot_restrictions:
-            if not self.slot_restrictions[index](item): #type: ignore
-                #test failed, return early
-                return item
-            
-        # the test is passed or there was no test
-        if item is None: #we can just skip to swapping immediately
-            return self.inventory.swap(index,item)
-        
-        if item.stackCompatible(self.inventory[index]): #if the objects can be combined
-            # here i_item is guaranteed to not be None 
-            i_item = self.inventory[index]
-            if i_item.count == i_item.max_stack_count:
-                return item
-            to_transfer = min(i_item.max_stack_count - i_item.count,item.count) # we take the smaller value of how much the i_item needs to be full and how much item can give
-            item.count -= to_transfer
-            i_item.count += to_transfer
-            if item.count == 0:
-                return None
-            else: 
-                return item
-        # in all cases where the items arent compatible or if they are the but something went wrong
-        return self.inventory.swap(index,item)
-
-    def _addItem(self,item: "Item",index:int):
-        '''Does not check if item & i_item are compatible, this should be done beforehand 
-        returns item left over or none'''
-        assert isinstance(item,Item)
-
-        i_item = self.inventory[index]
-        if i_item.count == i_item.max_stack_count:
-            return item
-        
-        to_transfer = min(i_item.max_stack_count - i_item.count,item.count) # we take the smaller value of how much the i_item needs to be full and how much item can give
-        item.count -= to_transfer
-        i_item.count += to_transfer
-        if item.count == 0:
-            return None
-        else: 
-            return item
-
-    def checkItem(self,index:int):
-        '''
-           *Run checks on item to make sure that it is valid
-           *Runs slot restriction, Checks item count and removes it accordingly'''
-        if self.inventory[index].count <= 0:
-            return self.inventory.remove(index)
-        if index in self.slot_restrictions:
-            if not self.slot_restrictions[index](self.inventory[index]):
-                return self.inventory.remove(index)
-   
-    def getItem(self,index: int):
-        '''Returns the original reference to the item inside the inventory, relinquishing its own reference to it'''
-        return self.inventory.take(index)
-
-    def slotCompatible(self,item,index):
-        return self.slot_restrictions.get(index,lambda x: True)(item)
-  
-    def fitItem(self,item :Union["Item" , None]):
-        empty_slots = []
-        for index, inventory_item in enumerate(self.inventory):
-            inventory_item:Item
-            if inventory_item is None:
-                empty_slots.append(index)
-            elif inventory_item.stackCompatible(item):
-                assert not isinstance(item, type(None)) #for typechecking purposes only! 
-                item = self._addItem(item,index)
-                if item is None:
-                    return None
-
-        del index, inventory_item #type: ignore
-        #if it has reached here then there is no previously existing item of the same type but there are empty slots
-        for slot in empty_slots:
-            if slot in self.slot_restrictions:
-                if self.slot_restrictions[slot](item): #type: ignore
-                    self.inventory[slot] = item
-                    return None
-            else:
-                self.inventory[slot] = item
-                return 
-        return item
-    '''
-    def get_selected(self) -> None:
-        return self.inventory[self.selected]
-    
-    def start_use_selected(self) -> None:
-        item:Item = self.inventory[self.selected]
-        if item is None: return
-        item.startUse(self);  
-        if item.count == 0:
-            self.inventory[self.selected] = None
-
-    def stop_use_selected(self):
-        item:Item = self.inventory[self.selected]
-        if item is None: return
-        item.stopUse(self)
-        if item.count == 0:
-            self.inventory[self.selected] = None
-    
-    def setSelected(self,newSelected:int) -> None:
-        self.stop_use_selected()
-        self.selected = newSelected
-    
-    def pop_selected(self) -> None:
-        return self.inventory.take(self.selected)          
-    '''
-    def seeIndex(self,index:int):
-        return self.inventory[index]
-
-    @property
-    def added_spd(self) -> float:
-        return 0
-
-    @property
-    def added_def(self) -> int:
-        return 0
-    
-    def addRestriction(self,index:int,func:Callable[[Any],bool]):
-        self.slot_restrictions[index] = func
-        return self
-    
-    def addArmourRestrictionsFromDictionary(self,dict:dict[int,tuple[str,...]]):
-        '''Will add it to the end of the slots'''
-        index = self.slot_restrictions.__len__() - dict.__len__()
-        for i,string in enumerate(dict.values(),start = index):
-            self.addRestriction(i,lambda item : item.armour_type == string)
-    def swapIndex(self,index1:int,index2:int) -> None:
-        self.inventory.swapIndices(index1,index2)
-class Hotbar:
-    def __init__(self,inventory:UniversalInventory,*spaces:int):
-        '''Spaces should be indexes  '''
-        self._inv = inventory
-        self.len = len(spaces)
-        self.spaces = spaces # offers a level of indirection to map hotbar indexes to inventory indexs
-        self.selected:int =  0 # this is a hotbar index
-
-        # helper variables for item use
-        self.item_selected:Item|None = None
-        self.item_selected_in_use:bool = False
-
-    def __len__(self) -> int:
-        return self.len
-    
-    def setItem(self,item:Union["Item" , None],index:int):
-        '''
-        The implementation should prioritize combining the items, if that doesn't work it will swap them
-        Should return item that is left over or None if nothing is left over
-        '''
-        return self._inv.setItem(item,self.spaces[index])
-
-    def seeIndex(self,hotbarIndex:int):
-        return self._inv.inventory[self.spaces[hotbarIndex]]
-
-    def seeSelected(self):
-        return self.seeIndex(self.selected)
-    
-    def start_use_selected(self) -> None:
-        if self.item_selected is None: return
-        self.item_selected.startUse(self._inv);  
-        if self.item_selected.count == 0:
-            self._inv.inventory[self.selected] = None
-            self.item_selected = None
-            self.item_selected_in_use = True
-        
-    def during_use_selected(self) -> None:
-        if self.item_selected is None or not self.item_selected_in_use: return
-        self.item_selected.duringUse(self._inv)
-        if self.item_selected.count == 0:
-            self._inv.inventory[self.selected] = None
-            self.item_selected = None
-
-    def stop_use_selected(self):
-        if self.item_selected is None: return
-        self.item_selected.stopUse(self._inv)
-        if self.item_selected.count == 0:
-            self._inv.inventory[self.selected] = None
-            self.item_selected  = None
-            self.item_selected_in_use = False
-    
-    def setSelected(self,newSelected:int) -> None:
-        if self.item_selected is not None:
-            self.stop_use_selected()
-        self.selected = newSelected
-        self.item_selected = self.seeSelected()
-        self.item_selected_in_use = False
-
-    def getSelected(self):
-        '''Will return the original item while removing it from the hotbar.\n
-        If only using for information then use seeSelected()'''
-        return self._inv.inventory.take(self.spaces[self.selected])          
 
 #### ITEM STATS ####
 class ArmourStats:
@@ -288,11 +80,13 @@ class DurabilityStats:
 
 #### ITEMS ####
 class Item:
+    bow_shootable = False #if this is true then there MUST be a instance variable named <projectile> which can be instantiated to make an entity
+    crossbow_shootable = False
     def setCount(self,count:int):
         assert count <= self.max_stack_count
         self.count = count
         return self
-
+    
     __slots__ = 'tag', 'name',  'count', 'durability_stats', 'armour_stats', 'damage', 'mining_speed', 'fps', 'animation','frames','inventory'
     def __init__(self,tag:str,frames:tuple[Surface,...]|None = None):
         self.tag = tag #all the same types of items should have the same tag
@@ -308,8 +102,6 @@ class Item:
         else:
             self.frames:tuple[pygame.Surface,...]  = Textures.items.get(self.tag,(Textures.NULL,))# at most 60 frames 
         self.inventory:UniversalInventory
-
-        #self.path = f'{Textures.PATH()}Images\\items\\{name}' #shouldn't need this actually
         self.animation = Animation.SimpleAnimation(Camera.CSurface(self.frames[0],Vector2.zero,(0,0)),self.fps,self.frames)
 
     @property
@@ -400,38 +192,51 @@ class BunnyEgg(Item):
         spawn_entity(Bunny(Camera.world_position_from_normalized(Input.m_pos_normalized)))
 
 class ItemArrow(Item):
-    __slots__ = 'arrow'
+    bow_shootable = True
+    __slots__ = 'projectile'
     def __init__(self):
         super().__init__(ITAG_ARROW)
-        self.arrow = Arrow
+        self.projectile = Arrow
     
 class ItemArrowExplosive(Item):
-    __slots__ = 'arrow'
+    bow_shootable = True
+    __slots__ = 'projectile'
     def __init__(self):
         super().__init__(ITAG_ARROW_EXPLOSIVE)
-        self.arrow = ArrowExplosive
+        self.projectile = ArrowExplosive
 
 class BowBase(Item):
-    __slots__ = 'springyness','startTime','loadStage','max_pull_time','loaded_item'
+    __slots__ = 'springyness','startTime','loadStage','max_pull_time','loaded_item','min_draw_time'
     def __init__(self,item_tag:str):
         super().__init__(item_tag)
         self.loadStage = 0.0
-        self.startTime:float|None
+        self.startTime:float|None = None
         self.startTime = None
         self.springyness:float = 7.0 # used to calculate arrow speed
+        self.min_draw_time = 0.5 # this is the minimum amount of time required so that the arrow in the inventory actually be consumbed
         self.max_pull_time = 5.0 #the maximum amount of time held down that should be counted towards the bow fire
         self.loaded_item:type[Arrow]|None = None
+        
     
-    def startUse(self,inventory):
-        assert isinstance(inventory,UniversalInventory)
+    def startUse(self,inventory: UniversalInventory):
         for i,item in enumerate(inventory.inventory):
-            if hasattr(item,'arrow'):
+
+            item:ItemArrow
+            if item is not None and item.bow_shootable:
                 self.startTime = Time.time
-                self.loaded_item = item.arrow
+                return
+        self.startTime = None
+
+    def duringUse(self, inventory: UniversalInventory) -> None:
+        print('during use@')
+        if self.startTime is None or self.loaded_item is not None: return
+        if Time.time - self.startTime < self.min_draw_time: return
+        for i,item in enumerate(inventory.inventory):
+            if item is not None and item.bow_shootable:
                 item:ItemArrow
+                self.loaded_item = item.projectile
                 item.count -= 1
                 return inventory.checkItem(i)  # return None
-        self.startTime = None
     
     def stopUse(self,inventory) -> None:
         if self.startTime is None or self.loaded_item is None: return
@@ -480,111 +285,135 @@ class DivineBow(BowBase):
 
     def getArrowInstability(self, t: float) -> float:
         return 0.0
+
+class GameObject:
+    '''This class is the base class of which every single diagetic object in the game MUST derive from.'''
+    __slots__ = 'pos','dead','csurface','typeid'
+    def __init__(self,pos:Vector2,typeid:str) -> None:
+        self.pos = pos
+        self.dead = False
+        self.typeid = intern(typeid)
+        self.csurface:CSurface
+
+    def update(self): ...
+
+    def take_damage(self,damage:int,type:str,appearance:Appearance|None = None): ...
+
+    def onLoad(self):
+        Camera.add(self.csurface)
+
+    def onLeave(self):
+        Camera.remove(self.csurface)
+
+    def onDeath(self):
+        '''Returns whether this is a true or false death
+        A false death happens when an object gets killed multiple times in one frame
+         and onDeath gets called multiple times. 
+        After the first call to onDeath
+         all other calls are considered false deaths '''
+        if self.dead: return False
+        self.onLeave()
+        self.dead = True
+        return True
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__} : {self.typeid}"
+
 #### BLOCKS ####
-class Block:
+class Block(GameObject):
+    tex_name = 'null'
+    anim_fps = 0
     @staticmethod
     def spawnable_on(ground):
       return True
-    __slots__ = 'collider','pos','type','tags','blast_resistance','hardness','surf_offset','surf','dead','csurface'
-    def __init__(self,pos,type):
-        hb = Settings.HITBOX_SIZE[type]
-        self.collider = Collider.SpawnOnBlockCenter(*pos,*hb)
-        self.pos = Vector2(*self.collider.center) #hp -> huan pablo
-        self.type:str = type
+    __slots__ = 'collider','tags','blast_resistance','hardness','animation'
+    def __init__(self,pos: Vector2Int,typeid:str):
+        hb = Settings.HITBOX_SIZE[typeid]
+        self.collider = Collider.SpawnOnBlockCenter(pos.x,pos.y,hb[0],hb[1])
+        super().__init__(Vector2(*self.collider.center),typeid)#hp -> huan pablo
         self.tags = set()
         self.blast_resistance = 0 
         self.hardness = 1
-        self.surf_offset = Settings.SURFACE_OFFSET[type]
-        self.surf = Surface((0,0))
+        self.animation = Animation.SimpleAnimation(self.csurface,self.anim_fps,Textures.blocks[self.tex_name])
         self.dead = False
+        self.csurface.offset = Settings.SURFACE_OFFSET[typeid]
 
-        self.csurface = CSurface(self.surf, self.pos, self.surf_offset)      
-
-    def take_damage(self,damage:int,type:str,entity = None):
+    def take_damage(self,damage:int,type:str,appearance:Appearance|None = None):
         if type is EXPLOSION_DAMAGE:
             if damage > self.blast_resistance:
                 self.onDeath()
         elif type is PHYSICAL_DAMAGE:
             pass 
 
-    def onLoad(self) -> None: 
-        Camera.add(self.csurface)
-
-    def onLeave(self) -> None: 
-        Camera.remove(self.csurface)
-
     def onDeath(self):
-        if self.dead:return
-        chunk = chunks[(self.pos//CHUNK_SIZE).tuple]
-        chunk.dead_blocks.append(self)
-        self.dead = True
-        self.onLeave()
+        if super().onDeath():
+            chunk = chunks[(self.pos//CHUNK_SIZE).tuple]
+            chunk.dead_blocks.append(self)
+            return True
+        return False
 
-    def update(self) -> None: ...
+    def update(self):
+        self.animation.animate()
 
 class Tree(Block):
-    oak_frames_directory = '03.png'
-    oak_fps = 0
+    tex_name = '03.png'
+    anim_fps = 0
 
     @staticmethod
     def spawnable_on(ground:Ground) -> bool:
         return ground.name is GROUND_DIRT
     #this class is an "obstacle" 
-    __slots__ = 'surf','animation'
-    def __init__(self,pos,ground:Ground):
+    def __init__(self,pos:Vector2Int,ground:Ground):
         assert Tree.spawnable_on(ground), f"Tree was spawned on illegal block: {ground}"
         super().__init__(pos,'tree')
-        self.animation = Animation.SimpleAnimation(self.csurface,self.oak_fps,Textures.blocks[self.oak_frames_directory])
-        self.surf = self.csurface.surf = self.animation.frames[0]
-        self.csurface.surf = self.surf
         self.blast_resistance = 10
         
-    def update(self):
-        self.animation.animate()
 
 class TNT(Block):
     @staticmethod
     def spawnable_on(ground:Ground):
         return ground.name is GROUND_DIRT
     __slots__ = 'timer','energy'
-    def __init__(self, pos):
+    def __init__(self, pos:Vector2Int):
         super().__init__(pos, 'tnt')
         self.blast_resistance = 10
-        self.surf = Textures.tnt[0]
-        self.csurface.surf = self.surf
-        self.timer = 4
+        self.csurface.surf =Textures.tnt[0]
+        self.timer = 4.0
         self.energy = 15
 
     def take_damage(self, damage: int, type: str,entity = None):
         if self.dead:return
-        if type is FIRE_DAMAGE:
+        if type is FIRE_DAMAGE or type is EXPLOSION_DAMAGE:
             self.onDeath()
             return
-
         return super().take_damage(damage, type,entity)
 
     def onDeath(self):
-        spawn_entity(LiveTNT(self.pos,4.0,15))
-        return super().onDeath()
+        if super().onDeath():
+            spawn_entity(LiveTNT(self.pos,4.0,15))
+            return True
+        return False
 
 class WoodenPlank(Block):
+    tex_name = 'tree'
+    anim_fps = 0
     @staticmethod
     def spawnable_on(ground:Ground):
         return ground.is_solid
-    
-    def __init__(self,pos:Vector2):
+    __slots__ = ()
+    def __init__(self,pos:Vector2Int):
         super().__init__(pos,'woodenplank')
-        self.surf = Textures.texture['15.png']
-        self.csurface.surf = self.surf
+        surf = Textures.blocks[self.tex_name][0]
+        self.csurface.surf = surf
 
 #### ENTITIES ####
-class Entity:
-    __slots__ = 'pos','vel','species','image','collider','animation','speed','appearance','dead'
-    def __init__(self,pos,species):
-        self.pos = Vector2(*pos)
+class Entity(GameObject):
+    __slots__ = 'vel','image','collider','animation','speed','appearance','dead'
+    def __init__(self,pos:Vector2,species:str):
+        super().__init__(pos,species)
         self.vel = Vector2.zero
         species = intern(species) # use intern to keep memory usage down and also be able to use "is" when compating entities
-        self.species = species
+        self.typeid = species
         self.image = CSurface(Textures.NULL,self.pos,Settings.SURFACE_OFFSET[species])
         self.collider = Collider(0,0,*Settings.HITBOX_SIZE[species])
         self.collider.setCenter(*self.pos)
@@ -623,9 +452,7 @@ class Entity:
         assert isinstance(entity,(Entity,Block))
         entity.take_damage(self.get_attack_damage(),self.get_attack_type(),self.appearance)
     
-    def attack_custom_damage(self,entity,damage:int):
-        assert isinstance(entity,(Entity,Block))
-        assert isinstance(damage,int)
+    def attack_custom_damage(self,entity: Union["Entity" , Block],damage:int):
         entity.take_damage(damage,self.get_attack_type(),self.appearance)
 
     def take_damage(self,damage:int,type:str,appearance:Appearance|None = None):
@@ -637,7 +464,7 @@ class Entity:
         return PHYSICAL_DAMAGE
     
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}: {self.species}"
+        return f"{self.__class__.__name__}: {self.typeid}"
 
 class ItemWrapper(Entity):
     def __init__(self,pos,item:Item):
@@ -685,7 +512,7 @@ class LiveTNT(Entity):
             Particles.spawn_animated(get_tnt_animation(self.pos+Vector2.randdir/3,38+x),False,0)
         damage_function = self.damage_func_getter(self.energy)
         for entity in collide_entities(c):
-            if entity.species == 'tnt': continue #tnt in entity form will be immune to other exploding tnt
+            if entity.typeid == 'tnt': continue #tnt in entity form will be immune to other exploding tnt
             entity.take_damage(damage_function((self.pos - entity.pos).magnitude()),self.get_attack_type(),None)   
         for block in collide_blocks(c):
             block.take_damage(damage_function((self.pos-block.pos).magnitude()),self.get_attack_type(),None)     
@@ -697,7 +524,7 @@ class LiveTNT(Entity):
         self.timer -= Time.deltaTime
         self.particle_timer -= Time.deltaTime
         while self.particle_timer <= 0:
-            Particles.after_spawn(self.pos+self.particle_emit,Vector2.randdir*1.5,Textures.texture['grey.png'],1,(-4,-4),True,slows_coef=1)
+            Particles.after_spawn(self.pos+self.particle_emit,Vector2.randdir*1.5,Textures.particles_opaque['grey'],1,(-4,-4),True,slows_coef=1)
             self.particle_timer += .15
         if self.timer <= 0:
             self.onDeath()
@@ -712,9 +539,9 @@ class Arrow(Entity):
         angle = -velocity.get_angle() 
         if shooter: 
             velocity += shooter.vel # add the shooters velocity to our own because its relative to the shooters vel in real life
-        tex = Textures.rotate(Textures.texture['entity_arrow.png'],angle * 180 / pi)
-        self.animation.add_state('going',0,(tex,),(Textures.texture['entity_arrow.png'],))
-        self.image.offset = (-tex.get_width()/2,-tex.get_height()/2)
+        tex = Textures.rotate(Textures.entity_arrow,angle * 180 / pi)
+        self.animation.add_state('going',0,(tex,),(Textures.entity_arrow,))
+        self.image.offset = (-tex.get_width()//2,-tex.get_height()//2)
         self.animation.set_state('going')
         self.vel = velocity.copy()
         self.time_til_death = 10 #seconds
@@ -750,7 +577,7 @@ class Arrow(Entity):
         if self.blocks_traveled >= self.blocks_to_travel:
             self.stopped = True
         for entity in collide_entities(self.collider):
-            if entity.species in {'arrow','item'}: continue
+            if entity.typeid in {'arrow','item'}: continue
             self.onDeath()
             self.attack(entity)
             break
@@ -792,7 +619,7 @@ class ArrowExplosive(Arrow):
             E = 2.718281828
             return (self.energy * E ** (-dist)).__trunc__()
         for entity in collide_entities(c):
-            if entity.species == 'tnt':continue #tnt in entity form will be immune to other exploding tnt
+            if entity.typeid == 'tnt':continue #tnt in entity form will be immune to other exploding tnt
             self.attack_custom_damage(entity,damage_from_dist((self.pos - entity.pos).magnitude()))
         for block in collide_blocks(c):
             self.attack_custom_damage(block,damage_from_dist((self.pos - block.pos).magnitude()))
@@ -956,7 +783,7 @@ class AliveEntity(Entity):
         return self.inventory.inventory[0]
 
     def depleteEnergy(self,action):
-        assert action in self.actions, f'{self.species} has tried to do actions: {action}, which is not in its list of actions!'
+        assert action in self.actions, f'{self.typeid} has tried to do actions: {action}, which is not in its list of actions!'
         self.energy -= Settings.ACTION_ENERGY_CONSUMPTION[action]
         if self.energy < 0:
             self.take_damage(-self.energy,INTERNAL_DAMAGE,None)
@@ -964,7 +791,7 @@ class AliveEntity(Entity):
         
     def canDoAction(self,action):
         '''Returns if self HAS ENOUGH ENERGY to do the action, keep in mind that the action can still be taken if this returns False, just with consequences...'''
-        assert action in self.actions,  f'{self.species} has tried to do actions: {action}, which is not in its list of actions!'
+        assert action in self.actions,  f'{self.typeid} has tried to do actions: {action}, which is not in its list of actions!'
         return self.energy >= Settings.ACTION_ENERGY_CONSUMPTION[action]
 
     def get_entities_seen(self):
@@ -975,7 +802,7 @@ class AliveEntity(Entity):
     def onDeath(self):
         super().onDeath()
         for i in range(10):
-            Particles.spawn(self.pos + Vector2.random/5,Vector2.random/2,Textures.texture['white.png'],1,slows_coef=0)
+            Particles.spawn(self.pos + Vector2.random/5,Vector2.random/2,Textures.particles_opaque['white'],1,slows_coef=0)
         Particles.spawn(self.pos.copy(),Vector2.zero,self.animation.surf.copy(),1,self.image.offset,False,False)
 
     def set_state(self,number:int):
@@ -1083,7 +910,7 @@ class AliveEntity(Entity):
 
 class Player(AliveEntity):
     __slots__ = 'cx','cy','can_move','attacking','state','showingInventory','hotbar','ui','hbui','walking_particle'
-    def __init__(self,pos):
+    def __init__(self,pos:Vector2):
         super().__init__(pos,'human')
 
         self.cx = (self.pos.x//CHUNK_SIZE).__floor__()
@@ -1110,15 +937,14 @@ class Player(AliveEntity):
         self.direction = 'right'
 
     def set_up_animation(self):
-        player_animations = Textures.load_entity_anim('player')
-        walk_right = player_animations['walk']
+        walk_right = Textures.player_walk
         walk_left = Textures.flipXArray(walk_right)
-        idle_right = player_animations['idle']
+        idle_right = Textures.player_idle
         idle_left = Textures.flipXArray(idle_right)
-        attack_right = player_animations['idle']
+        attack_right = Textures.player_attack
         attack_left = Textures.flipXArray(attack_right)
 
-        self.walking_particle = Textures.texture['dirt_particle.png']
+        self.walking_particle = Textures.particles_opaque['dirt_particle']
         self.animation.add_state('walk',4,walk_right,walk_left)
         self.animation.add_state('idle',1.2,idle_right,idle_left)
         self.animation.add_state('attack',5,attack_right,attack_left)
@@ -1154,10 +980,8 @@ class Player(AliveEntity):
                 #self.vel.reset() # I dont know what this is for but i m   
                 showingUIs.append(self.ui) 
             else:
-                showingUIs.append(Null) 
-                if self.ui.in_hand is not None:
-                    drop_item(self.ui.in_hand,self.pos,Input.m_pos_normalized)
-                    self.ui.in_hand = None
+                self.ui.close() #this also takes care of putting back the null ui
+            
         if self.showingInventory:return
 
         if 'r' in Input.KDQueue:
@@ -1174,7 +998,7 @@ class Player(AliveEntity):
                 velocity = Vector2.randdir
             spawn_entity(ArrowInciendiary(self.pos + velocity/2,velocity*3,self))
         if Input.space_d:
-            drop_item(BunnyEgg(),self.pos,Vector2.randdir)
+            spawn_item(BunnyEgg(),self.pos,Vector2.randdir)
         if self.animation.state != 'attack':
             x,y=  set_mag(Input.d-Input.a,Input.s-Input.w,self.getTotalSpeed() * self.ground.surface_friction)
             self.accelerate(x,y)
@@ -1201,8 +1025,9 @@ class Player(AliveEntity):
             self.hotbar.start_use_selected()
         elif Input.m_u3:
             self.hotbar.stop_use_selected()
-        elif Input.m_3: pass
-            #self.hotbar.during_use_selected()
+        elif Input.m_3:
+            print()
+            self.hotbar.during_use_selected()
 
     def move(self):
         super().update() 
@@ -1266,10 +1091,10 @@ class Spirit(AliveEntity):
 
     neutral_to = set()
     def __init__(self,pos):
-        self.right_idle,self.left_idle = Textures.import_folder('Images/enemies/spirit/idle',True,(32,32),True)
-
+        idle =  Textures.entities['spirit']['idle'] # type: ignore
+        assert isinstance(idle,tuple)
         super().__init__(pos,'spirit')
-        self.animation.add_state('idle',8,self.right_idle,self.left_idle)        
+        self.animation.add_state('idle',8,idle,idle)        
         self.animation.set_state('idle')
         self.vision_collider = Collider(0,0,Settings.VISION_BY_SPECIES['spirit']*2,Settings.VISION_BY_SPECIES['spirit']*2)
         self.vision_squared = Settings.VISION_BY_SPECIES['spirit'] ** 2
@@ -1281,7 +1106,7 @@ class Spirit(AliveEntity):
         self.time_to_introspection = 5
         #Set up animation
         for state in self.states:
-            self.animation.add_state(state,8,self.right_idle,self.left_idle)
+            self.animation.add_state(state,8,idle,idle)
 
     def set_state(self,number:int):
         if super().set_state(number) is False: return
@@ -1295,14 +1120,14 @@ class Spirit(AliveEntity):
 
         for entity in entities_seen:
             entity:Entity
-            if entity.species in self.fears:
+            if entity.typeid in self.fears:
                 self.set_state(3)
                 self.fear_producer = entity
                 return 
         self.closest_enemy = None
         closest_distance_squared = POSITIVE_INFINITY
         for entity in entities_seen:
-            if entity.species in self.enemies:
+            if entity.typeid in self.enemies:
                 dist_squared = (self.pos - entity.pos).magnitude_squared()
                 if dist_squared < closest_distance_squared:
                     closest_distance_squared = dist_squared
@@ -1354,11 +1179,12 @@ class Bunny(AliveEntity):
     #__slots__ = 'right_idle','left_idle','fears','eats','enemies','driver','mark','hunger','sprinting','states'
     def __init__(self,pos):
         super().__init__(pos,'bunny')
-        self.right_idle,self.left_idle = Textures.import_folder('Images/Entities/bamboo/idle',True,(32,32),True)
+        idle = tuple(Textures.entities['bamboo']['idle'].values()) #type: ignore
+
         self.fears = self.fears.copy()
         self.eats = self.eats.copy()
         self.enemies = self.enemies.copy()
-        self.animation.add_state('idle',8,self.right_idle,self.left_idle)        
+        self.animation.add_state('idle',8,idle,idle)        
         self.animation.set_state('idle')
         self.vision_collider = Collider(0,0,Settings.VISION_BY_SPECIES['bunny']*2,Settings.VISION_BY_SPECIES['bunny']*2)
         self.vision_squared = Settings.VISION_BY_SPECIES['bunny'] ** 2
@@ -1368,16 +1194,17 @@ class Bunny(AliveEntity):
         self.timer_to_vision = 1
         self.states = ['idle','wander','afraid','hungry']
         for state in self.states:
-            self.animation.add_state(state,8,self.right_idle,self.left_idle)
+            self.animation.add_state(state,8,idle,idle)
         self.state = self.states[0]
         self.mark:Entity|None = None
+
         self.hunger = 0
         self.sprinting = False
 
     def get_closest_enemy(self):
         closest:Entity|None = None
         for entity in collide_entities(self.vision_collider):
-            if entity.species in Spirit.enemies:
+            if entity.typeid in Spirit.enemies:
                 if closest is None or (closest.pos - self.pos).magnitude_squared() > (entity.pos - self.pos).magnitude_squared():
                     closest = entity 
         return closest 
@@ -1395,7 +1222,7 @@ class Bunny(AliveEntity):
         entities_seen = list(self.get_entities_seen())
         for entity in entities_seen:
             entity:Entity
-            if entity.species in self.fears:
+            if entity.typeid in self.fears:
                 print('sees something that it is scared of')
                 self.driver.mode = Driver.AVOID
                 self.driver.setTarget(entity.pos)
@@ -1404,7 +1231,7 @@ class Bunny(AliveEntity):
                 return   
         if self.hunger > 180:
             for entity in entities_seen:
-                if entity.species in self.eats:
+                if entity.typeid in self.eats:
                     self.set_state(3)
                     self.driver.mode = Driver.FOLLOW
                     self.driver.setTarget(entity.pos)
@@ -1643,7 +1470,7 @@ class InventoryUI(UI):
 
         else:
             if Input.m_d1 and self.in_hand is not None:
-                drop_item(self.in_hand,self.entity.pos,Input.m_pos_normalized*2)
+                spawn_item(self.in_hand,self.entity.pos.copy(),Input.m_pos_normalized*2)
                 self.in_hand = None
 
     def draw(self):
@@ -1661,17 +1488,24 @@ class InventoryUI(UI):
                 item_count = self.font.render(str(self.in_hand.count),False,'white')
                 self.surface.blit(item_count,(in_hand_pos[0] + ITEM_SIZE-item_count.get_width(),in_hand_pos[1] + ITEM_SIZE-item_count.get_height()))
 
-        entity = pygame.transform.scale_by(self.entity.image.surf,2)
+        entity = pygame.transform.scale_by(self.entity.image.surf,2) # TODO: Optimize
         draw.rect(self.surface,(70,70,70),entity.get_rect().move(self.screen_center.x-100,10))
         self.surface.blit(entity,(self.screen_center.x-100,10))
         super().draw()
 
+    def close(self):
+        showingUIs.append(Null)
+        if self.in_hand is not None:
+            spawn_item(self.in_hand,self.entity.pos.copy(),Input.m_pos_normalized*2)
+            self.in_hand = None
 class HotBarUI:
     __slots__ = 'selectedFrame','entity','slot_spacing','hb_inventory','background_color','surface','x','y','collider','has_mouse','slots','topleft'
     def __init__(self,entity:AliveEntity,hotbar:Hotbar):
         if not hasattr(entity,'hotbar'):
             raise RuntimeError('entity passed into HotBarUI does not seem to define its hotbar!')
-        self.selectedFrame = Textures.texture['selection_frame.png']
+        selectedFrame = Textures.user_interface['hotbar']['selection_frame'] #type: ignore
+        assert isinstance(selectedFrame, Surface)
+        self.selectedFrame = selectedFrame
         self.entity = entity
         self.slot_spacing = 4 #this is how many pixels will be between the edges of each
         self.hb_inventory = hotbar
@@ -1838,7 +1672,7 @@ class Chunk:
             for block in reversed(self.blocks):
                 if block.dead:
                     self.blocks.remove(block)
-                    print('A block of type',block.type,'did not manually add itself to the dead_blockslist')
+                    print('A block of type',block.typeid,'did not manually add itself to the dead_blockslist')
         
         for block in self.blocks:
             block.update()
@@ -1937,11 +1771,11 @@ def _create(chunk:Chunk):
         for chunk_pos in existing_surrounding_chunks:
             o_chunk = chunks[chunk_pos]
             for block in o_chunk.blocks:
-                if block.type == 'tree':
+                if block.typeid == 'tree':
                     if hypot(block.pos.x-x,block.pos.y-y) <= Settings.TREE_SPACING_BY_BIOME[chunk.biome]:
                         return False
         for block in chunk.blocks: #check own chunk
-            if block.type == 'tree':
+            if block.typeid == 'tree':
                 if hypot(block.pos.x-x,block.pos.y-y) <= Settings.TREE_SPACING_BY_BIOME[chunk.biome]:
                     return False  
         return True
@@ -1951,7 +1785,7 @@ def _create(chunk:Chunk):
         y = randint(chunk.pos.y, chunk.pos.y + CHUNK_SIZE - 1) #type: ignore
         g = chunk._get_ground(x,y)
         if Tree.spawnable_on(g) and isValid(x,y):
-            chunk.blocks.append(Tree((x,y),g))
+            chunk.blocks.append(Tree(Vector2Int(x,y),g))
     yield
     chunks[chunk.chunk_pos] = chunk
     for cmd in chunk.onCreationFinish:
@@ -2031,7 +1865,7 @@ def print_entity_chunks():
         if chunk not in entity_chunks:
             print(chunk,': Empty')
         else:
-            print(chunk,':',[et.species for et in entity_chunks[chunk]])
+            print(chunk,':',[et.typeid for et in entity_chunks[chunk]])
 
 def get_nearest_block(pos:Vector2):
     nearest = None
@@ -2136,7 +1970,7 @@ def collide_entities_in_range(pos:Vector2,range:float) -> Generator[Entity,None,
                     if not entity.dead and (entity.pos-pos).magnitude_squared() <= range_sqrd:
                         yield entity
 
-def collide_entities_in_range_species(pos:Vector2,range:float,species:str) -> Generator[Entity,None,None]:
+def collide_entities_in_range_species(pos:Vector2,range:float,typeid:str) -> Generator[Entity,None,None]:
     range_sqrd = range*range
     checked = set()
     for y in inclusive_range(floor(pos.y-range),ceil(pos.y+range),CHUNK_SIZE):
@@ -2147,10 +1981,10 @@ def collide_entities_in_range_species(pos:Vector2,range:float,species:str) -> Ge
             e_chunk = entity_chunks.get(cpos)
             if e_chunk is not None:
                 for entity in e_chunk:
-                    if not entity.dead and entity.species==species and (entity.pos-pos).magnitude_squared() <= range_sqrd:
+                    if not entity.dead and entity.typeid==typeid and (entity.pos-pos).magnitude_squared() <= range_sqrd:
                         yield entity
 
-def drop_item(item:Item,pos:Vector2,vel:Vector2|None=None):
+def spawn_item(item:Item,pos:Vector2,vel:Vector2|None=None):
     #step 1) create itemWrapper
     iw = ItemWrapper(pos,item)
     if vel is not None:

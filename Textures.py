@@ -1,5 +1,5 @@
-from Constants import BLOCK_SIZE,PARTICLE_SIZE,WIDTH,HEIGHT,HALFHEIGHT,HALFWIDTH,ITEM_SIZE
-from os import walk,listdir,scandir
+from Constants import BLOCK_SIZE,PARTICLE_SIZE,ITEM_SIZE
+from os import walk,scandir
 from time import sleep
 from pygame import Surface
 from Constants.Misc import TEXTURE_FANCY_IMPORT
@@ -22,8 +22,27 @@ else:
 	from pygame.image import load
 from pygame.transform import scale,flip,rotate
 from game_math import GAME_PATH
-from typing import Union,Dict
-PATH_DICT_TYPE = Union[Surface,Dict[str,"PATH_DICT_TYPE"]]
+from Game_Typing import PATH_DICT_TYPE
+
+__all__ = [
+	'NULL',
+	'player_attack',
+	'player_death',
+	'player_destruction',
+	'player_idle',
+	'player_run',
+	'player_walk',	
+	'tnt',
+	'items',
+	'blocks',
+	'entities',
+	'entity_arrow',
+	'enitity_spirit_idle',
+	'particles_opaque',
+	'particles_transparent',
+	'ground',
+	'user_interface', 
+]
 
 NULL = Surface((BLOCK_SIZE,BLOCK_SIZE))
 
@@ -48,7 +67,7 @@ particles_opaque:dict[str,Surface]
 particles_transparent:dict[str,Surface]  
 
 ground:dict[str,Surface]
-
+user_interface:PATH_DICT_TYPE
 
 ### HELPER FUNCTIONS ###
 def getFolders(path:str):
@@ -149,16 +168,28 @@ def _init():
 	entities = recursivelyImportPath('Images\\Entities')
 
 	'''PARTICLE ASSETS'''
-	## just pretends its here ##
+	global particles_opaque, particles_transparent
+	particles_opaque = importFolders('Images\\Particles',False,(PARTICLE_SIZE,PARTICLE_SIZE))
+	## Get Solild Particles from json
+	import json
+	with open('Images\\Particles\\Opaque\\Solids.json', 'r') as solids_file:
+		for key, value in json.load(solids_file).items():
+			particles_opaque.update({key:value})
+	del solids_file, key, value #type: ignore
+	del json
+
+	particles_transparent = importFolders('Images\\Particles',True,(PARTICLE_SIZE,PARTICLE_SIZE))
 
 	'''GROUND ASSETS'''
 	global ground
 	ground = importFolders('Images\\Ground')
 
+	global user_interface
+	user_interface = recursivelyImportPath('Images\\UI')
+
 	global done_loading
 	done_loading = True
-	#global 
-	#del importTexture,importFolders, recursivelyImportPath,getFolders,getFiles,isImage
+	
 
 
 ### EXPORTED FUNCTIONS ###

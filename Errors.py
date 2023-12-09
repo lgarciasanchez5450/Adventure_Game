@@ -9,7 +9,7 @@ class UnInstantiableError(Exception):
 
 
 
-def return_error(error):
+def return_error(error:BaseException):
     def _(*args,**kwargs):
-        raise error()
+        raise error
     return _

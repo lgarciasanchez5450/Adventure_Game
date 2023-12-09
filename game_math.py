@@ -71,7 +71,7 @@ def get_most_sig_bits(x:int,bits:int) -> int:
 	return output
 
 
-def inclusive_range(start,stop,step):
+def inclusive_range(start:int,stop:int,step:int):
 	#yield from range(start,stop,step)
 	#yield stop
 	return entity_manager.inclusive_range(start,stop,step)
@@ -113,7 +113,7 @@ class Vector2:
 	@classmethod
 	@property
 	def zero(cls):
-		return Vector2(0,0)
+		return Vector2(0.0,0.0)
 	
 	@final
 	@classmethod
@@ -251,7 +251,7 @@ class Vector2:
 		self.y = py
 
 	def floored(self):
-		return Vector2(floor(self.x),floor(self.y))
+		return Vector2Int(floor(self.x),floor(self.y))
 
 	def get_angle(self) -> scalar:
 		return atan2(self.y,self.x)
@@ -272,6 +272,132 @@ class Vector2:
 		return self
 
 ones= Vector2(1,1)
+
+
+
+class Vector2Int:
+	__slots__  = ('x','y')
+	def __init__(self,x:int,y:int):
+		self.x = x
+		self.y = y
+
+	@final
+	@classmethod
+	@property
+	def zero(cls):
+		return Vector2Int(0,0)
+	
+	def opposite_normalized(self):
+		return Vector2Int(*_opposite_normalized(self.x,self.y))
+
+	def __eq__(self,__object: "Vector2Int"):
+		return self.x == __object.x and self.y == __object.y
+	
+	def __add__(self,__object: "Vector2Int"):
+		return Vector2Int(self.x + __object.x,self.y + __object.y)
+	
+	def __sub__(self,__object: "Vector2Int"):
+		return Vector2Int(self.x - __object.x,self.y - __object.y)
+	
+	def __mul__(self,__object:int):
+		return Vector2Int(self.x *__object,self.y * __object)
+	
+	def __rmul__(self,__object:int):
+		return Vector2Int(self.x *__object,self.y * __object)
+
+	
+	def __itruediv__(self,__object:int):
+		self.x /= __object
+		self.y /= __object
+		return self
+
+	def __floordiv__(self,__object:int):
+		return Vector2Int(self.x // __object, self.y // __object)
+	
+	def moved_by(self,x:int,y:int):
+		return Vector2Int(self.x + x, self.y + y)
+
+
+	
+	def vector_mul(self,__object: "Vector2Int"):
+		return Vector2Int(self.x*__object.x,self.y*__object.y)
+	
+	def __getitem__(self,__index:int) -> scalar:
+		return [self.x,self.y][__index]
+	
+	def __iadd__(self,__object: "Vector2Int"):
+		self.x += __object.x
+		self.y += __object.y
+		return self
+
+	def __isub__(self,__object: "Vector2Int"):
+		self.x -= __object.x
+		self.y -= __object.y
+		return self
+
+	def __imul__(self,__object:scalar):
+		self.x *= __object
+		self.y *= __object
+		return self
+
+	def __str__(self) -> str:
+		return f"Vec2(x:{self.x}, y:{self.y})"	
+	
+	def __neg__(self):
+		return Vector2Int(-self.x,-self.y)
+	
+	@property
+	def isZero(self) -> bool:
+		return self.x == self.y == 0
+	
+	def magnitude_squared(self):
+		return self.x*self.x+self.y*self.y
+	
+	def magnitude(self):
+		return sqrt(self.x*self.x + self.y * self.y)
+	
+	def reset(self):
+		'''Reset each axis to 0'''
+		self.x = 0
+		self.y = 0
+
+	def __bool__(self):
+		return (self.x or self.y).__bool__()
+	
+	def __iter__(self):
+		yield self.x
+		yield self.y
+	
+	def set_to(self,__object:Vector2Int):
+		self.x = __object.x
+		self.y = __object.y
+
+	def from_tuple(self,tup:tuple[int,int]):
+		self.x = tup[0]
+		self.y = tup[1]
+
+	@property
+	def tuple(self):
+		return (self.x,self.y)
+	
+	@property
+	def tupled_ints(self):
+		return (self.x.__trunc__(),self.y.__trunc__())
+
+	def copy(self):
+		return Vector2Int(self.x,self.y)
+	
+
+	def floored(self):
+		return Vector2Int(floor(self.x),floor(self.y))
+
+
+
+
+
+
+
+
 
 
 def cap_magnitude(vector2:Vector2,mag:scalar):
@@ -436,7 +562,7 @@ class Array(list,Generic[T]):
 	def new(cls,size:int):
 		return cls(cls.none_range(size))
 	
-	def __getitem__(self,index:int) -> T:
+	def __getitem__(self,index:int) -> T|None:
 		return super().__getitem__(index)
 	def append(self, __object):
 		return SyntaxError("Array Size cannot be changed")
