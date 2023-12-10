@@ -270,6 +270,10 @@ class Vector2:
 	def restrain_magnitude(self,mag:float): 
 		self.from_tuple(restrainMagnitude(self.x,self.y,mag))
 		return self
+	
+	def asMagnitudeOf(self,other:scalar) -> Vector2:
+		m = sqrt(self.x * self.x + self.y * self.y)
+		return Vector2(self.x * other/m, self.y * other/m)
 
 ones= Vector2(1,1)
 

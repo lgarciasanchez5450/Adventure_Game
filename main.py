@@ -48,6 +48,7 @@ def onGameStart():
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,0),general_manager.DivineBow()))
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(-2,0),general_manager.Bow()))
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),general_manager.ItemArrow().setCount(64)))
+    general_manager.spawn_item(general_manager.StrengthPotion(),Vector2(1,0),Vector2(0,2))
     Camera.set_focus(player.pos)
     Camera.set_mouse_pull_strength(13)
     #Events.call_OnResize(WINDOW_WIDTH,WINDOW_HEIGHT)
@@ -62,8 +63,8 @@ def onGameStart():
 #print(t)
 #del t
 while True:
-    if Settings.game_state is RUNNING:
-        #update each module in order
+    while Settings.game_state is RUNNING:
+        #update each module in orders
         #Time
         Time.update() #should be updated before anything else
         Game_Time.update()
@@ -87,8 +88,7 @@ while True:
         Camera.draw_background() 
         Particles.draw()
         Camera.sorted_draw_from_queue()
-        Particles.after_draw()
-        Particles.anim_draw()
+
         Camera.draw_collider_queue()
         Camera.draw_UI()
         debug.debug(general_manager.active_entity_count(),(200,200))
@@ -99,19 +99,19 @@ while True:
         UI.showingUIs[0].draw()
         Camera.flip()
 
-    elif Settings.game_state is SETTINGS:
+    while Settings.game_state is SETTINGS:
         Time.update()
         #
         Pause_Menu.update()  
         Camera.flip()
   
-    elif Settings.game_state is MAIN_MENU:
+    while Settings.game_state is MAIN_MENU:
         Main_Menu.update()
         if (Main_Menu.loading_for.timeElapsed() > 2): #if has been "loading" for more than 2 seconds start generating the world-
             Main_Menu.lb.setMax(108)
             onGameAwake()
             Settings.game_state = GENERATING_WORLD
-    elif Settings.game_state is GENERATING_WORLD:
+    while Settings.game_state is GENERATING_WORLD:
             try:
                 #First try to see if we need to import Textures
                 
@@ -135,8 +135,14 @@ while True:
                 onGameStart()
                 Settings.game_state = RUNNING
 
-    elif Settings.game_state == CHARACTER_CREATION:
+    while Settings.game_state == CHARACTER_CREATION:
         pass
-    elif Settings.game_state == WORLD_SELECT:
+    while Settings.game_state == WORLD_SELECT:
         pass
 
+
+while True:
+    while Settings.game_state is RUNNING:
+        #do game logic
+        pass
+    

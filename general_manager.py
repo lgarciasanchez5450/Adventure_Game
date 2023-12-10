@@ -30,31 +30,13 @@ from UI_Elements import ItemSlot
 from Constants import EntityEffects
 from Inventory import UniversalInventory, Hotbar
 dead_entities = []
+from GameObject import GameObject
+from Appearance import Appearance
 
-
-def get_tnt_animation(pos:Vector2,fps=40):
-    return Particles.Cheap_Animation(pos.copy(),Textures.tnt,fps,None)
 
 class Actions:
     def __init__(self):
         pass
-
-class Appearance:
-    """What an entity of 'somthing' looks like in game
-    to be used for AI of npc's"""
-    __slots__ = 'color','size','shape','species'
-    def __init__(self,color,size,shape,species):
-        self.color = color
-        self.size = size
-        self.shape = shape
-        self.species = species
-
-    def looks_like(self,other:"Appearance",tolerance:float): 
-        '''A very simple model function to tell what others would look like in the future'''
-        return abs(other.color - self.color) < tolerance and abs(other.size - self.size) < tolerance and abs(other.size - self.size) < tolerance
-
-    def copy(self):
-        return Appearance(self.color,self.size,self.shape,self.species)
 
 #### ITEM STATS ####
 class ArmourStats:
@@ -79,8 +61,8 @@ class DurabilityStats:
         return False
 
 #### ITEMS ####
-class Item:
     bow_shootable = False #if this is true then there MUST be a instance variable named <projectile> which can be instantiated to make an entity
+class Item:
     crossbow_shootable = False
     def setCount(self,count:int):
         assert count <= self.max_stack_count
@@ -102,7 +84,7 @@ class Item:
         else:
             self.frames:tuple[pygame.Surface,...]  = Textures.items.get(self.tag,(Textures.NULL,))# at most 60 frames 
         self.inventory:UniversalInventory
-        self.animation = Animation.SimpleAnimation(Camera.CSurface(self.frames[0],Vector2.zero,(0,0)),self.fps,self.frames)
+        self.animation = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero,(0,0)),self.fps,self.frames)
 
     @property
     def max_stack_count(self):
@@ -140,45 +122,73 @@ class Item:
         raise RuntimeError("For what purpose?!?!")
 
 class DrinkableItem(Item):
+    DRINKING = 0
+    NOT_DRINKING = 1
+    IN_BETWEEN_DRINKS = 2
+    drinking_delay:float = 0.05 #how many seconds should be waited in between drunkss
     '''A generic drinkable item, drink time is how long drinkAnim takes to play
     all subclasses must define a onDrunk method'''
 
-    __slots__ = 'time_to_drink','drink_animation','animation_backup'
+    __slots__ = 'wait_in_state','drink_animation','animation_backup','state'
     def __init__(self, tag: str,drinkAnim:Animation.SimpleAnimation):
         super().__init__(tag)
         self.drink_animation = drinkAnim
-        self.time_to_drink = drinkAnim.time_per_cycle
+        self.wait_in_state = drinkAnim.time_per_cycle
         self.animation_backup = self.animation
+        self.state = self.NOT_DRINKING
 
     @final
     def startUse(self, inventory: UniversalInventory) -> None:
+        self.state = self.DRINKING
         self.animation = self.drink_animation
     
     @final
     def duringUse(self, inventory: UniversalInventory) -> None:
-        self.time_to_drink -= Time.deltaTime
-        if self.time_to_drink <= 0:
-            for i,item in enumerate(inventory.inventory):
-                if item is self:
-                    self.count -= 1
-                    inventory.checkItem(i)
-                    self.onDrunk(inventory)
-                    self.time_to_drink = self.drink_animation.time_per_cycle
+        match self.state:
+            case self.DRINKING:
+                self.wait_in_state -= Time.deltaTime
+                if self.wait_in_state <= Time.deltaTime:
+                    for i,item in enumerate(inventory.inventory):
+                        if item is self:
+                            self.count -= 1
+                            self.onDrunk(inventory)
+
+                            if self.count == 0:
+                                inventory.checkItem(i)
+                            else:
+                                self.wait_in_state = self.drink_animation.time_per_cycle
+                                self.state = self.IN_BETWEEN_DRINKS
+                                self.animation = self.animation_backup
+
+
+            case self.IN_BETWEEN_DRINKS:
+                self.wait_in_state -= Time.deltaTime
+                if self.wait_in_state <= 0:
+                    self.state = self.DRINKING
+                    self.wait_in_state = self.drink_animation.time_per_cycle
+                    self.animation = self.drink_animation
+                    self.drink_animation.reset()
+
  
     @final
     def stopUse(self, inventory: UniversalInventory) -> None:
-        self.time_to_drink = self.drink_animation.time_per_cycle
+        self.animation = self.animation_backup
+        self.wait_in_state = self.drink_animation.time_per_cycle
+        self.drink_animation.reset()
 
     @abstractmethod
     def onDrunk(self,inventory:UniversalInventory): ...
 
 class StrengthPotion(DrinkableItem):
     def __init__(self):
-        #anim = Animation.SimpleAnimation(Camera.CSurface(Camera.NullCSurface,Vector2.zero,(0,0)),10,)
-        #super().__init__(ITAG_STR_POTION, drinkAnim)
+        drinkAnim = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero,(0,0)),2,Textures.items['drinkingstrengthpotion'])
+        super().__init__(ITAG_STR_POTION, drinkAnim)
         pass
 
-    def onDrunk(self,inventory:UniversalInventory):...
+    def onDrunk(self,inventory:UniversalInventory):
+        print('drunk!!! hehehehaw')
+        inventory.entity.setExtraStatSpeed('need for speed', 100.0)
+        Camera.set_camera_convergence_speed(6)
 
 class BunnyEgg(Item): 
     __slots__ = 'species',
@@ -286,42 +296,9 @@ class DivineBow(BowBase):
     def getArrowInstability(self, t: float) -> float:
         return 0.0
 
-class GameObject:
-    '''This class is the base class of which every single diagetic object in the game MUST derive from.'''
-    __slots__ = 'pos','dead','csurface','typeid'
-    def __init__(self,pos:Vector2,typeid:str) -> None:
-        self.pos = pos
-        self.dead = False
-        self.typeid = intern(typeid)
-        self.csurface:CSurface
-
-    def update(self): ...
-
-    def take_damage(self,damage:int,type:str,appearance:Appearance|None = None): ...
-
-    def onLoad(self):
-        Camera.add(self.csurface)
-
-    def onLeave(self):
-        Camera.remove(self.csurface)
-
-    def onDeath(self):
-        '''Returns whether this is a true or false death
-        A false death happens when an object gets killed multiple times in one frame
-         and onDeath gets called multiple times. 
-        After the first call to onDeath
-         all other calls are considered false deaths '''
-        if self.dead: return False
-        self.onLeave()
-        self.dead = True
-        return True
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__} : {self.typeid}"
-
 #### BLOCKS ####
 class Block(GameObject):
-    tex_name = 'null'
+    tex_name = 'BLCOK_TEXTURE_NAME NOT SET!!!'
     anim_fps = 0
     @staticmethod
     def spawnable_on(ground):
@@ -332,6 +309,7 @@ class Block(GameObject):
         self.collider = Collider.SpawnOnBlockCenter(pos.x,pos.y,hb[0],hb[1])
         super().__init__(Vector2(*self.collider.center),typeid)#hp -> huan pablo
         self.tags = set()
+        self.csurface = CSurface.inferOffset(Textures.blocks[typeid][0],self.pos)
         self.blast_resistance = 0 
         self.hardness = 1
         self.animation = Animation.SimpleAnimation(self.csurface,self.anim_fps,Textures.blocks[self.tex_name])
@@ -370,6 +348,7 @@ class Tree(Block):
         
 
 class TNT(Block):
+    tex_name = 'tnt'
     @staticmethod
     def spawnable_on(ground:Ground):
         return ground.name is GROUND_DIRT
@@ -377,7 +356,7 @@ class TNT(Block):
     def __init__(self, pos:Vector2Int):
         super().__init__(pos, 'tnt')
         self.blast_resistance = 10
-        self.csurface.surf =Textures.tnt[0]
+        self.csurface.surf =Textures.blocks['tnt'][0]
         self.timer = 4.0
         self.energy = 15
 
@@ -498,7 +477,7 @@ class LiveTNT(Entity):
     
     def __init__(self,pos:Vector2,time:float,energy:int):
         super().__init__(pos,'tnt')
-        self.animation.add_state('1',1,Textures.tnt)
+        self.animation.add_state('1',1,Textures.blocks['tnt'])
         self.animation.set_state('1')
         self.animation.animate()
         self.timer = time
@@ -508,8 +487,10 @@ class LiveTNT(Entity):
 
     def onDeath(self):
         c = Collider.spawnFromCenter(self.pos.x,self.pos.y,self.energy*2,self.energy*2)
-        for x in range(5):
-            Particles.spawn_animated(get_tnt_animation(self.pos+Vector2.randdir/3,38+x),False,0)
+        for x in range(4):
+            #print(Textures.particles_transparent['Explosion'][0].get_size())
+            Particles.spawn_animated(
+                Particles.CheapAnimation(CSurface.inferOffset(Textures.particles_transparent['Explosion'][0],self.pos+ Vector2.randdir/3),Textures.particles_transparent['Explosion'],38+x))
         damage_function = self.damage_func_getter(self.energy)
         for entity in collide_entities(c):
             if entity.typeid == 'tnt': continue #tnt in entity form will be immune to other exploding tnt
@@ -524,7 +505,7 @@ class LiveTNT(Entity):
         self.timer -= Time.deltaTime
         self.particle_timer -= Time.deltaTime
         while self.particle_timer <= 0:
-            Particles.after_spawn(self.pos+self.particle_emit,Vector2.randdir*1.5,Textures.particles_opaque['grey'],1,(-4,-4),True,slows_coef=1)
+            Particles.spawn(CSurface.inferOffset(Textures.particles_opaque['grey'],self.pos+self.particle_emit),1.0,Vector2.randdir*1.5,True)
             self.particle_timer += .15
         if self.timer <= 0:
             self.onDeath()
@@ -614,7 +595,7 @@ class ArrowExplosive(Arrow):
         d = log(self.energy) + 3.5
         c = Collider.spawnFromCenter(self.pos.x,self.pos.y,d*2,d*2)
         for x in range(5):
-            Particles.spawn_animated(get_tnt_animation(self.pos+Vector2.randdir/3,38+x),False,0)
+            Particles.spawn_animated(Particles.CheapAnimation(CSurface.inferOffset(Textures.blocks['tnt'][0],self.pos+Vector2.randdir/3),Textures.blocks['tnt'],38+x))
         def damage_from_dist(dist:float) -> int:
             E = 2.718281828
             return (self.energy * E ** (-dist)).__trunc__()
@@ -802,8 +783,8 @@ class AliveEntity(Entity):
     def onDeath(self):
         super().onDeath()
         for i in range(10):
-            Particles.spawn(self.pos + Vector2.random/5,Vector2.random/2,Textures.particles_opaque['white'],1,slows_coef=0)
-        Particles.spawn(self.pos.copy(),Vector2.zero,self.animation.surf.copy(),1,self.image.offset,False,False)
+            Particles.spawn(CSurface.inferOffset(Textures.particles_opaque['white'],self.pos + Vector2.random/5),1.0,Vector2.random/2,slows_coef=0)
+        Particles.spawn(CSurface.inferOffset(self.animation.surf.copy(),self.pos.copy()),1.0)
 
     def set_state(self,number:int):
         '''Returns False if failed.
@@ -1026,7 +1007,6 @@ class Player(AliveEntity):
         elif Input.m_u3:
             self.hotbar.stop_use_selected()
         elif Input.m_3:
-            print()
             self.hotbar.during_use_selected()
 
     def move(self):
@@ -1062,7 +1042,7 @@ class Player(AliveEntity):
         
         if FPS != 0 and self.vel and not self.animation.frames_in_state % (FPS//12):
             #spawn a particle
-            Particles.spawn(self.pos + Vector2(-0.07,.2),Vector2.random * 0.5,self.walking_particle,.5)
+            Particles.spawn(CSurface.inferOffset(self.walking_particle,self.pos + Vector2(-0.07,.2)),.5,Vector2.random * 0.5)
  
     def update_inventory_ui(self):
         self.ui.update()

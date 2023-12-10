@@ -5,90 +5,106 @@ import pygame
 import Textures
 import Time
 from Animation import SimpleAnimation
+from Constants import POSITIVE_INFINITY
 from Game_Typing import *
+if TYPE_CHECKING:
+    from general_manager import GameObject
 
-class Cheap_Animation:
-    __slots__ = 'images','onDone','fps','time','frame','inv_fps','max_frames','csurf','done'
-    def __init__(self,pos:game_math.Vector2,images:list[pygame.Surface]|tuple[pygame.Surface,...],fps:int|float,onDone: Callable[[],None] | None):
+class CheapAnimation:
+    __slots__ = 'frames','fps','time','max_frames','csurface'
+    def __init__(self,csurf:Camera.CSurface,images:tuple[Surface,...], fps:float):
         assert len(images), 'cant have empty images list!'
-        self.images = images
-        self.onDone = onDone
+        self.frames = images
         self.fps = fps
         self.time = 0.0
-        self.frame:int = 0
-        self.inv_fps = 1/fps
         self.max_frames = (images).__len__()
-        self.csurf = Camera.CSurface(self.images[0],pos,(-self.images[0].get_width()//2,-self.images[0].get_height()//2))
-        self.done = False
+        self.csurface = csurf
 
+
+    @property
+    def time_per_cycle(self) -> float:
+        '''Seconds it takes to complete all frames'''
+        if self.fps == 0:
+            return POSITIVE_INFINITY
+        return self.max_frames / self.fps
 
 
     def animate(self):
-        if self.done:return
+        self.time += self.fps*Time.deltaTime
+        self.csurface.surf = self.frames[(self.time % self.max_frames).__trunc__()]
 
-        self.time += Time.deltaTime
-        if self.time > self.inv_fps:
-            self.time -= self.inv_fps
-            self.frame += 1
-            if self.frame == self.max_frames:
-                self.done= True
-                if self.onDone is not None:
-                    self.onDone()
-                return
-            self.csurf.surf = self.images[self.frame]
-            
+class EvenCheaperAnimation(CheapAnimation):
+    def __init__(self,csurface):
+        self.csurface = csurface
+    def animate(self): pass
+
+class Particle:
+    __slots__ = 'vel','time', 'k_f','anim'
+    def __init__(self, animation:CheapAnimation, vel:game_math.Vector2, time:float,friction:float):
+        self.vel = vel
+        self.time = time
+        self.k_f = friction 
+        self.anim = animation
+
+    def update(self):
+        self.anim.animate()
+
+    @classmethod
+    def noAnimation(cls,csurf:Camera.CSurface,vel:game_math.Vector2,time:float,friction:float):
+        return cls(EvenCheaperAnimation(csurf),vel,time,friction)
+    
+    @classmethod
+    def withAnimation(cls,animation:CheapAnimation,vel:game_math.Vector2,friction:float):
+        return cls(animation,vel,animation.time_per_cycle,friction)
+
 gravity = game_math.Vector2(0,1)
 
-particles = []
-anim_particles = []
-after_particles = []
-to_remove_anim = []
-def toRemove(anim):
-    return lambda : to_remove_anim.append(anim)
-def spawn(pos:game_math.Vector2,vel,surf,time:float|int,offset = (0,0),has_gravity:bool = False,slows_coef = 1):
-    particles.append([Camera.CSurface(surf,pos.copy(),offset),vel,time,has_gravity,slows_coef])
+g_particles:list[Particle] = []
+ng_particles:list[Particle] = []
 
-def spawn_animated(anim:Cheap_Animation,has_gravity:bool = False,slow_coef:float|int = 1):
-    anim.onDone = toRemove(anim)
-    anim_particles.append([anim,has_gravity,slow_coef])
 
-def after_spawn(pos:game_math.Vector2,vel,surf,time:float|int,offset = (0,0),has_gravity:bool = False,slows_coef = 1):
-    after_particles.append([Camera.CSurface(surf,pos.copy(),offset),vel,time,has_gravity,slows_coef])
+def spawn(csurf:Camera.CSurface,time:float,vel:game_math.Vector2|None = None,has_gravity:bool = False,slows_coef:float = 1.0):
+    if vel is None: vel = game_math.Vector2.zero
+    particle = Particle.noAnimation(csurf,vel,time,slows_coef)
+    if (has_gravity):
+        g_particles.append(particle)
+    else:
+        ng_particles.append(particle)
 
+def spawn_animated(anim:CheapAnimation,vel:game_math.Vector2|None = None,has_gravity:bool = False,slows_coef:float = 1.0):
+    if vel is None: vel = game_math.Vector2.zero
+    particle = Particle.withAnimation(anim,vel,slows_coef)
+    if (has_gravity):
+        g_particles.append(particle)
+    else:
+        ng_particles.append(particle)
 
 def spawn_hit_particles(pos:game_math.Vector2,time:float,amount:int = 5):
     for x in range(amount):
-        spawn(pos+game_math.Vector2.random/10,game_math.Vector2.random,Textures.particles_opaque['death'],time,(0,0),True)
+        spawn(Camera.CSurface.inferOffset(Textures.particles_opaque['death'],pos+game_math.Vector2.random/10),time,game_math.Vector2.random)
 
-def update_list(myList:list):
+def update_list(myList:list[Particle],has_gravity:bool):
     to_remove = []
     for index,particle in enumerate(myList):
-        particle[2] -= Time.deltaTime
-        if particle[2] < 0:
+        particle.time -= Time.deltaTime
+        if particle.time < 0:
             to_remove.append(index)
             continue
-        p:game_math.Vector2 = particle[0].pos 
-        v:game_math.Vector2 = particle[1]
+        particle.update()
+        p:game_math.Vector2 = particle.anim.csurface.pos 
+        v:game_math.Vector2 = particle.vel
         p += v * Time.deltaTime
-        if particle[3]:
+        if has_gravity:
             v += gravity * Time.deltaTime
         
-        v -= v * Time.deltaTime * particle[4]
+        v -= v * Time.deltaTime * particle.k_f
     #we can actually do this because it is being iterated over backwards
     for index in to_remove.__reversed__():
         myList.pop(index)
 def update():
-    update_list(particles)
-    update_list(after_particles)
-    for particle in (anim_particles):
-        anim:Cheap_Animation = particle[0]
-        #p = anim.csurface.pos
-        anim.animate()
-    for anim in to_remove_anim.__reversed__():
-        for index,particle in enumerate(anim_particles):
-            if particle[0] is anim:
-                anim_particles.pop(index)
-                break
+    update_list(ng_particles,False)
+    update_list(g_particles,True)
+   
 
 
 
@@ -98,15 +114,9 @@ def update():
 
    
 def draw():
-    for particle in particles:
-        Camera.blit_csurface(particle[0])
+    for particle in ng_particles:
+        Camera.blit_csurface(particle.anim.csurface)
+    for particle in g_particles:
+        Camera.blit_csurface(particle.anim.csurface)
 
-
-def after_draw():
-    for particle in after_particles:
-        Camera.blit_csurface(particle[0])
-
-def anim_draw():
-    for particle in anim_particles:
-        Camera.blit_csurface(particle[0].csurf)
 

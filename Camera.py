@@ -69,6 +69,7 @@ tracking_system:Literal['fixed','smooth'] = 'fixed'
 mouse_assisted:bool = False
 #variables for smooth tracking
 smooth_speed = 4
+maximum_camera_distance = 2
 mouse_pull_strength = 1/3
 width:int
 height:int
@@ -130,6 +131,13 @@ class CSurface:
         self.pos = position
         self.offset = offset
 
+    @classmethod
+    def inferOffset(cls,surface:Surface,position:game_math.Vector2):
+        return cls(surface,position,(-surface.get_width()//2,-surface.get_height()//2))
+
+
+
+
 NullCSurface = CSurface(Surface((0,0)),game_math.Vector2.zero,(0,0))
 
 '''Setting functions'''
@@ -169,6 +177,14 @@ def set_mouse_pull_strength(strength:float):
     global mouse_pull_strength
     mouse_pull_strength = strength*strength / (strength + 20)
 
+def set_camera_convergence_speed(speed:float|int):
+    global smooth_speed
+    smooth_speed = speed
+
+'''Getting functions'''
+def get_camera_convergence_speed() -> float|int:
+    return smooth_speed
+
 
 '''Functions used by Sprites'''
 def add_background(camera_surf:CSurface):
@@ -203,14 +219,18 @@ def update():
     global camera_offset_x,camera_offset_y,effective_camera_pos,camera_pos
     if tracking_system == 'smooth':
         dist = focus - camera_pos 
-        displacement = dist * (smooth_speed * Time.deltaTime)
+        if (distance_squared := dist.magnitude_squared()) > maximum_camera_distance * maximum_camera_distance:
+            extra_distance = game_math.sqrt(distance_squared) - maximum_camera_distance
+            displacement = dist.asMagnitudeOf(extra_distance)
+        else:
+            displacement = dist * (smooth_speed * Time.deltaTime)
         camera_pos += displacement
     elif tracking_system == 'fixed':
         pass
     else:
-        raise RuntimeError(f'Tracking System is {tracking_system} but that is not a valid system') # TODO: in prod this path should never run so it could be deletd
+        raise RuntimeError(f'Tracking System is {tracking_system}, but that is not a valid system') # TODO: in prod this path should never run so it could be deletd
     if mouse_assisted:
-        effective_camera_pos = camera_pos + m_pos_normalized*mouse_pull_strength/(BLOCK_SIZE)
+        effective_camera_pos = camera_pos + m_pos_normalized*(mouse_pull_strength/BLOCK_SIZE)
     camera_offset_x = (effective_camera_pos.x*BLOCK_SIZE).__floor__()
     camera_offset_y = (effective_camera_pos.y*BLOCK_SIZE).__floor__()
     

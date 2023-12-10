@@ -32,7 +32,6 @@ __all__ = [
 	'player_idle',
 	'player_run',
 	'player_walk',	
-	'tnt',
 	'items',
 	'blocks',
 	'entities',
@@ -53,7 +52,6 @@ player_idle:tuple[Surface,...]
 player_run:tuple[Surface,...]
 player_walk:tuple[Surface,...]
 
-tnt:tuple[Surface,Surface]
 
 items:dict[str,tuple[Surface,...]] = {}
 blocks:dict[str,tuple[Surface,...]] = {}
@@ -64,7 +62,7 @@ entity_arrow:Surface
 enitity_spirit_idle:tuple[Surface,...]
 
 particles_opaque:dict[str,Surface]
-particles_transparent:dict[str,Surface]  
+particles_transparent:dict[str,tuple[Surface,...]]  = {}
 
 ground:dict[str,Surface]
 user_interface:PATH_DICT_TYPE
@@ -161,7 +159,7 @@ def _init():
 
 	'''BLOCK ASSETS'''
 	for block_folder in getFolders('Images\\Blocks'):
-		items[block_folder] = tuple(importFolders("Images\\Blocks\\"+block_folder,False,(BLOCK_SIZE,BLOCK_SIZE)).values())
+		blocks[block_folder] = tuple(importFolders("Images\\Blocks\\"+block_folder,False).values())
 
 	'''ENTITY ASSETS'''
 	global entities
@@ -169,17 +167,22 @@ def _init():
 
 	'''PARTICLE ASSETS'''
 	global particles_opaque, particles_transparent
-	particles_opaque = importFolders('Images\\Particles',False,(PARTICLE_SIZE,PARTICLE_SIZE))
+	particles_opaque = importFolders('Images\\Particles\\Opaque',False,(PARTICLE_SIZE,PARTICLE_SIZE))
 	## Get Solild Particles from json
 	import json
 	with open('Images\\Particles\\Opaque\\Solids.json', 'r') as solids_file:
 		for key, value in json.load(solids_file).items():
-			particles_opaque.update({key:value})
+			s = Surface((PARTICLE_SIZE,PARTICLE_SIZE))
+			s.fill(value)
+			particles_opaque.update({key:s})
+			del s
 	del solids_file, key, value #type: ignore
 	del json
 
-	particles_transparent = importFolders('Images\\Particles',True,(PARTICLE_SIZE,PARTICLE_SIZE))
-
+	global particles_transparent
+	for particle_folder in getFolders('Images\\Particles\\Transparent'):
+		particles_transparent[particle_folder] = tuple(importFolders("Images\\Particles\\Transparent\\"+particle_folder,True).values())
+	print(particles_transparent)
 	'''GROUND ASSETS'''
 	global ground
 	ground = importFolders('Images\\Ground')
@@ -206,7 +209,7 @@ draw.rect(NULL,(255,0,255),(0,0,BLOCK_SIZE//2,BLOCK_SIZE//2))
 draw.rect(NULL,(255,0,255),(BLOCK_SIZE//2,BLOCK_SIZE//2,BLOCK_SIZE//2,BLOCK_SIZE//2))
 del draw
 
-if __name__ == "__main__":
+if __name__ == "11__main__":
 	print('Running Tests on Module Textures')
 	import pygame
 	pygame.init()
@@ -219,24 +222,21 @@ if __name__ == "__main__":
 
 
 #### LEGACY FUNCTIONS ####
+if __name__ == '__main__':
+	pass
 '''
 
-def load_top(path:str):
-	surfs:list[Surface] = []
-	path = path.replace('/','\\')
-	if not path.endswith('\\'): path += '\\' #make sure our path ends with a "\"
-	return tuple((load(path+file) for file in listdir(path)))
-	
 
+	import pygame
+	def _compress_and_save():
+		from pygame.image import load,save
+		p = 'Images\\Particles\\Transparent\\Explosion'
+		o = 'Images\\_LegacyUncompressedImages\\Particles\\Transparent\\Explosion'
+		files = getFiles(p)
+		for filename in files:
 
+			save(importTexture(p+'\\'+filename,True),GAME_PATH+f"{o}\\{filename}",'png')
+			save(importTexture(p+'\\'+filename,True,(BLOCK_SIZE,BLOCK_SIZE)),(f"{p}\\{filename}"))
 
-def _compress_and_save():
-	from pygame.image import load,save
-	p = 'Images\\Entities\\player\\walk'
-	o = p.replace("Entities","_LegacyUncompressedImages")
-	c = import_folder(p,True,(BLOCK_SIZE,BLOCK_SIZE))
-	unc = import_folder(p,True)
-	for csurf,usurf,x in zip(c,unc,range(100000)):
-		save(csurf,f"{p}\\{x}.png",'png')
-		save(usurf,f"{o}\\{x}.png",'png')
-'''
+	_ = pygame.display.set_mode((100,10))
+	_compress_and_save()'''

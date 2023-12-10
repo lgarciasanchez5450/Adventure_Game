@@ -21,7 +21,6 @@ class UniversalInventory:
         The implementation should prioritize combining the items, if that doesn't work it will swap them
         Should return item that is left over or None if nothing is left over
         '''
-        assert isinstance(item,(Item,type(None)))
         #check if new item passes slot restrictions
         if index in self.slot_restrictions:
             if not self.slot_restrictions[index](item): #type: ignore
@@ -200,10 +199,10 @@ class Hotbar:
         #    self.using_selected = False        
 
     def during_use_selected(self) -> None:
-        print(self.item_selected,self.using_selected)
+        #print(self.item_selected,self.using_selected)
         if self.item_selected is None or not self.using_selected: return
         self.item_selected.duringUse(self._inv)
-        if self.item_selected.count == 0:
+        if self.item_selected is None or self.item_selected.count == 0:
             self._inv.inventory[self.selected] = None
             self.using_selected = False
 
@@ -211,7 +210,7 @@ class Hotbar:
         if self.item_selected is None: return
         self.item_selected.stopUse(self._inv)
         self.using_selected = False
-        if self.item_selected.count == 0:
+        if self.item_selected is None or self.item_selected.count == 0:
             self._inv.inventory[self.selected] = None
     
     def setSelected(self,newSelected:int) -> None:

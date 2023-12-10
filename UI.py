@@ -52,6 +52,7 @@ class UI:
         self.render_object.release()
         self.program.release()
 class EmtpyUI(UI):
+    __slots__ = tuple()
     def __init__(self,*args,**kwargs): pass
     def __setattr__(self, __name: str, __value: Any) -> None: pass
     def __delattr__(self, __name: str) -> None: pass
@@ -67,9 +68,6 @@ class DebugUI(UI):
     def update(self):
         self.surface.fill((0,0,0))
         self.surface.blit(self.font.render(str(Time.get_frameRateInt()),True,(255,255,255)),(0,0))
-
-class Fake_Inventory:
-    spaces:int
 
 Null = EmtpyUI()
 
