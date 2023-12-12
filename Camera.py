@@ -56,6 +56,8 @@ WIDTH:int
 HEIGHT:int
 HALFWIDTH:int
 HALFHEIGHT:int
+HALF_WIDTH_OVER_BLOCK_SIZE:float
+HALF_HEIGHT_OVER_BLOCK_SIZE:float
 
 queue = []
 collider_queue = []
@@ -70,16 +72,19 @@ mouse_assisted:bool = False
 #variables for smooth tracking
 smooth_speed = 4
 maximum_camera_distance = 2
+using_max_camera_distance = False
 mouse_pull_strength = 1/3
 width:int
 height:int
 def init(display:Surface):
-    global screen,WIDTH,HEIGHT,HALFWIDTH,HALFHEIGHT,halfscreensize,width,height,screen_size
+    global screen,WIDTH,HEIGHT,HALFWIDTH,HALFHEIGHT,halfscreensize,width,height,screen_size,HALF_HEIGHT_OVER_BLOCK_SIZE,HALF_WIDTH_OVER_BLOCK_SIZE
 
     screen = display
     WIDTH,HEIGHT = width,height = screen.get_size()
     HALFWIDTH = WIDTH//2
     HALFHEIGHT = HEIGHT//2
+    HALF_HEIGHT_OVER_BLOCK_SIZE = HEIGHT/(2 * BLOCK_SIZE)
+    HALF_WIDTH_OVER_BLOCK_SIZE = WIDTH/(2 * BLOCK_SIZE)
     halfscreensize = game_math.Vector2(HALFWIDTH,HALFHEIGHT)
     screen_size = game_math.Vector2(width-1,height-1)
 
@@ -219,7 +224,7 @@ def update():
     global camera_offset_x,camera_offset_y,effective_camera_pos,camera_pos
     if tracking_system == 'smooth':
         dist = focus - camera_pos 
-        if (distance_squared := dist.magnitude_squared()) > maximum_camera_distance * maximum_camera_distance:
+        if using_max_camera_distance and (distance_squared := dist.magnitude_squared()) > maximum_camera_distance * maximum_camera_distance:
             extra_distance = game_math.sqrt(distance_squared) - maximum_camera_distance
             displacement = dist.asMagnitudeOf(extra_distance)
         else:
@@ -237,16 +242,20 @@ def update():
 
 
 def screen_position(pos:game_math.Vector2):
-    return (floor(pos.x*BLOCK_SIZE-floor(effective_camera_pos.x*BLOCK_SIZE)+HALFWIDTH) * (width/ WIDTH),floor(pos.y*BLOCK_SIZE-floor(effective_camera_pos.y*BLOCK_SIZE)+ HALFHEIGHT)* ( width/WIDTH)) 
+    #return (floor(pos.x*BLOCK_SIZE-floor(effective_camera_pos.x*BLOCK_SIZE)+HALFWIDTH) * (width/ WIDTH),floor(pos.y*BLOCK_SIZE-floor(effective_camera_pos.y*BLOCK_SIZE)+ HALFHEIGHT)* ( width/WIDTH)) 
+    return game_math.Vector2((pos.x*BLOCK_SIZE-camera_offset_x+HALFWIDTH),(pos.y*BLOCK_SIZE-camera_offset_y+ HALFHEIGHT))
+
+
 
 def screen_position_normalized(world_pos:game_math.Vector2):
-    return ((world_pos-effective_camera_pos) * BLOCK_SIZE).vector_mul((halfscreensize-game_math.ones).inverse)
+    return (((world_pos-effective_camera_pos) ).vector_mul(game_math.Vector2(width/WIDTH,height/HEIGHT)) ).vector_mul((halfscreensize).inverse)
 
 def world_position(screen_pos:game_math.Vector2):
     return (screen_pos - halfscreensize) / BLOCK_SIZE + effective_camera_pos
 
-def world_position_from_normalized(screen_pos:game_math.Vector2):
-    return screen_pos.vector_mul(halfscreensize-game_math.ones) / BLOCK_SIZE + effective_camera_pos
+def world_position_from_normalized(screen_normalized_pos:game_math.Vector2):
+    return game_math.Vector2(screen_normalized_pos.x * HALF_WIDTH_OVER_BLOCK_SIZE + effective_camera_pos.x, screen_normalized_pos.y *HALF_HEIGHT_OVER_BLOCK_SIZE + effective_camera_pos.y )
+    return screen_normalized_pos.vector_mul(game_math.Vector2(WIDTH//2,HEIGHT//2)) / BLOCK_SIZE + effective_camera_pos
 
 
 '''Helper Functions'''
@@ -268,7 +277,7 @@ def blit(surface,position,s_offset_x = 0, s_offset_y = 0):
 
 
 def blit_csurface(csurface:CSurface):
-    screen.blit(csurface.surf,((csurface.pos.x*BLOCK_SIZE-camera_offset_x+HALFWIDTH+csurface.offset[0]).__floor__(),(csurface.pos.y*BLOCK_SIZE-camera_offset_y+ HALFHEIGHT+csurface.offset[1]).__trunc__()))
+    screen.blit(csurface.surf,((csurface.pos.x*BLOCK_SIZE-camera_offset_x+HALFWIDTH+csurface.offset[0]).__floor__(),(csurface.pos.y*BLOCK_SIZE-camera_offset_y+ HALFHEIGHT+csurface.offset[1]).__floor__()))
 
 
 

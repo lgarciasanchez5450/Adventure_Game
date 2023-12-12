@@ -16,6 +16,7 @@ def start():
     Camera.init(screen)
     Events.call_OnResize(500,500)
     Camera.set_tracking('smooth')
+    Camera.using_max_camera_distance = False
     Camera.program['light'] = 1.0
     Camera.program['tex'] = 0 
     Time.init()

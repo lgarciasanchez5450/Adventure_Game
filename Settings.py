@@ -80,7 +80,22 @@ INVENTORY_SPACES_BY_SPECIES = {'human':36,'spirit':0,'bamboo':0,'raccoon':1,'squ
 
 ## Since the "Great Merge of Inventories" each entity has to start by getting its armourslots and then its normal inventory spaces
 
-GROUND_NAME_BY_NUMBER = {}#to be filled by the groundRegisterer at runtime
+GROUND_NAME_BY_NUMBER = {
+    GROUND_INVALID: 'GENERATION ERROR GROUND',
+    GROUND_TEST: 'TEST GROUND',
+    GROUND_DIRT:  'Dirt',
+    GROUND_GRASS: 'grass!',
+    GROUND_WATER: 'agua!',
+    GROUND_STONE: 'hard rock'
+}
+GROUND_TEXTURE_BY_ID = {
+    GROUND_INVALID: 'null',
+    GROUND_TEST: 'null',
+    GROUND_DIRT:  'Dirt',
+    GROUND_GRASS: 'Grass',
+    GROUND_WATER: 'Water',
+    GROUND_STONE: 'Stone'
+}
 
 # If the item doesn't exist in this dictionary, the game will probably assume a stack of 64
 STACK_COUNT_BY_TAG = {

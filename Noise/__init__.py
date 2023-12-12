@@ -5,7 +5,6 @@ By Hithere32123
 from array import array
 from numpy import ndarray, zeros,float32
 
-
 __all__ = [
     'noise2',
     'noise2_array',
@@ -67,7 +66,7 @@ def noise1(x:float):
     
 def unit_smoothstep(i:ndarray):
     return i * (-i*i+3) / 2
-def rescale(i:ndarray):
+def rescale(i):
     return (i + 1) / 2
 def inverse_rescale(i:ndarray):
     return i * 2 - 1

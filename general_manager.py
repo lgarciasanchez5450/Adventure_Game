@@ -15,11 +15,11 @@ if __name__ == '__main__':
     Camera.init(screen)                                     
 from Errors import GenerationError
 from math import log 
-from ground import *
+import ground
 import Settings
 import Input
 import Time
-from Game_Typing import assert_type
+from Game_Typing import assert_type, abstractmethod
 import Events
 from UI import *
 import Animation
@@ -29,9 +29,10 @@ from Inventory import ArmorInventory
 from UI_Elements import ItemSlot
 from Constants import EntityEffects
 from Inventory import UniversalInventory, Hotbar
-dead_entities = []
+from sys import intern
 from GameObject import GameObject
 from Appearance import Appearance
+dead_entities = []
 
 
 class Actions:
@@ -187,7 +188,8 @@ class StrengthPotion(DrinkableItem):
 
     def onDrunk(self,inventory:UniversalInventory):
         print('drunk!!! hehehehaw')
-        inventory.entity.setExtraStatSpeed('need for speed', 100.0)
+        SuperStrength1(inventory.entity)
+        inventory.entity.setExtraStatSpeed('need for speed', 10.0)
         Camera.set_camera_convergence_speed(6)
 
 class BunnyEgg(Item): 
@@ -338,10 +340,10 @@ class Tree(Block):
     anim_fps = 0
 
     @staticmethod
-    def spawnable_on(ground:Ground) -> bool:
+    def spawnable_on(ground:ground.Ground) -> bool:
         return ground.name is GROUND_DIRT
     #this class is an "obstacle" 
-    def __init__(self,pos:Vector2Int,ground:Ground):
+    def __init__(self,pos:Vector2Int,ground:ground.Ground):
         assert Tree.spawnable_on(ground), f"Tree was spawned on illegal block: {ground}"
         super().__init__(pos,'tree')
         self.blast_resistance = 10
@@ -350,7 +352,7 @@ class Tree(Block):
 class TNT(Block):
     tex_name = 'tnt'
     @staticmethod
-    def spawnable_on(ground:Ground):
+    def spawnable_on(ground:ground.Ground):
         return ground.name is GROUND_DIRT
     __slots__ = 'timer','energy'
     def __init__(self, pos:Vector2Int):
@@ -377,7 +379,7 @@ class WoodenPlank(Block):
     tex_name = 'tree'
     anim_fps = 0
     @staticmethod
-    def spawnable_on(ground:Ground):
+    def spawnable_on(ground:ground.Ground):
         return ground.is_solid
     __slots__ = ()
     def __init__(self,pos:Vector2Int):
@@ -641,7 +643,7 @@ class AliveEntity(Entity):
         self.vision_collider = Collider(0,0,Settings.VISION_BY_SPECIES[species]*2,Settings.VISION_BY_SPECIES[species]*2)
         self.vision_squared = Settings.VISION_BY_SPECIES[species] ** 2
         self.states = []
-        self.ground = getGround(GROUND_DIRT)
+        self.ground = ground.Invalid()
         # damage timer
         self.invulnerability_time = 0.5
         self.time_til_vulnerable = 0.0
@@ -831,7 +833,7 @@ class AliveEntity(Entity):
             else:
                 self.vel += self.vel.opposite_normalized() * friction
         else:
-            self.ground = getGround(GROUND_DIRT)
+            self.ground = ground.Invalid()
         self.natural_regen()
         for effect in self.effects:
             effect.update()
@@ -1321,7 +1323,7 @@ class EntityEffect: # these effects should take care of themselves in the sense 
 
 class SuperStrength1(EntityEffect):
     __slots__ = 'time'
-    def __init__(self, entity: AliveEntity) -> None:
+    def __init__(self, entity: AliveEntity):
         super().__init__(EntityEffects.EFFECT_STRENGTH_I, entity)
         self.time = 60.0
         self.entity.setExtraStatStrength(self.name,1000)
@@ -1335,6 +1337,8 @@ class SuperStrength1(EntityEffect):
         ## Decouple the effect and the entity so they no  longer know about each other
         self.entity.effects.remove(self) 
         del self.entity 
+
+
 
 ########## NOTE : for custom classes that dont define __eq__ method python defaults to check identity being equal to "is"
 
@@ -1550,15 +1554,15 @@ active_chunks = []
 
 _DEBUG_ = True
 
-def noise_to_ground(n):
+def noise_to_ground(n) -> ground.Ground:
   if n > 1 or n < 0: 
-    return getGround(GROUND_INVALID)
+    return ground.Invalid()
   if n > .85:
-    return getGround(GROUND_STONE)
+    return ground.Stone()
   if n > .45:
-    return getGround(GROUND_GRASS)
+    return ground.Grass()
   
-  return getGround(GROUND_WATER) 
+  return ground.Water()
 
 
 class Chunk:  
@@ -1569,13 +1573,13 @@ class Chunk:
         return chunk_pos in cls._insts
     
     @classmethod
-    def get_ground_at(cls,x,y) -> Ground:
+    def get_ground_at(cls,x,y) :
         global chunks
         c_pos = (x//CHUNK_SIZE,y//CHUNK_SIZE)
         if c_pos in chunks:
             chunk = chunks[c_pos]
             return chunk._get_ground(x,y)
-        return NullGround
+        return ground.Invalid()
         
     def __new__(cls,pos:tuple[int,int]|list[int]):
         if pos in cls._insts:
@@ -1604,7 +1608,7 @@ class Chunk:
     __slots__ = ('chunk_pos','pos','collider','id','data','blocks','biome','active','ground','onCreationFinish','csurf','dead_blocks')
     # removed slots 'x','y','subdivision_lengths','items','items_sub',
     def __init__(self,pos:tuple[int,int]|list[int]):
-        self.chunk_pos = (floor(pos[0]),floor(pos[1]))
+        self.chunk_pos = (pos[0]).__floor__(),pos[1].__floor__()
         #for drawing to screen
         #self.x,self.y = pos[0] * CHUNK_SIZE, pos[1] * CHUNK_SIZE 
         self.pos:Vector2# = Vector2(pos[0] * CHUNK_SIZE,pos[1] * CHUNK_SIZE)
@@ -1616,7 +1620,7 @@ class Chunk:
       
         self.biome:int
         self.active:bool
-        self.ground:list[list[Ground|None]]
+        self.ground:tuple[list[ground.Ground|None]]
         self.onCreationFinish:list
         self.csurf:CSurface 
         self.dead_blocks:list[Block]
@@ -1629,7 +1633,7 @@ class Chunk:
     def surf(self,__object):
         self.csurf.surf = __object
 
-    def _get_ground(self,x,y) -> Ground:
+    def _get_ground(self,x,y) -> 'ground.Ground':
         #this is a method to bypass all the checks made by normal ground_getter but only works if you already know what chunk the block is in
         x = floor(x) % CHUNK_SIZE
         y = floor(y) % CHUNK_SIZE
@@ -1733,7 +1737,7 @@ def _create(chunk:Chunk):
             ground = noise_to_ground(noise) 
             chunk.ground[y][x] = ground #type: ignore
             #pygame.draw.rect(surf,(noise*255,)*3,(x*BLOCK_SIZE,y*BLOCK_SIZE,BLOCK_SIZE,BLOCK_SIZE))
-            surf.blit(Textures.ground[ground.name],(x*BLOCK_SIZE,y*BLOCK_SIZE))
+            surf.blit(Textures.ground[ground.tex],(x*BLOCK_SIZE,y*BLOCK_SIZE))
             #surf.blit(myfont.render(str((x+chunk.chunk_pos[0]*CHUNK_SIZE,y+chunk.chunk_pos[1]*CHUNK_SIZE)),True,'black'),(x*BLOCK_SIZE,y*BLOCK_SIZE))
     #yield
     
@@ -2284,9 +2288,17 @@ def generate_world():
 
 if __name__ == '__main__':
     from pympler.asizeof import asizeof
+    Textures.ground = {}
+    Textures.ground[ground.Grass().tex] = Surface(((BLOCK_SIZE,BLOCK_SIZE)))
+    Textures.ground[ground.Stone().tex] = Surface(((BLOCK_SIZE,BLOCK_SIZE)))
+    Textures.ground[ground.Invalid().tex] = Surface(((BLOCK_SIZE,BLOCK_SIZE)))
+    Textures.ground[ground.Water().tex] = Surface(((BLOCK_SIZE,BLOCK_SIZE)))
     chunk = Chunk((1,1))
+    import sys
     print(asizeof(chunk.ground if chunk.active else 0))
     ting = _create(chunk)
     for _ in ting: #finish the creation of the chunk
         pass
     print(asizeof(chunk.ground))
+    print(asizeof(chunk))
+

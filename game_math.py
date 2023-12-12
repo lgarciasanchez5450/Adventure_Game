@@ -93,15 +93,6 @@ def _opposite_normalized(x,y):
 		return (0,0)
 	return -x/mag,-y/mag
 
-def abstractmethod(func:Callable):
-	if DEBUG: 
-		assert callable(func), 'abstractmethod only works on callable objects'
-		def default_abstract_method(*args,**kwargs):
-			raise NotImplementedError("call to abstract method " + repr(func))
-		default_abstract_method.__name__ = func.__name__
-		return default_abstract_method
-	else:
-		return func
 
 
 class Vector2:
@@ -602,9 +593,9 @@ class Array(list,Generic[T]):
 	def swapIndices(self,__index1:int, __index2:int):
 		self[__index1],self[__index2] = self[__index2],self[__index1]
 
-def make2dlist(x,y = None) -> list[list[None]]:
+def make2dlist(x,y = None) -> tuple[list[None],...]:
 	y = x if y is None else y
-	return [[None] * x for _ in range(y)]
+	return tuple([None for _ in range(x)] for _ in range(y))
 
 @njit(cache = True)
 def normalize(x,y) -> tuple[float,float]:

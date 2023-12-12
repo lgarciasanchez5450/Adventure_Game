@@ -134,8 +134,6 @@ def initInThread():
 	t = threading.Thread(target=_init,daemon=True)
 	t.start()
 
-
-
 def _init():
 	'''PLAYER ASSETS'''
 	global player_attack,player_death,player_destruction,player_idle,player_run,player_walk

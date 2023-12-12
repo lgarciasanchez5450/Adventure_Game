@@ -39,10 +39,12 @@ def onGameStart():
     
     screen = pygame.Surface((WIDTH,HEIGHT))
     Camera.init(screen)
+    Camera.using_max_camera_distance = True
     Sounds.init()
     debug.init(screen)
     Music.start()
     Camera.set_mouse_assist(False)
+    global player
     player = general_manager.Player(Vector2(0,0))
     general_manager.spawn_entity(player)
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,0),general_manager.DivineBow()))
@@ -70,7 +72,9 @@ while True:
         Game_Time.update()
         #Input
         Input.update()
-        
+        #print(Input.m_pos_normalized)
+        #print(Camera.world_position_from_normalized(Input.m_pos_normalized))
+        print((Camera.screen_position(player.pos))) #type: ignore
         #Main Game Loop
         general_manager.step()
         general_manager.update()

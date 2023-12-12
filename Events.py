@@ -31,13 +31,12 @@ class Event:
 
 
 if __name__ == '__main__':
-    event1 = Event(str)
+    event1 = Event(str,int)
     @event1.register
     def spam(he:str,two:int) -> None:
-        
         return print(he.upper())
     
-    event1('wassup!???!')
+    event1('wassup!???!',2)
     
 
 
