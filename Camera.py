@@ -73,6 +73,8 @@ mouse_assisted:bool = False
 smooth_speed = 4
 maximum_camera_distance = 2
 using_max_camera_distance = False
+minimum_camera_distance = 0.2
+using_min_camera_distance = False
 mouse_pull_strength = 1/3
 width:int
 height:int
@@ -224,12 +226,18 @@ def update():
     global camera_offset_x,camera_offset_y,effective_camera_pos,camera_pos
     if tracking_system == 'smooth':
         dist = focus - camera_pos 
-        if using_max_camera_distance and (distance_squared := dist.magnitude_squared()) > maximum_camera_distance * maximum_camera_distance:
+        distance_squared = dist.magnitude_squared()
+        if using_max_camera_distance and distance_squared > maximum_camera_distance * maximum_camera_distance:
             extra_distance = game_math.sqrt(distance_squared) - maximum_camera_distance
             displacement = dist.asMagnitudeOf(extra_distance)
+            camera_pos += displacement
+        elif using_min_camera_distance and distance_squared < minimum_camera_distance * minimum_camera_distance:
+            pass
         else:
+            if using_max_camera_distance:
+                dist = dist.asMagnitudeOf(game_math.sqrt(distance_squared) - minimum_camera_distance)
             displacement = dist * (smooth_speed * Time.deltaTime)
-        camera_pos += displacement
+            camera_pos += displacement
     elif tracking_system == 'fixed':
         pass
     else:

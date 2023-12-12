@@ -40,6 +40,7 @@ def onGameStart():
     screen = pygame.Surface((WIDTH,HEIGHT))
     Camera.init(screen)
     Camera.using_max_camera_distance = True
+    Camera.using_min_camera_distance = True
     Sounds.init()
     debug.init(screen)
     Music.start()
@@ -74,7 +75,6 @@ while True:
         Input.update()
         #print(Input.m_pos_normalized)
         #print(Camera.world_position_from_normalized(Input.m_pos_normalized))
-        print((Camera.screen_position(player.pos))) #type: ignore
         #Main Game Loop
         general_manager.step()
         general_manager.update()
@@ -89,6 +89,7 @@ while True:
                 print(len(general_manager.entity_chunks))
         #Cameras  
         Camera.update()
+        #print((Camera.screen_position(player.pos))) #type: ignore
         Camera.draw_background() 
         Particles.draw()
         Camera.sorted_draw_from_queue()

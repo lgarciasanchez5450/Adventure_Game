@@ -65,6 +65,7 @@ class DurabilityStats:
     bow_shootable = False #if this is true then there MUST be a instance variable named <projectile> which can be instantiated to make an entity
 class Item:
     crossbow_shootable = False
+    bow_shootable = False
     def setCount(self,count:int):
         assert count <= self.max_stack_count
         self.count = count
@@ -240,7 +241,6 @@ class BowBase(Item):
         self.startTime = None
 
     def duringUse(self, inventory: UniversalInventory) -> None:
-        print('during use@')
         if self.startTime is None or self.loaded_item is not None: return
         if Time.time - self.startTime < self.min_draw_time: return
         for i,item in enumerate(inventory.inventory):
