@@ -7,7 +7,9 @@ class UnInstantiableError(Exception):
     def __init__(self, *args: object) -> None:
         super().__init__("An object deriving from the base class \"UnInstantiable\" was created")
 
-
+class EntitySetupError(Exception):
+    def __init__(self, *args: object) -> None:
+        super().__init__("An object deriving from \"Entity\" must define a class attribute \"species\"")
 
 def return_error(error:BaseException):
     def _(*args,**kwargs):

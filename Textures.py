@@ -133,6 +133,17 @@ def initInThread():
 	import threading
 	t = threading.Thread(target=_init,daemon=True)
 	t.start()
+	return t
+
+def initInThreadSimple(): #this should just be used for testing other modules which require Textures to this loads them
+	thread = initInThread()	
+	global ready_for_next
+	while not done_loading:
+		ready_for_next = False
+		sleep(0.02)
+	thread.join()
+	print('Textures imported')
+
 
 def _init():
 	'''PLAYER ASSETS'''

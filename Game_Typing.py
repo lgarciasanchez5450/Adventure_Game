@@ -1,5 +1,6 @@
 from Constants import DEBUG
-from typing import Protocol,Any, Union, Callable, TypeVar, Dict, TYPE_CHECKING, Optional
+from typing import Protocol,Any, Union, Callable, TypeVar, Dict, TYPE_CHECKING, Optional,final
+from warnings import warn
 from Errors import return_error,UnInstantiableError
 from pygame import Surface
 T = TypeVar("T")

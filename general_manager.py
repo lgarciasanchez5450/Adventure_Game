@@ -13,7 +13,7 @@ if __name__ == '__main__':
     screen = pygame.Surface((WIDTH,HEIGHT))
     import Camera
     Camera.init(screen)                                     
-from Errors import GenerationError
+from Errors import GenerationError, EntitySetupError
 from math import log 
 import ground
 import Settings
@@ -32,271 +32,16 @@ from Inventory import UniversalInventory, Hotbar
 from sys import intern
 from GameObject import GameObject
 from Appearance import Appearance
+from Items import *
+
 dead_entities = []
+
 
 
 class Actions:
     def __init__(self):
         pass
 
-#### ITEM STATS ####
-class ArmourStats:
-    wearable:bool = True
-    __slots__ = 'type','defense'
-    def __init__(self,type:str,defense:int) -> None:
-        self.type = type
-        self.defense = defense
-
-class DurabilityStats:
-    breakable = True
-    __slots__ = 'max_durability','durability'
-    def __init__(self,max_durability:int,durability:int):
-        self.max_durability = max_durability
-        self.durability = durability
-
-    def remove_durability(self,amount:int) -> bool:
-        self.durability -= amount
-        if self.durability <= 0:
-            self.durability = 0
-            return True
-        return False
-
-#### ITEMS ####
-    bow_shootable = False #if this is true then there MUST be a instance variable named <projectile> which can be instantiated to make an entity
-class Item:
-    crossbow_shootable = False
-    bow_shootable = False
-    def setCount(self,count:int):
-        assert count <= self.max_stack_count
-        self.count = count
-        return self
-    
-    __slots__ = 'tag', 'name',  'count', 'durability_stats', 'armour_stats', 'damage', 'mining_speed', 'fps', 'animation','frames','inventory'
-    def __init__(self,tag:str,frames:tuple[Surface,...]|None = None):
-        self.tag = tag #all the same types of items should have the same tag
-        self.name = tag # display name should start as default tag
-        self.count = 1
-        self.durability_stats:DurabilityStats|None = None
-        self.armour_stats:ArmourStats|None = None
-        self.damage:int = 0 
-        self.mining_speed:int = 0 
-        self.fps = 0 #this is for when the ItemWrapper <Entity> needs to create the animation. 
-        if frames:
-            self.frames = frames
-        else:
-            self.frames:tuple[pygame.Surface,...]  = Textures.items.get(self.tag,(Textures.NULL,))# at most 60 frames 
-        self.inventory:UniversalInventory
-        self.animation = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero,(0,0)),self.fps,self.frames)
-
-    @property
-    def max_stack_count(self):
-        return Settings.STACK_COUNT_BY_TAG.get(self.tag,DEFAULT_ITEM_MAX_STACK)
-
-    def getAttack(self) -> int:
-        return self.damage
-    @property
-    def armour_type(self) -> str|None:
-        return None if self.armour_stats is None else self.armour_stats.type
-    
-    #this method is called every frame during in which is in use
-    def duringUse(self, inventory: UniversalInventory) -> None: ...
-
-    #this method is called on right click down
-    def startUse(self,inventory:UniversalInventory) -> None: ...
-    
-    #This function will also be called when the item stops being in main hand or on right click up
-    def stopUse(self,inventory:UniversalInventory) -> None: ...
-    
-    def stackCompatible(self,other :Union["Item",None]) -> bool:
-        '''
-        Returns whether the items can possibly be stacked
-        with no regard if the item is fully stacked
-        '''
-        if other is None: return False
-        assert isinstance(other,Item) 
-        return self.tag is other.tag and self.name == other.name
-    
-    def __repr__(self) -> str:
-        if _DEBUG_: warn('This should not be called!!')
-        return self.__class__.__name__ + ": " + self.tag +": " + self.name
-
-    def __eq__(self,other):
-        raise RuntimeError("For what purpose?!?!")
-
-class DrinkableItem(Item):
-    DRINKING = 0
-    NOT_DRINKING = 1
-    IN_BETWEEN_DRINKS = 2
-    drinking_delay:float = 0.05 #how many seconds should be waited in between drunkss
-    '''A generic drinkable item, drink time is how long drinkAnim takes to play
-    all subclasses must define a onDrunk method'''
-
-    __slots__ = 'wait_in_state','drink_animation','animation_backup','state'
-    def __init__(self, tag: str,drinkAnim:Animation.SimpleAnimation):
-        super().__init__(tag)
-        self.drink_animation = drinkAnim
-        self.wait_in_state = drinkAnim.time_per_cycle
-        self.animation_backup = self.animation
-        self.state = self.NOT_DRINKING
-
-    @final
-    def startUse(self, inventory: UniversalInventory) -> None:
-        self.state = self.DRINKING
-        self.animation = self.drink_animation
-    
-    @final
-    def duringUse(self, inventory: UniversalInventory) -> None:
-        match self.state:
-            case self.DRINKING:
-                self.wait_in_state -= Time.deltaTime
-                if self.wait_in_state <= Time.deltaTime:
-                    for i,item in enumerate(inventory.inventory):
-                        if item is self:
-                            self.count -= 1
-                            self.onDrunk(inventory)
-
-                            if self.count == 0:
-                                inventory.checkItem(i)
-                            else:
-                                self.wait_in_state = self.drink_animation.time_per_cycle
-                                self.state = self.IN_BETWEEN_DRINKS
-                                self.animation = self.animation_backup
-
-
-            case self.IN_BETWEEN_DRINKS:
-                self.wait_in_state -= Time.deltaTime
-                if self.wait_in_state <= 0:
-                    self.state = self.DRINKING
-                    self.wait_in_state = self.drink_animation.time_per_cycle
-                    self.animation = self.drink_animation
-                    self.drink_animation.reset()
-
- 
-    @final
-    def stopUse(self, inventory: UniversalInventory) -> None:
-        self.animation = self.animation_backup
-        self.wait_in_state = self.drink_animation.time_per_cycle
-        self.drink_animation.reset()
-
-    @abstractmethod
-    def onDrunk(self,inventory:UniversalInventory): ...
-
-class StrengthPotion(DrinkableItem):
-    def __init__(self):
-        drinkAnim = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero,(0,0)),2,Textures.items['drinkingstrengthpotion'])
-        super().__init__(ITAG_STR_POTION, drinkAnim)
-        pass
-
-    def onDrunk(self,inventory:UniversalInventory):
-        print('drunk!!! hehehehaw')
-        SuperStrength1(inventory.entity)
-        inventory.entity.setExtraStatSpeed('need for speed', 10.0)
-        Camera.set_camera_convergence_speed(6)
-
-class BunnyEgg(Item): 
-    __slots__ = 'species',
-    def __init__(self):
-        super().__init__(ITAG_BUNNY_EGG)
-        self.name = f"Bunny Spawn Egg"
-        self.species =  'bunny'
-    
-    def startUse(self,inventory:UniversalInventory) -> None:
-        self.count -= 1
-        spawn_entity(Bunny(Camera.world_position_from_normalized(Input.m_pos_normalized)))
-
-class ItemArrow(Item):
-    bow_shootable = True
-    __slots__ = 'projectile'
-    def __init__(self):
-        super().__init__(ITAG_ARROW)
-        self.projectile = Arrow
-    
-class ItemArrowExplosive(Item):
-    bow_shootable = True
-    __slots__ = 'projectile'
-    def __init__(self):
-        super().__init__(ITAG_ARROW_EXPLOSIVE)
-        self.projectile = ArrowExplosive
-
-class BowBase(Item):
-    __slots__ = 'springyness','startTime','loadStage','max_pull_time','loaded_item','min_draw_time'
-    def __init__(self,item_tag:str):
-        super().__init__(item_tag)
-        self.loadStage = 0.0
-        self.startTime:float|None = None
-        self.startTime = None
-        self.springyness:float = 7.0 # used to calculate arrow speed
-        self.min_draw_time = 0.5 # this is the minimum amount of time required so that the arrow in the inventory actually be consumbed
-        self.max_pull_time = 5.0 #the maximum amount of time held down that should be counted towards the bow fire
-        self.loaded_item:type[Arrow]|None = None
-        
-    
-    def startUse(self,inventory: UniversalInventory):
-        for i,item in enumerate(inventory.inventory):
-
-            item:ItemArrow
-            if item is not None and item.bow_shootable:
-                self.startTime = Time.time
-                return
-        self.startTime = None
-
-    def duringUse(self, inventory: UniversalInventory) -> None:
-        if self.startTime is None or self.loaded_item is not None: return
-        if Time.time - self.startTime < self.min_draw_time: return
-        for i,item in enumerate(inventory.inventory):
-            if item is not None and item.bow_shootable:
-                item:ItemArrow
-                self.loaded_item = item.projectile
-                item.count -= 1
-                return inventory.checkItem(i)  # return None
-    
-    def stopUse(self,inventory) -> None:
-        if self.startTime is None or self.loaded_item is None: return
-        assert isinstance(inventory,UniversalInventory)
-        time = min(Time.time - self.startTime,self.max_pull_time)
-        speed_modifier = self.getArrowSpeedFromTime(time)
-        direction = (Camera.world_position_from_normalized(Input.m_pos_normalized) - inventory.entity.pos).normalized
-        direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
-        spawn_entity(self.loaded_item(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
-        self.loaded_item = None
-        self.startTime = None
-
-    def getArrowSpeedFromTime(self,t:float) -> float: ...
-        
-    def getArrowInstability(self,t:float) -> float: ...
-
-class Bow(BowBase):
-    def __init__(self):
-        super().__init__(ITAG_BOW)
-    
-    def getArrowSpeedFromTime(self,t:float) -> float:
-        return tanh(t) * self.springyness
-
-    def getArrowInstability(self,t:float) -> float: # this is how much the arrow should be randomized for 
-        return 1/ ( 5.0 + (4.5 * (t - 0.3))**2)
-
-class QuickBow(BowBase):
-    def __init__(self):
-        super().__init__(ITAG_SHORTBOW)
-        self.springyness = 5.0
-    
-    def getArrowSpeedFromTime(self,t:float) -> float:
-        return tanh(min(2*t,self.max_pull_time)) * self.springyness
-    
-    def getArrowInstability(self,t): # this is how much the arrow should be randomized for 
-        return 1/ ( 5.0 + (3.5 * (t - 0.3))**2)+0.2
-
-class DivineBow(BowBase):
-    def __init__(self):
-        super().__init__(ITAG_DIVINE_BOW)
-        self.springyness = 10.0
-
-    def getArrowSpeedFromTime(self, t: float) -> float:
-        v = (t + 0.5)
-        return tanh(v*v)  * self.springyness
-
-    def getArrowInstability(self, t: float) -> float:
-        return 0.0
 
 #### BLOCKS ####
 class Block(GameObject):
@@ -389,18 +134,25 @@ class WoodenPlank(Block):
 
 #### ENTITIES ####
 class Entity(GameObject):
+    species:str
+    def __init_subclass__(cls) -> None:
+        if not hasattr(cls,'species'):
+            raise EntitySetupError()
+        if cls.species in Settings.SPAWNABLE_ENTITIES:
+            raise RuntimeError("No two entities may share the same species attribute value!")
+        Settings.SPAWNABLE_ENTITIES[cls.species] = cls
     __slots__ = 'vel','image','collider','animation','speed','appearance','dead'
-    def __init__(self,pos:Vector2,species:str):
-        super().__init__(pos,species)
+
+    def __init__(self,pos:Vector2):
+        super().__init__(pos,self.species)
         self.vel = Vector2.zero
-        species = intern(species) # use intern to keep memory usage down and also be able to use "is" when compating entities
-        self.typeid = species
-        self.image = CSurface(Textures.NULL,self.pos,Settings.SURFACE_OFFSET[species])
-        self.collider = Collider(0,0,*Settings.HITBOX_SIZE[species])
+        self.typeid = self.species
+        self.image = CSurface(Textures.NULL,self.pos,Settings.SURFACE_OFFSET[self.species])
+        self.collider = Collider(0,0,*Settings.HITBOX_SIZE[self.species])
         self.collider.setCenter(*self.pos)
         self.animation = Animation.Animation(self.image)
         self.speed = 1.0
-        self.appearance = Appearance(*Settings.APPEARANCE_BY_SPECIES[species],species=species)
+        self.appearance = Appearance(*Settings.APPEARANCE_BY_SPECIES[self.species],species=self.species)
         self.dead = False
 
     def onLoad(self): 
@@ -448,9 +200,10 @@ class Entity(GameObject):
         return f"{self.__class__.__name__}: {self.typeid}"
 
 class ItemWrapper(Entity):
+    species = 'item'
     def __init__(self,pos,item:Item):
         self.pickup_time = ITEM_PICKUP_TIME
-        super().__init__(pos,'item')
+        super().__init__(pos)
         assert isinstance(item,Item)
         self.item = item
         item.animation.csurface = self.image
@@ -476,9 +229,9 @@ class LiveTNT(Entity):
     def damage_func_getter(joules:float) -> Callable[[float],int]:
         E = 2.718281828
         return lambda dist : (joules * E ** (-dist)).__trunc__()
-    
+    species = 'tnt'
     def __init__(self,pos:Vector2,time:float,energy:int):
-        super().__init__(pos,'tnt')
+        super().__init__(pos)
         self.animation.add_state('1',1,Textures.blocks['tnt'])
         self.animation.set_state('1')
         self.animation.animate()
@@ -517,8 +270,9 @@ class LiveTNT(Entity):
         return EXPLOSION_DAMAGE
 
 class Arrow(Entity):
+    species = 'arrow'
     def __init__(self,pos:Vector2,velocity:Vector2,shooter:Entity|None):
-        super().__init__(pos,'arrow')     
+        super().__init__(pos)     
         angle = -velocity.get_angle() 
         if shooter: 
             velocity += shooter.vel # add the shooters velocity to our own because its relative to the shooters vel in real life
@@ -613,16 +367,16 @@ class AliveEntity(Entity):
     'energy','attack_speed','time_between_attacks','time_to_attack','time_to_regen','regen_time','vision_collider','vision_squared','states','ground','invulnerability_time', \
     'time_til_vulnerable','direction','extra_speed','extra_speed_sum','extra_total_health','extra_total_health_sum','extra_regen','extra_regen_sum','extra_strength' ,\
     'extra_strength_sum','extra_energy','extra_energy_sum','extra_defense','extra_defense_sum','effects','state'
-    def __init__(self,pos,species):
-        super().__init__(pos,species)
-        self.actions = Settings.ACTIONS_BY_SPECIES[species]
-        self.pickup_range = max(*Settings.HITBOX_SIZE[species]) * half_sqrt_2 # just a shortcut for finding the length to the corner of a box from the middle when you only know a side length
-        self.inventory = UniversalInventory(Settings.INVENTORY_SPACES_BY_SPECIES[species],self)
-        self.armour_inventory = ArmorInventory(*Settings.ARMOUR_SLOTS_BY_SPECIES[species])
+    def __init__(self,pos):
+        super().__init__(pos)
+        self.actions = Settings.ACTIONS_BY_SPECIES[self.species]
+        self.pickup_range = max(*Settings.HITBOX_SIZE[self.species]) * half_sqrt_2 # just a shortcut for finding the length to the corner of a box from the middle when you only know a side length
+        self.inventory = UniversalInventory(Settings.INVENTORY_SPACES_BY_SPECIES[self.species],self)
+        self.armour_inventory = ArmorInventory(*Settings.ARMOUR_SLOTS_BY_SPECIES[self.species])
         #Stats
-        self.stats = Settings.STATS_BY_SPECIES[species].copy()
+        self.stats = Settings.STATS_BY_SPECIES[self.species].copy()
         self.exp = 5000 #dont make attribute points (overused). make exp have another purpose. attribute points can lead to severely op setups and the player getting exactly what they want. 
-        self.max_speed = Settings.MAX_SPEED_BY_SPECIES[species] 
+        self.max_speed = Settings.MAX_SPEED_BY_SPECIES[self.species] 
         speed = self.stats['speed'] 
         self.speed = self.max_speed * speed / (speed + 100)
         self.total_health = self.stats['constitution'] * 5 + self.stats['strength'] + self.stats['stamina']
@@ -640,8 +394,8 @@ class AliveEntity(Entity):
         self.time_to_attack = self.time_between_attacks
         self.time_to_regen = 0.0 # regen timer
         self.regen_time = 1.0 # how long in seconds should we wait between regen ticks
-        self.vision_collider = Collider(0,0,Settings.VISION_BY_SPECIES[species]*2,Settings.VISION_BY_SPECIES[species]*2)
-        self.vision_squared = Settings.VISION_BY_SPECIES[species] ** 2
+        self.vision_collider = Collider(0,0,Settings.VISION_BY_SPECIES[self.species]*2,Settings.VISION_BY_SPECIES[self.species]*2)
+        self.vision_squared = Settings.VISION_BY_SPECIES[self.species] ** 2
         self.states = []
         self.ground = ground.Invalid()
         # damage timer
@@ -892,9 +646,10 @@ class AliveEntity(Entity):
                     item.onDeath()
 
 class Player(AliveEntity):
+    species ='human'
     __slots__ = 'cx','cy','can_move','attacking','state','showingInventory','hotbar','ui','hbui','walking_particle'
     def __init__(self,pos:Vector2):
-        super().__init__(pos,'human')
+        super().__init__(pos)
 
         self.cx = (self.pos.x//CHUNK_SIZE).__floor__()
         self.cy = (self.pos.y//CHUNK_SIZE).__floor__()
@@ -1066,7 +821,7 @@ class Player(AliveEntity):
         self.animate()
 
 class Spirit(AliveEntity):
-
+    species = 'spirit'
     enemies = {'bunny','human'}
     eats = set()# spirits eat nothing (for now)
     fears = set() #spirits fear nothing (for now)
@@ -1075,7 +830,7 @@ class Spirit(AliveEntity):
     def __init__(self,pos):
         idle =  Textures.entities['spirit']['idle'] # type: ignore
         assert isinstance(idle,tuple)
-        super().__init__(pos,'spirit')
+        super().__init__(pos)
         self.animation.add_state('idle',8,idle,idle)        
         self.animation.set_state('idle')
         self.vision_collider = Collider(0,0,Settings.VISION_BY_SPECIES['spirit']*2,Settings.VISION_BY_SPECIES['spirit']*2)
@@ -1156,11 +911,11 @@ class Bunny(AliveEntity):
     enemies = set() #have no natural enemies for now
     eats = set()# bunny's eat nothing (for now)
     fears = {'spirit'}
-
+    species = 'bunny'
     neutral_to = set()
     #__slots__ = 'right_idle','left_idle','fears','eats','enemies','driver','mark','hunger','sprinting','states'
     def __init__(self,pos):
-        super().__init__(pos,'bunny')
+        super().__init__(pos)
         idle = tuple(Textures.entities['bamboo']['idle'].values()) #type: ignore
 
         self.fears = self.fears.copy()

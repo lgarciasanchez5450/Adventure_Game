@@ -42,6 +42,7 @@ class SolidGround(Ground):
             nonlocal initial
             inst.is_solid = True
             return initial(inst)
+        wrapper.__name__ = cls.__custom_init__.__name__
         cls.__custom_init__ = wrapper
 
 class Invalid(Ground):

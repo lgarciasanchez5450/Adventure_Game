@@ -1,193 +1,296 @@
 import pygame
+from Constants import *
+import Textures
 if __name__=='__main__':
     screen = pygame.display.set_mode((100,100),pygame.OPENGL)
-    import Textures
-    Textures.init()
-from Constants import *
-from Settings import BLOCK_SIZE,ITEM_SIZE, SLEEP_VELOCITY_THRESHOLD
-import Textures
-from Camera import NullCSurface
-from game_math import cache,Vector2,Collider,get_most_sig_bits
-from math import floor
-from pygame.transform import smoothscale as image_scale
+
+    #Textures.initInThreadSimple()
+import Camera
+from game_math import Vector2, tanh, randomNudge
+
 from game_random import generate_point_from
 import Animation
+from Game_Typing import Optional, Surface, final, warn, TYPE_CHECKING, abstractmethod
+from Inventory import UniversalInventory
+import Settings
+import Time
 from typing import Callable,TypeVar
+import Input
+_DEBUG_ = DEBUG
+if TYPE_CHECKING:
+    from general_manager import Arrow, ArrowExplosive, Bunny, SuperStrength1
 
 
-_DEBUG_ = True
-@cache
-def get_surface(name):
-    return image_scale(Textures.texture[name],(ITEM_SIZE,ITEM_SIZE))
+__all__ = [
+    'Item',
+    'DivineBow',
+    'Bow',
+    'BunnyEgg',
+    'StrengthPotion',
+    'ItemArrow'
+]
+
+
+
+#### ITEM STATS ####
 class ArmourStats:
     wearable:bool = True
-
-    __slots__ = ('type','defense')
+    __slots__ = 'type','defense'
     def __init__(self,type:str,defense:int) -> None:
         self.type = type
         self.defense = defense
 
-    def hashcode(self):
-        '''Should return 4 bytes as an int '''
-        return (hash(self.type) ^ self.defense) & 0xFFFFFFFF
-
-
 class DurabilityStats:
     breakable = True
-    __slots__ = ('max_durability','durability')
+    __slots__ = 'max_durability','durability'
     def __init__(self,max_durability:int,durability:int):
         self.max_durability = max_durability
         self.durability = durability
 
-    def remove_durability(self,amount:int):
+    def remove_durability(self,amount:int) -> bool:
         self.durability -= amount
         if self.durability <= 0:
             self.durability = 0
-
-    def hashcode(self):
-        '''Should return 4 bytes as an int '''
-        return ((self.max_durability + 53) * self.durability + 53 ) & 0xFFFFFFFF
+            return True
+        return False
 
 
-nullFrame:pygame.Surface= Textures.texture['null.png']
+
+
+
+#### ITEMS ####
 class Item:
+    bow_shootable = False #if this is true then there MUST be a instance variable named <projectile> which can be instantiated to make an entity
+    crossbow_shootable = False
+    entity_loaded = None
 
-    def build(self):
-        self.hashcode = 0  
-        if self.armour_stats is not None:
-            self.hashcode |= self.armour_stats.hashcode() << 32
-        if self.durability_stats is not None:
-            self.hashcode |= self.durability_stats.hashcode()
-        
-        self.hashcode <<= 16
-        generic_code = ((get_most_sig_bits(self.damage,2)<<2)|(self.damage&0b11))
-        generic_code <<=4
-        generic_code |= ((get_most_sig_bits(self.max_stack_count,2)<<2)|(self.max_stack_count&0b11))
-        generic_code <<=4
-        generic_code |= ((get_most_sig_bits(self.mining_speed,2)<<2)|(self.mining_speed&0b11))
-        self.hashcode |= generic_code
-
+    
+    def setCount(self,count:int):
+        assert count <= self.max_stack_count
+        self.count = count
         return self
-
-    __slots__ = ('name', 'max_stack_count', 'count', 'durability_stats', 'armour_stats', 'block', 'damage', 'mining_speed', 'fps', 'animation','frames','hashcode','left_click','right_click','left_hold','right_hold')
-    def __init__(self,name:str,block:str|None=None):
-        self.hashcode =None
-        self.block = block# if this is not None then it needs to be a key <string> to the block that it should place  
-        self.name = name
-        self.max_stack_count = 1
+    
+    __slots__ = 'tag', 'name',  'count', 'durability_stats', 'armour_stats', 'damage', 'mining_speed', 'fps', 'animation','frames','inventory'
+    def __init__(self,tag:str,frames:tuple[Surface,...]|None = None):
+        self.tag = tag #all the same types of items should have the same tag
+        self.name = tag # display name should start as default tag
         self.count = 1
         self.durability_stats:DurabilityStats|None = None
         self.armour_stats:ArmourStats|None = None
-        self.damage = 0 
-        self.mining_speed = 0 
+        self.damage:int = 0 
+        self.mining_speed:int = 0 
         self.fps = 0 #this is for when the ItemWrapper <Entity> needs to create the animation. 
-        self.frames:tuple[pygame.Surface]  = (Textures.texture.get(name+'.png',nullFrame),) # at most 60 frames 
-        #self.path = f'{Textures.PATH()}Images\\items\\{name}'
-        self.animation = Animation.SimpleAnimation(NullCSurface,self.fps,self.frames)
-        self.left_click:Callable[[Item],None] = lambda t: None
-        self.right_click:Callable[[Item],None] = lambda t : None
-        self.left_hold:Callable[[Item],None] = lambda t: None
-        self.right_hold:Callable[[Item],None] = lambda t: None
-
-    def take_one(self):
-        '''Splits an instance of a specific item (that has a count > 1) in two, one that it returns that has a count of 1 and it decrements the count of this item by 1'''
-        if _DEBUG_ and self.count == 1: raise RuntimeError("Cannot split an item that has a count of one!")
-        self.count -= 1
-        return self.copy_one()
-    
-    def split_half(self):
-        '''Splits an instance of a specific item (that has a count > 1) in two, one that it returns that has a count of ceil(self.count/2) and it decrements the count of this item by floor(count/2)'''
-        if _DEBUG_ and self.count == 1: raise RuntimeError("Cannot split an item that has a count of one!")
-        floored_half = self.count//2 
-        self.count -= floored_half
-        _new = self.copy_one()
-        _new.count = floored_half
-        return _new
-    
-    def leave_one(self):
-        if _DEBUG_ and self.count == 1: raise RuntimeError("Cannot split an item that has a count of one!")
-        _new = self.copy_one()
-        _new.count = self.count-1
-        self.count =1 
-        return _new
-
-    def copy_one(self):
-        inst = Item(self.name,self.block)
-        inst.durability_stats = self.durability_stats
-        inst.armour_stats = self.armour_stats
-        inst.max_stack_count = self.max_stack_count
-        inst.fps = self.fps
-        inst.damage = self.damage
-        return inst
-    
-    def remove_one(self):
-        self.count -= 1
-        if self.count == 0:
-            return True
-        return False
-        
-    def setMaxCount(self,max_count):
-        self.max_stack_count = max_count
-        return self
-
-    def setWearable(self,type,armour):
-        self.armour_stats = ArmourStats(type,armour)
-        return self
-    
-    def setBreakable(self,max,curr):
-        self.durability_stats = DurabilityStats(max,curr)
-        return self
-    
-    def setLeftClick(self,leftClick):
-        self.left_click = leftClick
-        return self
+        if frames:
+            self.frames = frames
+        else:
+            self.frames:tuple[pygame.Surface,...]  = Textures.items.get(self.tag,(Textures.NULL,))# at most 60 frames 
+        self.inventory:UniversalInventory
+        self.animation = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero,(0,0)),self.fps,self.frames)
 
     @property
-    def wearable(self) -> bool:
-        return self.armour_stats is not None
+    def max_stack_count(self):
+        return Settings.STACK_COUNT_BY_TAG.get(self.tag,DEFAULT_ITEM_MAX_STACK)
 
-   
-    def canStack(self,other):
-        '''Items can only stack with each other if they share the same name and hashcode method'''
-        if other is None:
-            return False
-        assert isinstance(other,Item), 'Can only compare Items with other items'
-        return self.name is other.name and self.hashcode == other.hashcode
-    def __eq__(self,other) -> bool:
-        return self is other        
-
-    def __repr__(self):       
-        return f"{self.name} <Item>: Count -> {self.count}"
-import typing
-ItemFactory = typing.Callable[[],Item]
-ItemSystem:dict[str,ItemFactory] = {}
-def registerItem(itemFactory:ItemFactory,name):
-    registeringError = "Error in Registering Item: "+name
-    global ItemSystem
-    if name in ItemSystem:
-        print("Cannot override a previous item registered in ItemSystem")
-        raise RuntimeError()
-    #Testing if item is good to add
-    if not callable(itemFactory):
-        print(registeringError)
-        return
-    testItem:Item = itemFactory()
-    if testItem.hashcode is not None:
-        print(registeringError)
-        raise RuntimeError()
-    if testItem.name is not name:
-        print(registeringError)
-        return
-    print('Succesfully Registered item ->',name)
-    ItemSystem[name] = itemFactory
-
-def getItem(name:str) -> Item:
-    if name not in ItemSystem:
-        raise RuntimeError(f'Item of name {name} does not exist. Make sure it is registered!')
-    return ItemSystem[name]().build()
+    def getAttack(self) -> int:
+        return self.damage
+    @property
+    def armour_type(self) -> str|None:
+        return None if self.armour_stats is None else self.armour_stats.type
     
-def delItem(item:Item):
-    import gc
-    print("All references to item:",gc.get_referrers)
+    #this method is called every frame during in which is in use
+    def duringUse(self, inventory: UniversalInventory) -> None: ...
+
+    #this method is called on right click down
+    def startUse(self,inventory:UniversalInventory) -> None: ...
+    
+    #This function will also be called when the item stops being in main hand or on right click up
+    def stopUse(self,inventory:UniversalInventory) -> None: ...
+    
+    def stackCompatible(self,other :Optional["Item"]) -> bool:
+        '''
+        Returns whether the items can possibly be stacked
+        with no regard if the item is fully stacked
+        '''
+        if other is None: return False
+        assert isinstance(other,Item) 
+        return self.tag is other.tag and self.name == other.name
+    
+    def __repr__(self) -> str:
+        if _DEBUG_: warn('This should not be called!!')
+        return self.__class__.__name__ + ": " + self.tag +": " + self.name
+
+    def __eq__(self,other):
+        raise RuntimeError("For what purpose?!?!")
+
+class DrinkableItem(Item):
+    DRINKING = 0
+    NOT_DRINKING = 1
+    IN_BETWEEN_DRINKS = 2
+    drinking_delay:float = 0.05 #how many seconds should be waited in between drunkss
+    '''A generic drinkable item, drink time is how long drinkAnim takes to play
+    all subclasses must define a onDrunk method'''
+
+    __slots__ = 'wait_in_state','drink_animation','animation_backup','state'
+    def __init__(self, tag: str,drinkAnim:Animation.SimpleAnimation):
+        super().__init__(tag)
+        self.drink_animation = drinkAnim
+        self.wait_in_state = drinkAnim.time_per_cycle
+        self.animation_backup = self.animation
+        self.state = self.NOT_DRINKING
+
+    @final
+    def startUse(self, inventory: UniversalInventory) -> None:
+        self.state = self.DRINKING
+        self.animation = self.drink_animation
+    
+    @final
+    def duringUse(self, inventory: UniversalInventory) -> None:
+        match self.state:
+            case self.DRINKING:
+                self.wait_in_state -= Time.deltaTime
+                if self.wait_in_state <= Time.deltaTime:
+                    for i,item in enumerate(inventory.inventory):
+                        if item is self:
+                            self.count -= 1
+                            self.onDrunk(inventory)
+
+                            if self.count == 0:
+                                inventory.checkItem(i)
+                            else:
+                                self.wait_in_state = self.drink_animation.time_per_cycle
+                                self.state = self.IN_BETWEEN_DRINKS
+                                self.animation = self.animation_backup
+
+
+            case self.IN_BETWEEN_DRINKS:
+                self.wait_in_state -= Time.deltaTime
+                if self.wait_in_state <= 0:
+                    self.state = self.DRINKING
+                    self.wait_in_state = self.drink_animation.time_per_cycle
+                    self.animation = self.drink_animation
+                    self.drink_animation.reset()
 
  
+    @final
+    def stopUse(self, inventory: UniversalInventory) -> None:
+        self.animation = self.animation_backup
+        self.wait_in_state = self.drink_animation.time_per_cycle
+        self.drink_animation.reset()
+
+    @abstractmethod
+    def onDrunk(self,inventory:UniversalInventory): ...
+
+class StrengthPotion(DrinkableItem):
+    def __init__(self):
+        drinkAnim = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero,(0,0)),2,Textures.items['drinkingstrengthpotion'])
+        super().__init__(ITAG_STR_POTION, drinkAnim)
+        pass
+
+    def onDrunk(self,inventory:UniversalInventory):
+        print('drunk!!! hehehehaw')
+        SuperStrength1(inventory.entity)
+        inventory.entity.setExtraStatSpeed('need for speed', 10.0)
+        Camera.set_camera_convergence_speed(6)
+
+class BunnyEgg(Item): 
+    entity_loaded = 'bunny'
+    def __init__(self):
+        super().__init__(ITAG_BUNNY_EGG)
+        self.name = f"Bunny Spawn Egg"
+        self.species =  'bunny'
+
+class ItemArrow(Item):
+    bow_shootable = True
+    __slots__ = 'projectile'
+    def __init__(self):
+        super().__init__(ITAG_ARROW)
+        self.projectile = Arrow
+    
+class ItemArrowExplosive(Item):
+    bow_shootable = True
+    __slots__ = 'projectile'
+    def __init__(self):
+        super().__init__(ITAG_ARROW_EXPLOSIVE)
+        self.projectile = ArrowExplosive
+
+class BowBase(Item):
+    __slots__ = 'springyness','startTime','loadStage','max_pull_time','loaded_item','min_draw_time'
+    def __init__(self,item_tag:str):
+        super().__init__(item_tag)
+        self.loadStage = 0.0
+        self.startTime:float|None = None
+        self.startTime = None
+        self.springyness:float = 7.0 # used to calculate arrow speed
+        self.min_draw_time = 0.5 # this is the minimum amount of time required so that the arrow in the inventory actually be consumbed
+        self.max_pull_time = 5.0 #the maximum amount of time held down that should be counted towards the bow fire
+        self.loaded_item:type[Arrow]|None = None
+        
+    
+    def startUse(self,inventory: UniversalInventory):
+        for i,item in enumerate(inventory.inventory):
+
+            item:ItemArrow
+            if item is not None and item.bow_shootable:
+                self.startTime = Time.time
+                return
+        self.startTime = None
+
+    def duringUse(self, inventory: UniversalInventory) -> None:
+        if self.startTime is None or self.loaded_item is not None: return
+        if Time.time - self.startTime < self.min_draw_time: return
+        for i,item in enumerate(inventory.inventory):
+            if item is not None and item.bow_shootable:
+                item:ItemArrow
+                self.loaded_item = item.projectile
+                item.count -= 1
+                return inventory.checkItem(i)  # return None
+    
+    def stopUse(self,inventory) -> None:
+        if self.startTime is None or self.loaded_item is None: return
+        assert isinstance(inventory,UniversalInventory)
+        time = min(Time.time - self.startTime,self.max_pull_time)
+        speed_modifier = self.getArrowSpeedFromTime(time)
+        direction = (Camera.world_position_from_normalized(Input.m_pos_normalized) - inventory.entity.pos).normalized
+        direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
+        #spawn_entity(self.loaded_item(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
+        self.loaded_item = None
+        self.startTime = None
+
+    def getArrowSpeedFromTime(self,t:float) -> float: ...
+        
+    def getArrowInstability(self,t:float) -> float: ...
+
+class Bow(BowBase):
+    def __init__(self):
+        super().__init__(ITAG_BOW)
+    
+    def getArrowSpeedFromTime(self,t:float) -> float:
+        return tanh(t) * self.springyness
+
+    def getArrowInstability(self,t:float) -> float: # this is how much the arrow should be randomized for 
+        return 1/ ( 5.0 + (4.5 * (t - 0.3))**2)
+
+class QuickBow(BowBase):
+    def __init__(self):
+        super().__init__(ITAG_SHORTBOW)
+        self.springyness = 5.0
+    
+    def getArrowSpeedFromTime(self,t:float) -> float:
+        return tanh(min(2*t,self.max_pull_time)) * self.springyness
+    
+    def getArrowInstability(self,t): # this is how much the arrow should be randomized for 
+        return 1/ ( 5.0 + (3.5 * (t - 0.3))**2)+0.2
+
+class DivineBow(BowBase):
+    def __init__(self):
+        super().__init__(ITAG_DIVINE_BOW)
+        self.springyness = 10.0
+
+    def getArrowSpeedFromTime(self, t: float) -> float:
+        v = (t + 0.5)
+        return tanh(v*v)  * self.springyness
+
+    def getArrowInstability(self, t: float) -> float:
+        return 0.0
+
+

@@ -1,4 +1,6 @@
 from Constants import *
+from typing import TYPE_CHECKING
+
 TREE_SPACING_BY_BIOME = {
     PLAINS: 5,
     SAVANAH:10
@@ -96,6 +98,9 @@ GROUND_TEXTURE_BY_ID = {
     GROUND_WATER: 'Water',
     GROUND_STONE: 'Stone'
 }
+if TYPE_CHECKING:
+    from general_manager import Entity
+SPAWNABLE_ENTITIES: dict [str, type['Entity']] = {}
 
 # If the item doesn't exist in this dictionary, the game will probably assume a stack of 64
 STACK_COUNT_BY_TAG = {
