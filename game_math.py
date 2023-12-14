@@ -218,9 +218,14 @@ class Vector2:
 		self.x = __object.x
 		self.y = __object.y
 
+	@classmethod
+	def new_from_tuple(cls,tup:tuple[scalar,scalar]):
+		return Vector2(tup[0],tup[1])
+
 	def from_tuple(self,tup:tuple[scalar,scalar]):
 		self.x = tup[0]
 		self.y = tup[1]
+
 
 	@property
 	def tuple(self):
@@ -367,6 +372,9 @@ class Vector2Int:
 		self.x = __object.x
 		self.y = __object.y
 
+	@classmethod
+	def new_from_tuple(cls,tup:tuple[int,int]):
+		return Vector2Int(tup[0],tup[1])
 	def from_tuple(self,tup:tuple[int,int]):
 		self.x = tup[0]
 		self.y = tup[1]
@@ -375,9 +383,7 @@ class Vector2Int:
 	def tuple(self):
 		return (self.x,self.y)
 	
-	@property
-	def tupled_ints(self):
-		return (self.x.__trunc__(),self.y.__trunc__())
+
 
 	def copy(self):
 		return Vector2Int(self.x,self.y)

@@ -6,10 +6,11 @@ if __name__ == "__main__":
 import Camera
 from Constants import HEIGHT, WIDTH
 import Time
-from game_math import Vector2, Collider,ones,deque
+from game_math import Vector2, Collider,ones,deque, Vector2Int
 import Input
-
-
+from Game_Typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from Items import Item
 tex_location = 1
 
 class UI:
@@ -51,6 +52,50 @@ class UI:
         self.tex.release()
         self.render_object.release()
         self.program.release()
+
+class InScreenUI:
+    def __init__(self, center:Vector2Int,size:tuple[int,int]):
+        self.size = Vector2Int(*size)
+        #normal screen units
+        self.topleft = center - Vector2Int.new_from_tuple(size)//2
+        self.surface = pygame.Surface(size)
+        self.surface_size = Vector2.new_from_tuple(size)
+        #normalized units
+        self.center = Vector2(center.x/WIDTH,center.y/HEIGHT)
+        normalized_topleft = center - Vector2Int(HALFWIDTH,HALFHEIGHT) - Vector2Int.new_from_tuple(size)#center is in pixels
+        normalized_topleft = Vector2(normalized_topleft.x/WIDTH, normalized_topleft.y/HEIGHT)
+        normalized_size = Vector2.new_from_tuple(size) # size is in pixels
+        normalized_size.x /= WIDTH
+        normalized_size.y /= HEIGHT
+        self.collider = Collider(normalized_topleft.x,normalized_topleft.y,normalized_size.x,normalized_size.y)
+        self.thingy = normalized_size.inverse
+
+    def update(self):
+        self.surface.fill('grey')
+        if self.collider.collide_point_inclusive(Input.m_pos_normalized.tuple): 
+            self.relative_mouse_position_normalized = (Input.m_pos_normalized - self.center).vector_mul(self.thingy)
+            self.rel_mouse_pos = (self.relative_mouse_position_normalized+ones).vector_mul(self.surface_size/2)
+
+
+    def draw(self,surface:pygame.Surface):
+        surface.blit(self.surface,self.topleft.tuple)
+
+class ItemDescriptionUI:
+    def __init__(self):
+        self.pos = Vector2.zero
+        self.size = Vector2.zero
+        self.item:'Item'
+
+    def setItem(self,item:'Item'): 
+        self.item = item
+
+
+    def update(self):
+        pass # TODO add the cool scrolling function for reading long descriptions soon
+
+        
+
+
 class EmtpyUI(UI):
     __slots__ = tuple()
     def __init__(self,*args,**kwargs): pass
@@ -72,5 +117,5 @@ class DebugUI(UI):
 Null = EmtpyUI()
 
 showingUIs:deque[UI] = deque([Null],maxlen=1)
-
+inScreenUI:deque[InScreenUI] = deque([Null],maxLen=1) #type: ignore
 

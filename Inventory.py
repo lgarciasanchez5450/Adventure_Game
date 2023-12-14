@@ -6,7 +6,8 @@ import Animation
 from game_math import Array
 from Game_Typing import UnInstantiable, TYPE_CHECKING, Optional, Any
 if TYPE_CHECKING: 
-    from general_manager import Item,AliveEntity
+    from general_manager import AliveEntity
+    from Items import *
 class UniversalInventory:
     def __init__(self,spaces:int,entity):
         self.spaces = spaces
@@ -16,7 +17,7 @@ class UniversalInventory:
         self.selected:int = -1
         self.slot_restrictions:dict[int,Callable[['Item'],bool]] = {} #will store slot indexes that have restrictions via a function that will accept the item and return True only if it fits
 
-    def setItem(self,item: Optional[ "Item"],index:int):
+    def setItem(self,item: Optional["Item"],index:int):
         '''
         The implementation should prioritize combining the items, if that doesn't work it will swap them
         Should return item that is left over or None if nothing is left over

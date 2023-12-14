@@ -16,9 +16,10 @@ import Settings
 import Time
 from typing import Callable,TypeVar
 import Input
+from EntityEffects import *
 _DEBUG_ = DEBUG
 if TYPE_CHECKING:
-    from general_manager import Arrow, ArrowExplosive, Bunny, SuperStrength1
+    from general_manager import Arrow, ArrowExplosive, Bunny, Entity
 
 
 __all__ = [
@@ -62,7 +63,13 @@ class DurabilityStats:
 class Item:
     bow_shootable = False #if this is true then there MUST be a instance variable named <projectile> which can be instantiated to make an entity
     crossbow_shootable = False
+    base_projectile:str #MUST be defined when ((bow_shootable || crossbow_shootable) == True)
     entity_loaded = None
+    places_block = None
+    def __init_subclass__(cls) -> None:
+        if cls.bow_shootable or cls.crossbow_shootable:
+            assert hasattr(cls,'base_projectile'), f'Item {cls.__name__} must define a base_projectile as it is marked as shootable by a bow or crossbow'
+            assert cls.base_projectile in Settings.SPAWNABLE_ENTITIES, f' Item {cls.__name__}\'s base_projectile ({cls.base_projectile}) is not found in SPAWNABLE ENTITIES!'
 
     
     def setCount(self,count:int):
@@ -189,8 +196,18 @@ class StrengthPotion(DrinkableItem):
     def onDrunk(self,inventory:UniversalInventory):
         print('drunk!!! hehehehaw')
         SuperStrength1(inventory.entity)
-        inventory.entity.setExtraStatSpeed('need for speed', 10.0)
+
+class SpeedPotion(DrinkableItem):
+    def __init__(self):
+        drinkAnim = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero,(0,0)),2,Textures.items['drinkingstrengthpotion'])
+        super().__init__(ITAG_SPD_POTION, drinkAnim)
+        pass
+
+    def onDrunk(self,inventory:UniversalInventory):
+        print('drunk!!! hehehehaw')
+        Speed1(inventory.entity)
         Camera.set_camera_convergence_speed(6)
+
 
 class BunnyEgg(Item): 
     entity_loaded = 'bunny'
@@ -201,17 +218,19 @@ class BunnyEgg(Item):
 
 class ItemArrow(Item):
     bow_shootable = True
+    base_projectile = 'arrow'
     __slots__ = 'projectile'
     def __init__(self):
         super().__init__(ITAG_ARROW)
-        self.projectile = Arrow
+        self.projectile = self.base_projectile
     
 class ItemArrowExplosive(Item):
     bow_shootable = True
+    base_projectile = 'arrow'
     __slots__ = 'projectile'
     def __init__(self):
         super().__init__(ITAG_ARROW_EXPLOSIVE)
-        self.projectile = ArrowExplosive
+        self.projectile = self.base_projectile
 
 class BowBase(Item):
     __slots__ = 'springyness','startTime','loadStage','max_pull_time','loaded_item','min_draw_time'
@@ -223,7 +242,7 @@ class BowBase(Item):
         self.springyness:float = 7.0 # used to calculate arrow speed
         self.min_draw_time = 0.5 # this is the minimum amount of time required so that the arrow in the inventory actually be consumbed
         self.max_pull_time = 5.0 #the maximum amount of time held down that should be counted towards the bow fire
-        self.loaded_item:type[Arrow]|None = None
+        self.loaded_item:type["Entity"]|None = None
         
     
     def startUse(self,inventory: UniversalInventory):
@@ -241,7 +260,7 @@ class BowBase(Item):
         for i,item in enumerate(inventory.inventory):
             if item is not None and item.bow_shootable:
                 item:ItemArrow
-                self.loaded_item = item.projectile
+                self.loaded_item = Settings.SPAWNABLE_ENTITIES[item.projectile]
                 item.count -= 1
                 return inventory.checkItem(i)  # return None
     
@@ -252,6 +271,7 @@ class BowBase(Item):
         speed_modifier = self.getArrowSpeedFromTime(time)
         direction = (Camera.world_position_from_normalized(Input.m_pos_normalized) - inventory.entity.pos).normalized
         direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
+
         #spawn_entity(self.loaded_item(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
         self.loaded_item = None
         self.startTime = None

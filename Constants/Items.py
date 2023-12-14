@@ -15,4 +15,4 @@ ITAG_ARROW_EXPLOSIVE = 'explosivearrow'
 ITAG_BUNNY_EGG = 'bunny egg'
 ITAG_SPAWN_EGG = "spawn_egg"
 ITAG_STR_POTION = 'strengthpotion'
-
+ITAG_SPD_POTION = 'speedpotion'

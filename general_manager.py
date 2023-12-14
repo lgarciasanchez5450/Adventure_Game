@@ -19,7 +19,7 @@ import ground
 import Settings
 import Input
 import Time
-from Game_Typing import assert_type, abstractmethod
+from Game_Typing import assert_type, abstractmethod,Optional
 import Events
 from UI import *
 import Animation
@@ -32,7 +32,7 @@ from Inventory import UniversalInventory, Hotbar
 from sys import intern
 from GameObject import GameObject
 from Appearance import Appearance
-from Items import *
+from EntityEffects import *
 
 dead_entities = []
 
@@ -134,34 +134,42 @@ class WoodenPlank(Block):
 
 #### ENTITIES ####
 class Entity(GameObject):
+    abstract:bool
     species:str
     def __init_subclass__(cls) -> None:
         if not hasattr(cls,'species'):
-            raise EntitySetupError()
+            if hasattr(cls,'abstract'):                
+                if cls.abstract:
+                    print(f"Marking class: {cls.__name__} as abstract!")
+                    return 
+            raise EntitySetupError(cls.__name__)
+
         if cls.species in Settings.SPAWNABLE_ENTITIES:
-            raise RuntimeError("No two entities may share the same species attribute value!")
+            raise RuntimeError("No two entities may share the same species attribute value! Error on -> " + cls.species)
         Settings.SPAWNABLE_ENTITIES[cls.species] = cls
-    __slots__ = 'vel','image','collider','animation','speed','appearance','dead'
+        if cls.species == '':
+            print(cls.__name__ + " has \"species\" as an empty string, this cannot happen plz fix." )
+    __slots__ = 'vel','collider','animation','speed','appearance'
 
     def __init__(self,pos:Vector2):
         super().__init__(pos,self.species)
         self.vel = Vector2.zero
         self.typeid = self.species
-        self.image = CSurface(Textures.NULL,self.pos,Settings.SURFACE_OFFSET[self.species])
+        self.csurface = CSurface(Textures.NULL,self.pos,Settings.SURFACE_OFFSET[self.species])
         self.collider = Collider(0,0,*Settings.HITBOX_SIZE[self.species])
         self.collider.setCenter(*self.pos)
-        self.animation = Animation.Animation(self.image)
+        self.animation = Animation.Animation(self.csurface)
         self.speed = 1.0
         self.appearance = Appearance(*Settings.APPEARANCE_BY_SPECIES[self.species],species=self.species)
         self.dead = False
 
     def onLoad(self): 
         if _DEBUG_: Camera.add_collider(self.collider)
-        Camera.add(self.image)
+        Camera.add(self.csurface)
 
     def onLeave(self):
         if _DEBUG_: Camera.remove_collider(self.collider)
-        Camera.remove(self.image)
+        Camera.remove(self.csurface)
 
     def onDeath(self):
         if self.dead: return
@@ -199,14 +207,17 @@ class Entity(GameObject):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}: {self.typeid}"
 
+    def place_block(self,block:Block):
+        place_block(block)
+
 class ItemWrapper(Entity):
     species = 'item'
-    def __init__(self,pos,item:Item):
+    def __init__(self,pos,item:"Items.Item"):
         self.pickup_time = ITEM_PICKUP_TIME
         super().__init__(pos)
-        assert isinstance(item,Item)
+        assert isinstance(item,Items.Item)
         self.item = item
-        item.animation.csurface = self.image
+        item.animation.csurface = self.csurface
         self.animation = item.animation
         self.alive_time = ITEM_MAX_LIFESPAN
         
@@ -278,7 +289,7 @@ class Arrow(Entity):
             velocity += shooter.vel # add the shooters velocity to our own because its relative to the shooters vel in real life
         tex = Textures.rotate(Textures.entity_arrow,angle * 180 / pi)
         self.animation.add_state('going',0,(tex,),(Textures.entity_arrow,))
-        self.image.offset = (-tex.get_width()//2,-tex.get_height()//2)
+        self.csurface.offset = (-tex.get_width()//2,-tex.get_height()//2)
         self.animation.set_state('going')
         self.vel = velocity.copy()
         self.time_til_death = 10 #seconds
@@ -331,11 +342,12 @@ class Arrow(Entity):
         return( 0.5 * self.base_damage * (self.vel/2).magnitude_squared() * self.weight * max(0.01,self.penetration)).__trunc__()
 
 class ArrowInciendiary(Arrow):
-
+    species = 'firearrow'
     def get_attack_type(self):
         return FIRE_DAMAGE
 
 class ArrowExplosive(Arrow):
+    species = 'explosivearrow'
     __slots__ = 'energy'
     def __init__(self, pos, velocity: Vector2, shooter: Entity | None = None):
         self.energy = 5 # in joules
@@ -363,6 +375,7 @@ class ArrowExplosive(Arrow):
         return
 
 class AliveEntity(Entity):
+    abstract = True
     __slots__ = 'actions','pickup_range','inventory','armour_inventory','stats','exp','max_speed','total_health','defense','regen_multiplier','health','strength','max_energy', \
     'energy','attack_speed','time_between_attacks','time_to_attack','time_to_regen','regen_time','vision_collider','vision_squared','states','ground','invulnerability_time', \
     'time_til_vulnerable','direction','extra_speed','extra_speed_sum','extra_total_health','extra_total_health_sum','extra_regen','extra_regen_sum','extra_strength' ,\
@@ -515,7 +528,7 @@ class AliveEntity(Entity):
     
     
     @property
-    def selected_item(self) -> Item|None:
+    def selected_item(self) -> Optional['Items.Item']:
         if self.inventory.spaces == 0 :return None
         return self.inventory.inventory[0]
 
@@ -736,7 +749,7 @@ class Player(AliveEntity):
                 velocity = Vector2.randdir
             spawn_entity(ArrowInciendiary(self.pos + velocity/2,velocity*3,self))
         if Input.space_d:
-            spawn_item(BunnyEgg(),self.pos,Vector2.randdir)
+            spawn_item(Items.BunnyEgg(),self.pos,Vector2.randdir)
         if self.animation.state != 'attack':
             x,y=  set_mag(Input.d-Input.a,Input.s-Input.w,self.getTotalSpeed() * self.ground.surface_friction)
             self.accelerate(x,y)
@@ -1062,37 +1075,8 @@ class Driver:
             return Vector2.zero #this one can actually return a cached value Vector2.zero so it doesn't have to create new ones every frame but that is a microoptimization for later
         else:
             return lineVec/sqrt(magSqrd)
-    
-#### ENTITY EFFECTS ####
-#disclaimer : e - effects only affect alive entities sooo the name isn't perfect but whatever, I HAVE CONTROL HERE!!, mwuaa HA HA !!
-class EntityEffect: # these effects should take care of themselves in the sense that entities should only know that they exist not whats happening to them
-    __slots__ = ('name','entity')
-    def __init__(self, name:str, entity:AliveEntity ) -> None:
-        self.name:str = name
-        self.entity = entity
-        self.entity.effects.append(self)
-
-    def update(self): ...
-    
-    def remove(self): ...
-
-class SuperStrength1(EntityEffect):
-    __slots__ = 'time'
-    def __init__(self, entity: AliveEntity):
-        super().__init__(EntityEffects.EFFECT_STRENGTH_I, entity)
-        self.time = 60.0
-        self.entity.setExtraStatStrength(self.name,1000)
-
-    def update(self):
-        self.time -= Time.deltaTime
-        if self.time <= 0:
-            self.remove()
-
-    def remove(self):
-        ## Decouple the effect and the entity so they no  longer know about each other
-        self.entity.effects.remove(self) 
-        del self.entity 
-
+ 
+import Items #This must happen after all entities have been initialized
 
 
 ########## NOTE : for custom classes that dont define __eq__ method python defaults to check identity being equal to "is"
@@ -1132,7 +1116,7 @@ class InventoryUI(UI):
         self.hb_slots_center = Vector2(0,150)
 
         self.recalc_slots()
-        self.in_hand:Item|None = None
+        self.in_hand:Items.Item|None = None
 
     def recalc_slots(self):
         slots_size = Vector2(self.slots_width * self.slot_spacing, self.inventory_size//self.slots_width * self.slot_spacing)
@@ -1227,7 +1211,7 @@ class InventoryUI(UI):
                 item_count = self.font.render(str(self.in_hand.count),False,'white')
                 self.surface.blit(item_count,(in_hand_pos[0] + ITEM_SIZE-item_count.get_width(),in_hand_pos[1] + ITEM_SIZE-item_count.get_height()))
 
-        entity = pygame.transform.scale_by(self.entity.image.surf,2) # TODO: Optimize
+        entity = pygame.transform.scale_by(self.entity.csurface.surf,2) # TODO: Optimize
         draw.rect(self.surface,(70,70,70),entity.get_rect().move(self.screen_center.x-100,10))
         self.surface.blit(entity,(self.screen_center.x-100,10))
         super().draw()
@@ -1723,7 +1707,7 @@ def collide_entities_in_range_species(pos:Vector2,range:float,typeid:str) -> Gen
                     if not entity.dead and entity.typeid==typeid and (entity.pos-pos).magnitude_squared() <= range_sqrd:
                         yield entity
 
-def spawn_item(item:Item,pos:Vector2,vel:Vector2|None=None):
+def spawn_item(item:"Items.Item",pos:Vector2,vel:Vector2|None=None):
     #step 1) create itemWrapper
     iw = ItemWrapper(pos,item)
     if vel is not None:

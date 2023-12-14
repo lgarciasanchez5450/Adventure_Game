@@ -25,7 +25,7 @@ Main_Menu.start()
 import Events
 import Pause_Menu
 import Textures
-
+import Items
 
 def onGameAwake():
     global gen
@@ -47,11 +47,12 @@ def onGameStart():
     Camera.set_mouse_assist(False)
     global player
     player = general_manager.Player(Vector2(0,0))
+
     general_manager.spawn_entity(player)
-    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,0),general_manager.DivineBow()))
-    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(-2,0),general_manager.Bow()))
-    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),general_manager.ItemArrow().setCount(64)))
-    general_manager.spawn_item(general_manager.StrengthPotion(),Vector2(1,0),Vector2(0,2))
+    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,0),Items.DivineBow()))
+    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(-2,0),Items.Bow()))
+    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),Items.ItemArrow().setCount(64)))
+    general_manager.spawn_item(Items.StrengthPotion(),Vector2(1,0),Vector2(0,2))
     Camera.set_focus(player.pos)
     Camera.set_mouse_pull_strength(13)
     #Events.call_OnResize(WINDOW_WIDTH,WINDOW_HEIGHT)
