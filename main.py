@@ -10,10 +10,10 @@ import pygame
 import Camera
 import Time
 import Input 
-import UI
 import Settings
 import Particles
 pygame.init()
+import UI
 import general_manager #should take care of everything that chunk/entity manager used to do
 import debug
 from game_math import Vector2, GAME_PATH
@@ -99,10 +99,10 @@ while True:
         Camera.draw_UI()
         debug.debug(general_manager.active_entity_count(),(200,200))
         debug.debug(Time.get_frameRateInt())
+        UI.showingUIs[0].draw()
         Camera.program['light'] = Game_Time.light
 
         Camera.translate_to_opengl()
-        UI.showingUIs[0].draw()
         Camera.flip()
 
     while Settings.game_state is SETTINGS:

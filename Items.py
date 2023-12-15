@@ -66,6 +66,9 @@ class Item:
     base_projectile:str #MUST be defined when ((bow_shootable || crossbow_shootable) == True)
     entity_loaded = None
     places_block = None
+    lore:str = ''
+    description:str = ''
+
     def __init_subclass__(cls) -> None:
         if cls.bow_shootable or cls.crossbow_shootable:
             assert hasattr(cls,'base_projectile'), f'Item {cls.__name__} must define a base_projectile as it is marked as shootable by a bow or crossbow'

@@ -682,7 +682,7 @@ class Player(AliveEntity):
         #humans have 36 inventory spots and 9 hotbar spots
         self.hotbar = Hotbar(self.inventory,27,28,29,30,31,32,33,34,35) # the numbers at the end mean the inventory slots that the hotbar should use in order
         
-        self.ui = InventoryUI(self,(WIDTH*.7,HEIGHT*.7))
+        self.ui = InventoryUI(self,((WIDTH*.7).__trunc__(),(HEIGHT*.7).__trunc__()))
         self.hbui = HotBarUI(self,self.hotbar)
 
         self.direction = 'right'
@@ -729,7 +729,7 @@ class Player(AliveEntity):
             self.showingInventory = not self.showingInventory  
             if self.showingInventory:
                 #self.vel.reset() # I dont know what this is for but i m   
-                showingUIs.append(self.ui) 
+                showingUIs.append(self.ui)  
             else:
                 self.ui.close() #this also takes care of putting back the null ui
             
@@ -1082,14 +1082,18 @@ import Items #This must happen after all entities have been initialized
 ########## NOTE : for custom classes that dont define __eq__ method python defaults to check identity being equal to "is"
 
 #### UI ####
-class InventoryUI(UI):
+class InventoryUI(InScreenUI):
     __slots__ = 'screen_center','inventory','armour_inventory','inventory_size','has_hotbar','inventory_dont_do','slots_width','entity','slot_spacing','slots_center',\
     'armour_slots_center','hb_slots_center','in_hand','items_offset','slots','armour_offset','armour_slots','hb_inventory','hb_size','hotbar','hb_offset','hb_slots'
     font = pygame.font.SysFont("Arial",ITEM_COUNTER_SIZE)   
-    def __init__(self,entity:AliveEntity, surface_size:tuple|list = (WIDTH, HEIGHT), hotBarIndexes:tuple[int,...]|None = None):
+    def __init__(self,entity:AliveEntity, surface_size:tuple[int,int] = (WIDTH, HEIGHT)):
+        self.surface = Surface(surface_size)
+        self.pixel_topleft = (HALFWIDTH-surface_size[0]//2, HALFHEIGHT-surface_size[1]//2)
         screen_size = (surface_size[0]/WIDTH,surface_size[1]/HEIGHT)
-        super().__init__(surface_size, (0,0), screen_size)
-        self.screen_center = self.surface_size/2
+        self.surface_size = Vector2.new_from_tuple(surface_size)
+        self.topleft = Vector2( -screen_size[0],-screen_size[1])
+        self.size = Vector2(*screen_size)
+        self.screen_center = Vector2.new_from_tuple(surface_size)/2
         self.inventory:None|UniversalInventory = entity.inventory
         self.inventory_size = entity.inventory.spaces
         self.armour_inventory = entity.armour_inventory
@@ -1114,6 +1118,7 @@ class InventoryUI(UI):
         self.slots_center = Vector2(0,100) # where should the center of the slots be?
         self.armour_slots_center = Vector2(-130,-120)
         self.hb_slots_center = Vector2(0,150)
+        self.hover_item: Optional[Item] = None
 
         self.recalc_slots()
         self.in_hand:Items.Item|None = None
@@ -1147,20 +1152,28 @@ class InventoryUI(UI):
 
     def update(self):
         self.surface.fill('grey')
+        curr_hover = None
+        curr_position:tuple = (0,0)
         if self.collider.collide_point_inclusive(Input.m_pos_normalized.tuple): 
-            self.relative_mouse_position_normalized = (Input.m_pos_normalized - self.center).vector_mul(self.thingy)
+            self.relative_mouse_position_normalized = (Input.m_pos_normalized).vector_mul(self.thingy)
             self.rel_mouse_pos = (self.relative_mouse_position_normalized+ones).vector_mul(self.surface_size/2)
             current_inventory_hover_index = -1
             for slot in self.slots:
                 slot.update(self.rel_mouse_pos)
                 if slot.state == slot.HOVER:
+                    if self.inventory is None: break
+                    curr_hover =  self.inventory.seeIndex(slot.index)
+                    curr_position = slot.pos #type: ignore
                     current_inventory_hover_index = slot.index
-                    if Input.m_d1 and self.inventory is not None:
+                    if Input.m_d1:# and self.inventory is not None:
                         self.in_hand = self.inventory.setItem(self.in_hand,slot.index)
             if self.has_hotbar:
                 for slot in self.hb_slots:
                     slot.update(self.rel_mouse_pos)
                     if slot.state == slot.HOVER:
+                        curr_hover = self.hotbar.seeIndex(slot.index)
+                        curr_position = slot.pos #type: ignore
+
                         current_inventory_hover_index = self.hotbar.spaces[slot.index]
                         if Input.m_d1:
                             self.in_hand = self.hotbar.setItem(self.in_hand,slot.index)   
@@ -1188,6 +1201,8 @@ class InventoryUI(UI):
             for slot in self.armour_slots:
                 slot.update(self.rel_mouse_pos)
                 if slot.state == slot.HOVER:
+                    curr_position = slot.pos #type: ignore
+                    curr_hover = self.armour_inventory.seeIndex(slot.index) #type: ignore
                     if Input.m_d1:
                         self.in_hand = self.armour_inventory.set_armour(self.in_hand,slot.index) #type: ignore
 
@@ -1195,6 +1210,10 @@ class InventoryUI(UI):
             if Input.m_d1 and self.in_hand is not None:
                 spawn_item(self.in_hand,self.entity.pos.copy(),Input.m_pos_normalized*2)
                 self.in_hand = None
+        if self.hover_item is not curr_hover:
+            self.hover_item_pos = curr_position #type: ignore
+            self.hover_item = curr_hover
+            itemDescriptor.setItem(curr_hover)
 
     def draw(self):
         for slot in self.slots:
@@ -1214,7 +1233,9 @@ class InventoryUI(UI):
         entity = pygame.transform.scale_by(self.entity.csurface.surf,2) # TODO: Optimize
         draw.rect(self.surface,(70,70,70),entity.get_rect().move(self.screen_center.x-100,10))
         self.surface.blit(entity,(self.screen_center.x-100,10))
-        super().draw()
+        Camera.screen.blit(self.surface,self.pixel_topleft)
+        if (self.hover_item is not None):
+            itemDescriptor.draw(Camera.screen,Vector2Int(self.pixel_topleft[0]+self.hover_item_pos[0],self.pixel_topleft[1]+self.hover_item_pos[1]))
 
     def close(self):
         showingUIs.append(Null)

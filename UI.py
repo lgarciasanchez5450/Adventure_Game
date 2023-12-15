@@ -8,7 +8,7 @@ from Constants import HEIGHT, WIDTH
 import Time
 from game_math import Vector2, Collider,ones,deque, Vector2Int
 import Input
-from Game_Typing import TYPE_CHECKING
+from Game_Typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from Items import Item
 tex_location = 1
@@ -81,20 +81,50 @@ class InScreenUI:
         surface.blit(self.surface,self.topleft.tuple)
 
 class ItemDescriptionUI:
+    INVISIBLE_COLOR = (255,55,255) #UGLY Pink
     def __init__(self):
+        self.name_font = pygame.font.SysFont("Courier",18,True)
+        self.name_color = 'white'
+        self.description_font = pygame.font.SysFont("Arial",14)
+        self.description_color = 'grey'
+        self.lore_font = pygame.font.SysFont("Arial",12)
+        self.lore_color = 'light grey'
         self.pos = Vector2.zero
-        self.size = Vector2.zero
-        self.item:'Item'
+        self.width = 200 # pixels
+        self.content_width = 190
+        self.content_left = (self.width - self.content_width) // 2
+        assert self.content_left >0, 'width must be greater than content width by more than 1 !!!'
+        self.item:Optional['Item']
+        self.size = Vector2(self.width,0)
+        self.name:pygame.Surface
+        self.description:pygame.Surface
+        self.lore:pygame.Surface
+        self.surf = pygame.Surface((self.width,0))
+        self.surf.set_colorkey(self.INVISIBLE_COLOR)
 
-    def setItem(self,item:'Item'): 
+    def setItem(self,item:Optional['Item']): 
         self.item = item
-
-
+        if self.item is None: return
+        self.name = self.name_font.render(self.item.name,True,self.name_color,wraplength=self.content_width)
+        self.description = self.description_font.render(self.item.description,True,self.description_color,wraplength=self.content_width)
+        self.lore = self.lore_font.render(self.item.lore,True,self.lore_color,wraplength=self.content_width)
+        self.size.y = self.name.get_height() + self.description.get_height() + self.lore.get_height() + 40 # 4 * 10 after each section for spacing
+        self.surf = pygame.Surface(self.size.tuple)
+        self.surf.set_colorkey(self.INVISIBLE_COLOR)
+        self.surf.blits([
+            (self.name,(self.content_left,10)),
+            (self.description,(self.content_left,self.name.get_height() + 20)),
+            (self.lore,(self.content_left, self.size.y - self.lore.get_height()-10)),
+        ],doreturn=False
+        )
     def update(self):
         pass # TODO add the cool scrolling function for reading long descriptions soon
 
-        
+    def draw(self,surface:pygame.Surface,pos:Vector2Int): 
+        if self.item is None: return
+        surface.blit(self.surf,pos.tuple)
 
+itemDescriptor = ItemDescriptionUI()
 
 class EmtpyUI(UI):
     __slots__ = tuple()
@@ -117,5 +147,5 @@ class DebugUI(UI):
 Null = EmtpyUI()
 
 showingUIs:deque[UI] = deque([Null],maxlen=1)
-inScreenUI:deque[InScreenUI] = deque([Null],maxLen=1) #type: ignore
+inScreenUI:deque[InScreenUI] = deque([Null],maxlen=1) #type: ignore
 
