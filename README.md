@@ -14,6 +14,7 @@ for the perlin.c noise, you must pass do the same but with arrayobject as well, 
 
 The game is run via main.py
 
+![image](https://github.com/lgarciasanchez5450/Adventure_Game/assets/81716333/d3b99b34-f903-4649-9768-ccaa366cb08e)
 
 Contact Me via:
  - Discord @ hithere32123
