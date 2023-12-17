@@ -70,6 +70,8 @@ class Item:
     description:str = ''
 
     def __init_subclass__(cls) -> None:
+        assert isinstance(cls.lore,str)
+        assert isinstance(cls.description,str)
         if cls.bow_shootable or cls.crossbow_shootable:
             assert hasattr(cls,'base_projectile'), f'Item {cls.__name__} must define a base_projectile as it is marked as shootable by a bow or crossbow'
             assert cls.base_projectile in Settings.SPAWNABLE_ENTITIES, f' Item {cls.__name__}\'s base_projectile ({cls.base_projectile}) is not found in SPAWNABLE ENTITIES!'
@@ -83,7 +85,7 @@ class Item:
     __slots__ = 'tag', 'name',  'count', 'durability_stats', 'armour_stats', 'damage', 'mining_speed', 'fps', 'animation','frames','inventory'
     def __init__(self,tag:str,frames:tuple[Surface,...]|None = None):
         self.tag = tag #all the same types of items should have the same tag
-        self.name = tag # display name should start as default tag
+        self.name = Settings.ITEM_BASE_NAME_FROM_TAG.get(tag,tag) # display name should start as default tag
         self.count = 1
         self.durability_stats:DurabilityStats|None = None
         self.armour_stats:ArmourStats|None = None
@@ -211,7 +213,6 @@ class SpeedPotion(DrinkableItem):
         Speed1(inventory.entity)
         Camera.set_camera_convergence_speed(6)
 
-
 class BunnyEgg(Item): 
     entity_loaded = 'bunny'
     def __init__(self):
@@ -226,7 +227,7 @@ class ItemArrow(Item):
     def __init__(self):
         super().__init__(ITAG_ARROW)
         self.projectile = self.base_projectile
-    
+
 class ItemArrowExplosive(Item):
     bow_shootable = True
     base_projectile = 'arrow'
@@ -305,8 +306,11 @@ class QuickBow(BowBase):
         return 1/ ( 5.0 + (3.5 * (t - 0.3))**2)+0.2
 
 class DivineBow(BowBase):
+    description = 'An ancient bow made of unfathomably light yet incredibly springy material.'
+    lore =  'Said to have hold the blood of ten thousand wariors'
     def __init__(self):
         super().__init__(ITAG_DIVINE_BOW)
+
         self.springyness = 10.0
 
     def getArrowSpeedFromTime(self, t: float) -> float:

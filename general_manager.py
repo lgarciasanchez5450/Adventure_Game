@@ -729,7 +729,7 @@ class Player(AliveEntity):
             self.showingInventory = not self.showingInventory  
             if self.showingInventory:
                 #self.vel.reset() # I dont know what this is for but i m   
-                showingUIs.append(self.ui)  
+                showingUIs.append(self.ui)  #type: ignore
             else:
                 self.ui.close() #this also takes care of putting back the null ui
             
@@ -1235,7 +1235,7 @@ class InventoryUI(InScreenUI):
         self.surface.blit(entity,(self.screen_center.x-100,10))
         Camera.screen.blit(self.surface,self.pixel_topleft)
         if (self.hover_item is not None):
-            itemDescriptor.draw(Camera.screen,Vector2Int(self.pixel_topleft[0]+self.hover_item_pos[0],self.pixel_topleft[1]+self.hover_item_pos[1]))
+            itemDescriptor.draw(Camera.screen,Vector2Int(self.pixel_topleft[0]+self.hover_item_pos[0]+ITEM_SIZE,self.pixel_topleft[1]+self.hover_item_pos[1]+ITEM_SIZE//2))
 
     def close(self):
         showingUIs.append(Null)

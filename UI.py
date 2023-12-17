@@ -81,9 +81,10 @@ class InScreenUI:
         surface.blit(self.surface,self.topleft.tuple)
 
 class ItemDescriptionUI:
+    CONTENT_SPACING:int = 10
     INVISIBLE_COLOR = (255,55,255) #UGLY Pink
     def __init__(self):
-        self.name_font = pygame.font.SysFont("Courier",18,True)
+        self.name_font = pygame.font.SysFont("Courier",15,True)
         self.name_color = 'white'
         self.description_font = pygame.font.SysFont("Arial",14)
         self.description_color = 'grey'
@@ -93,6 +94,7 @@ class ItemDescriptionUI:
         self.width = 200 # pixels
         self.content_width = 190
         self.content_left = (self.width - self.content_width) // 2
+        assert self.width > 0 and self.content_width > 0, 'bruh this doesnt even make sense'
         assert self.content_left >0, 'width must be greater than content width by more than 1 !!!'
         self.item:Optional['Item']
         self.size = Vector2(self.width,0)
@@ -108,7 +110,13 @@ class ItemDescriptionUI:
         self.name = self.name_font.render(self.item.name,True,self.name_color,wraplength=self.content_width)
         self.description = self.description_font.render(self.item.description,True,self.description_color,wraplength=self.content_width)
         self.lore = self.lore_font.render(self.item.lore,True,self.lore_color,wraplength=self.content_width)
-        self.size.y = self.name.get_height() + self.description.get_height() + self.lore.get_height() + 40 # 4 * 10 after each section for spacing
+        self.size.y = 20#self.name.get_height() + self.description.get_height() + self.lore.get_height() + 20 #10 for each spacing above and below all the texts
+        self.size.y += self.name.get_height()
+
+        if self.item.description:
+            self.size.y += self.CONTENT_SPACING + self.description.get_height()
+        if self.item.lore:
+            self.size.y += self.CONTENT_SPACING + self.lore.get_height()
         self.surf = pygame.Surface(self.size.tuple)
         self.surf.set_colorkey(self.INVISIBLE_COLOR)
         self.surf.blits([

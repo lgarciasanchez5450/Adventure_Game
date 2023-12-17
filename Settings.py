@@ -102,6 +102,16 @@ if TYPE_CHECKING:
     from general_manager import Entity
 SPAWNABLE_ENTITIES: dict [str, type['Entity']] = {}
 
+ITEM_BASE_NAME_FROM_TAG = {
+    ITAG_ARROW: 'Arrow',
+    ITAG_ARROW_EXPLOSIVE: 'Explosive Arrow',
+    ITAG_BOW: 'Bow',
+    ITAG_DIVINE_BOW: 'Divine Bow',
+    ITAG_DIRT: 'Dirt',
+    ITAG_SPD_POTION: 'Speed Potion',
+    ITAG_WOODEN_SWORD: 'Wooden Sword'
+}
+
 # If the item doesn't exist in this dictionary, the game will probably assume a stack of 64
 STACK_COUNT_BY_TAG = {
     ITAG_WOODEN_SWORD:64,
