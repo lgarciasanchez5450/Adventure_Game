@@ -126,4 +126,6 @@ RenderDistance = 3
  
 GenerationDistance = 10 # Should be larger than RenderDistance
 
+ITEM_DESCRIPTION_USES_MOUSE = True
+
 game_state = MAIN_MENU

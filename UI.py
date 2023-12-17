@@ -54,6 +54,7 @@ class UI:
         self.program.release()
 
 class InScreenUI:
+    #__slots__ = 'size','topleft','surface','surface_size','center','collider','thingy','relative_mouse_position_normalized','rel_mouse_pos'
     def __init__(self, center:Vector2Int,size:tuple[int,int]):
         self.size = Vector2Int(*size)
         #normal screen units
@@ -82,17 +83,18 @@ class InScreenUI:
 
 class ItemDescriptionUI:
     CONTENT_SPACING:int = 10
-    INVISIBLE_COLOR = (255,55,255) #UGLY Pink
+    BACKGROUND_COLOR = (30,30,30,220)
+    BORDER_COLOR = (20,30,100,220)
     def __init__(self):
         self.name_font = pygame.font.SysFont("Courier",15,True)
-        self.name_color = 'white'
+        self.name_color = (255,255,255,255)
         self.description_font = pygame.font.SysFont("Arial",14)
         self.description_color = 'grey'
         self.lore_font = pygame.font.SysFont("Arial",12)
-        self.lore_color = 'light grey'
+        self.lore_color = (200,200,200,255)
         self.pos = Vector2.zero
         self.width = 200 # pixels
-        self.content_width = 190
+        self.content_width = 180
         self.content_left = (self.width - self.content_width) // 2
         assert self.width > 0 and self.content_width > 0, 'bruh this doesnt even make sense'
         assert self.content_left >0, 'width must be greater than content width by more than 1 !!!'
@@ -101,8 +103,9 @@ class ItemDescriptionUI:
         self.name:pygame.Surface
         self.description:pygame.Surface
         self.lore:pygame.Surface
-        self.surf = pygame.Surface((self.width,0))
-        self.surf.set_colorkey(self.INVISIBLE_COLOR)
+        self.surf = pygame.Surface((self.width,0),pygame.SRCALPHA)
+        self.surf.fill(self.BACKGROUND_COLOR)
+
 
     def setItem(self,item:Optional['Item']): 
         self.item = item
@@ -112,19 +115,37 @@ class ItemDescriptionUI:
         self.lore = self.lore_font.render(self.item.lore,True,self.lore_color,wraplength=self.content_width)
         self.size.y = 20#self.name.get_height() + self.description.get_height() + self.lore.get_height() + 20 #10 for each spacing above and below all the texts
         self.size.y += self.name.get_height()
+        if not (self.item.description or self.item.lore):
+            self.size.x = self.name.get_width() + self.CONTENT_SPACING * 2 # 10 for each side!!
+        else: 
+            self.size.x = self.width
 
         if self.item.description:
             self.size.y += self.CONTENT_SPACING + self.description.get_height()
         if self.item.lore:
             self.size.y += self.CONTENT_SPACING + self.lore.get_height()
-        self.surf = pygame.Surface(self.size.tuple)
-        self.surf.set_colorkey(self.INVISIBLE_COLOR)
+        self.surf = pygame.Surface(self.size.tuple,pygame.SRCALPHA)
+
+        self.surf.fill(self.BACKGROUND_COLOR)
+        self._setSurfaceFrame()
         self.surf.blits([
-            (self.name,(self.content_left,10)),
-            (self.description,(self.content_left,self.name.get_height() + 20)),
-            (self.lore,(self.content_left, self.size.y - self.lore.get_height()-10)),
+            (self.name,(self.content_left,self.CONTENT_SPACING)),
+            (self.description,(self.content_left,self.name.get_height() + self.CONTENT_SPACING * 2)),
+            (self.lore,(self.content_left, self.size.y - self.lore.get_height()-self.CONTENT_SPACING)),
         ],doreturn=False
         )
+
+    def _setSurfaceFrame(self):
+        r = pygame.Rect((0,0,2,2))
+        big_rect = self.surf.get_rect()
+        pygame.draw.rect(self.surf,self.BORDER_COLOR,big_rect,2)
+        pygame.draw.rect(self.surf,(0,0,0,0),r)
+        r.topright = big_rect.topright
+        pygame.draw.rect(self.surf,(0,0,0,0),r)
+        r.bottomleft = big_rect.bottomleft
+        pygame.draw.rect(self.surf,(0,0,0,0),r)
+        r.bottomright = big_rect.bottomright
+        pygame.draw.rect(self.surf,(0,0,0,0),r)
     def update(self):
         pass # TODO add the cool scrolling function for reading long descriptions soon
 

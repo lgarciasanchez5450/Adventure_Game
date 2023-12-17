@@ -186,7 +186,8 @@ class Entity(GameObject):
         #move y rect 
         self.collider.move_y(self.vel.y * frame_speed) # move in world coordinates
         collision_vertical(self.collider,self.vel.y)
-        self.pos.from_tuple(self.collider.center)
+        self.pos.x = self.collider.centerx
+        self.pos.y = self.collider.centery
         self.animation.animate()
 
     def attack(self,entity):
@@ -590,8 +591,9 @@ class AliveEntity(Entity):
         #move y rect 
         self.collider.move_y(self.vel.y * frame_speed) # move in world coordinates
         collision_vertical(self.collider,self.vel.y)
-        self.pos.from_tuple(self.collider.center)
-     
+        self.pos.x = self.collider.centerx
+        self.pos.y = self.collider.centery
+
         self.ground = Chunk.get_ground_at(self.pos.x,self.pos.y)
         if self.ground is not None:
             friction = self.ground.surface_friction * Time.deltaTime
@@ -1098,7 +1100,8 @@ class InventoryUI(InScreenUI):
         self.inventory_size = entity.inventory.spaces
         self.armour_inventory = entity.armour_inventory
         self.has_hotbar = hasattr(entity,'hotbar') 
-        
+        self.putted_inv:set[int] = set()
+        self.putted_hotbar:set[int] = set()   
         self.inventory_dont_do = tuple()
         if self.has_hotbar:
 
@@ -1155,8 +1158,12 @@ class InventoryUI(InScreenUI):
         curr_hover = None
         curr_position:tuple = (0,0)
         if self.collider.collide_point_inclusive(Input.m_pos_normalized.tuple): 
+            if Input.m_d3:
+                self.putted_inv:set[int] = set()
+                self.putted_hotbar:set[int] = set()
             self.relative_mouse_position_normalized = (Input.m_pos_normalized).vector_mul(self.thingy)
             self.rel_mouse_pos = (self.relative_mouse_position_normalized+ones).vector_mul(self.surface_size/2)
+            self.rel_mouse_pos_int = Vector2Int.new_from_tuple(self.rel_mouse_pos.tupled_ints)
             current_inventory_hover_index = -1
             for slot in self.slots:
                 slot.update(self.rel_mouse_pos)
@@ -1165,8 +1172,14 @@ class InventoryUI(InScreenUI):
                     curr_hover =  self.inventory.seeIndex(slot.index)
                     curr_position = slot.pos #type: ignore
                     current_inventory_hover_index = slot.index
+
                     if Input.m_d1:# and self.inventory is not None:
                         self.in_hand = self.inventory.setItem(self.in_hand,slot.index)
+                    elif Input.m_3 and self.in_hand is not None:
+                        if (curr_hover is not None and curr_hover.stackCompatible(self.in_hand) and slot.index not in self.putted_inv):
+                            
+                            self.putted_inv.add(slot.index)
+
             if self.has_hotbar:
                 for slot in self.hb_slots:
                     slot.update(self.rel_mouse_pos)
@@ -1235,7 +1248,11 @@ class InventoryUI(InScreenUI):
         self.surface.blit(entity,(self.screen_center.x-100,10))
         Camera.screen.blit(self.surface,self.pixel_topleft)
         if (self.hover_item is not None):
-            itemDescriptor.draw(Camera.screen,Vector2Int(self.pixel_topleft[0]+self.hover_item_pos[0]+ITEM_SIZE,self.pixel_topleft[1]+self.hover_item_pos[1]+ITEM_SIZE//2))
+            if Settings.ITEM_DESCRIPTION_USES_MOUSE:
+                mouse_offset = Vector2Int(7,-4)
+                itemDescriptor.draw(Camera.screen,Vector2Int(self.pixel_topleft[0],self.pixel_topleft[1]) + mouse_offset + self.rel_mouse_pos_int)
+            else: 
+                itemDescriptor.draw(Camera.screen,Vector2Int(self.pixel_topleft[0]+self.hover_item_pos[0]+ITEM_SIZE,self.pixel_topleft[1]+self.hover_item_pos[1]+ITEM_SIZE//2))
 
     def close(self):
         showingUIs.append(Null)
@@ -1276,8 +1293,23 @@ class HotBarUI:
         for slot in self.slots:
             slot.state = slot.UP
 
+    def setSelected(self,hotbar_index:int):
+        self.hb_inventory.setSelected(hotbar_index)
+        self.surface.fill(self.background_color)
+        self.surface.blit(self.selectedFrame,(self.hb_inventory.selected * (ITEM_SIZE + self.slot_spacing) ,0))   
+
     def update(self):
         m_pos = Input.m_pos.vector_mul(Camera.screen_size.inverse)
+        if '1' in Input.KDQueue: self.setSelected(0)
+        elif '2' in Input.KDQueue: self.setSelected(1)
+        elif '3' in Input.KDQueue: self.setSelected(2)
+        elif '4' in Input.KDQueue: self.setSelected(3)
+        elif '5' in Input.KDQueue: self.setSelected(4)
+        elif '6' in Input.KDQueue: self.setSelected(5)
+        elif '7' in Input.KDQueue: self.setSelected(6)
+        elif '8' in Input.KDQueue: self.setSelected(7)
+        elif '9' in Input.KDQueue: self.setSelected(8)
+            
         if Input.wheel:
             self.hb_inventory.setSelected((self.hb_inventory.selected + Input.wheel) % self.hb_inventory.len)
             self.surface.fill(self.background_color)
@@ -1336,12 +1368,12 @@ class Chunk:
     def get_ground_at(cls,x,y) :
         global chunks
         c_pos = (x//CHUNK_SIZE,y//CHUNK_SIZE)
-        if c_pos in chunks:
-            chunk = chunks[c_pos]
-            return chunk._get_ground(x,y)
-        return ground.Invalid()
+        try:
+            return chunks[c_pos]._get_ground(x,y)
+        except: 
+            return ground.Invalid()
         
-    def __new__(cls,pos:tuple[int,int]|list[int]):
+    def __new__(cls,pos:tuple[int,int]):
         if pos in cls._insts:
             return cls._insts[pos]
         else:
@@ -1367,7 +1399,7 @@ class Chunk:
 
     __slots__ = ('chunk_pos','pos','collider','id','data','blocks','biome','active','ground','onCreationFinish','csurf','dead_blocks')
     # removed slots 'x','y','subdivision_lengths','items','items_sub',
-    def __init__(self,pos:tuple[int,int]|list[int]):
+    def __init__(self,pos:tuple[int,int]):
         self.chunk_pos = (pos[0]).__floor__(),pos[1].__floor__()
         #for drawing to screen
         #self.x,self.y = pos[0] * CHUNK_SIZE, pos[1] * CHUNK_SIZE 
@@ -1380,7 +1412,7 @@ class Chunk:
       
         self.biome:int
         self.active:bool
-        self.ground:tuple[list[ground.Ground|None]]
+        self.ground:tuple[list[ground.Ground]]
         self.onCreationFinish:list
         self.csurf:CSurface 
         self.dead_blocks:list[Block]
@@ -1393,10 +1425,10 @@ class Chunk:
     def surf(self,__object):
         self.csurf.surf = __object
 
-    def _get_ground(self,x,y) -> 'ground.Ground':
+    def _get_ground(self,x:int,y:int) -> 'ground.Ground':
         #this is a method to bypass all the checks made by normal ground_getter but only works if you already know what chunk the block is in
-        x = floor(x) % CHUNK_SIZE
-        y = floor(y) % CHUNK_SIZE
+        x = (x).__floor__() % CHUNK_SIZE
+        y = (y).__floor__() % CHUNK_SIZE
         return self.ground[y][x]
     
     def get_ground(self,x,y):
@@ -1547,7 +1579,7 @@ current_chunks:list[Chunk] = []
 
 chunk_loading_queue = deque()
 
-def queue_chunk(chunk_pos:tuple[int,int]|list[int]):
+def queue_chunk(chunk_pos:tuple[int,int]):
     '''Will queue the chunk at the inputed pos and return it'''
     #first make some checks to make sure that its not loaded or currently being loaded
     assert len(chunk_pos) == 2, 'chunk position must have 2 numbers!'
@@ -1688,8 +1720,8 @@ def active_entity_count():
 
 def collide_entities(collider:Collider):
     checked = set()
-    for y in inclusive_range(floor(collider.top),ceil(collider.bottom),CHUNK_SIZE):
-        for x in inclusive_range(floor(collider.left),ceil(collider.right),CHUNK_SIZE):
+    for y in inclusive_range((collider.top).__floor__(),(collider.bottom).__ceil__(),CHUNK_SIZE):
+        for x in inclusive_range((collider.left).__floor__(),(collider.right).__ceil__(),CHUNK_SIZE):
             cpos = (x//CHUNK_SIZE,y//CHUNK_SIZE)
             if cpos in checked: continue
             e_chunk = entity_chunks.get(cpos)
@@ -1703,8 +1735,8 @@ def collide_entities(collider:Collider):
 def collide_entities_in_range(pos:Vector2,range:float) -> Generator[Entity,None,None]:
     range_sqrd = range*range
     checked = set()
-    for y in inclusive_range(floor(pos.y-range),ceil(pos.y+range),CHUNK_SIZE):
-        for x in inclusive_range(floor(pos.x-range),ceil(pos.x+range),CHUNK_SIZE):  
+    for y in inclusive_range((pos.y-range).__floor__(),(pos.y+range).__ceil__(),CHUNK_SIZE):
+        for x in inclusive_range((pos.x-range).__floor__(),(pos.x+range).__ceil__(),CHUNK_SIZE):  
             cpos = (x//CHUNK_SIZE,y//CHUNK_SIZE)
             if cpos in checked:continue
             checked.add(cpos)
@@ -1717,8 +1749,8 @@ def collide_entities_in_range(pos:Vector2,range:float) -> Generator[Entity,None,
 def collide_entities_in_range_species(pos:Vector2,range:float,typeid:str) -> Generator[Entity,None,None]:
     range_sqrd = range*range
     checked = set()
-    for y in inclusive_range(floor(pos.y-range),ceil(pos.y+range),CHUNK_SIZE):
-        for x in inclusive_range(floor(pos.x-range),ceil(pos.x+range),CHUNK_SIZE):  
+    for y in inclusive_range((pos.y-range).__floor__(),(pos.y+range).__ceil__(),CHUNK_SIZE):
+        for x in inclusive_range((pos.x-range).__floor__(),(pos.x+range).__ceil__(),CHUNK_SIZE):  
             cpos = (x//CHUNK_SIZE,y//CHUNK_SIZE)
             if cpos in checked:continue
             checked.add(cpos)
@@ -1753,8 +1785,8 @@ def get_loaded_chunks_collided(collider:Collider):
     
 def get_chunks_collided(collider:Collider):
     checked = set() 
-    for y in inclusive_range(floor(collider.top),ceil(collider.bottom),CHUNK_SIZE):
-        for x in inclusive_range(floor(collider.left),ceil(collider.right),CHUNK_SIZE):
+    for y in inclusive_range((collider.top).__floor__(),(collider.bottom).__ceil__(),CHUNK_SIZE):
+        for x in inclusive_range((collider.left).__floor__(),(collider.right).__ceil__(),CHUNK_SIZE):
             cpos = (x//CHUNK_SIZE,y//CHUNK_SIZE)
             if cpos in checked: continue
             chunk:Chunk|None = chunks.get(cpos)
@@ -1770,7 +1802,6 @@ def collide_blocks(collider:Collider):
                 
 def collision_horizontal(collider:Collider,vx:int|float) -> bool:
     '''Returns whether the collider collided with any block'''
-    assert_type(collider,Collider)
     if not vx: return False
     hit_smthng = False
     for chunk in get_chunks_collided(collider):
@@ -1785,7 +1816,6 @@ def collision_horizontal(collider:Collider,vx:int|float) -> bool:
 
 def collision_vertical(collider:Collider,vy:float|int) -> bool:
     '''Returns whether the collider collided with any block'''
-    assert_type(collider,Collider)
     if not vy: return False
     hit_smthng = False
     for chunk in get_chunks_collided(collider): # TODO: maybe as an optimization if we collide with one thing then we can break early so we dont have to keep the hit_smthng variable and directly return

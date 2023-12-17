@@ -3,7 +3,8 @@
         "limits.h": "c",
         "string.h": "c",
         "stdlib.h": "c",
-        "arrayobject.h": "c"
+        "arrayobject.h": "c",
+        "cmath": "c"
     },
     "python.analysis.typeCheckingMode": "basic"
 }

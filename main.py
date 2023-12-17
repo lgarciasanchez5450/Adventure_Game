@@ -119,8 +119,7 @@ while True:
             Settings.game_state = GENERATING_WORLD
     while Settings.game_state is GENERATING_WORLD:
             try:
-                #First try to see if we need to import Textures
-                
+                #First try to see if we need to import Texturesee
                 if not Textures.done_loading:
                     Main_Menu.lt.setText(Textures.current_load_name.removeprefix(GAME_PATH))
                     Main_Menu.lb.setDone(Textures.loaded_counter)

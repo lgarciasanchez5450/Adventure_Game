@@ -538,13 +538,13 @@ class Collider:
 		assert isinstance(c,Collider), "argument <c> must be of type 'Collider'"
 		return rectangle_overlap(self.left,self.top,self.right,self.bottom,c.left,c.top,c.right,c.bottom)
 
-	def collide_point_inclusive(self,point):
+	def collide_point_inclusive(self,point:tuple[int|float,int|float]):
 		#assert isinstance(point,(tuple,list)), 'point must be a "tuple" or "list" '
 		#assert len(point) == 2, 'point must have a length of 2'
 		x,y = point
 		return self.left <= x <= self.right and self.top <= y <= self.bottom
 
-	def collide_point_exclusive(self,point):
+	def collide_point_exclusive(self,point:tuple[int,int]):
 		#assert isinstance(point,(tuple,list)), 'point must be a "tuple" or "list" '
 		#assert len(point) == 2, 'point must have a length of 2'
 		x,y = point

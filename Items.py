@@ -306,8 +306,8 @@ class QuickBow(BowBase):
         return 1/ ( 5.0 + (3.5 * (t - 0.3))**2)+0.2
 
 class DivineBow(BowBase):
-    description = 'An ancient bow made of unfathomably light yet incredibly springy material.'
-    lore =  'Said to have hold the blood of ten thousand wariors'
+    description = 'An ancient bow made of incredibly light yet springy material.'
+    lore =  'DIS BOW IS SUPA OP'
     def __init__(self):
         super().__init__(ITAG_DIVINE_BOW)
 
