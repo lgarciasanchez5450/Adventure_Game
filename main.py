@@ -51,7 +51,7 @@ def onGameStart():
     general_manager.spawn_entity(player)
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,0),Items.DivineBow()))
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(-2,0),Items.Bow()))
-    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),Items.ItemArrow().setCount(64)))
+    general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),Items.ItemArrowFunny().setCount(64)))
     general_manager.spawn_item(Items.StrengthPotion(),Vector2(1,0),Vector2(0,2))
     Camera.set_focus(player.pos)
     Camera.set_mouse_pull_strength(13)
@@ -62,7 +62,8 @@ def onGameStart():
     Game_Time.update()
     Camera.resize_screen(WINDOW_WIDTH,WINDOW_HEIGHT)
     #pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT),pygame.OPENGL| pygame.DOUBLEBUF|pygame.RESIZABLE) # can be Resizable with no problems
-# can be set outside of the game loop
+# can be set outside of the game loop+
+    
 #t = gc.collect()
 #print(t)
 #del t

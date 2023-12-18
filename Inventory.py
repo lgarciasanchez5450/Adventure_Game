@@ -55,8 +55,10 @@ class UniversalInventory:
         returns item left over or none'''
 
         i_item = self.inventory[index]
-        if TYPE_CHECKING:
-            assert isinstance(i_item,Item)
+        if i_item is None:
+            self.inventory[index] = item
+            return None
+    
         if i_item.count == i_item.max_stack_count:
             return item
         
@@ -67,7 +69,21 @@ class UniversalInventory:
             return None
         else: 
             return item
+        
+    def _addItemAsOne(self,item: "Item", index:int):
+        '''Does not check if item & i_item are compatible, this should be done beforehand 
+        returns item left over or none. On top of that, assumes that item.count == 1'''
+        i_item = self.inventory[index]
+        if i_item is None:
+            self.inventory[index] = item
+            return None
 
+        if i_item.count == i_item.max_stack_count:
+            return item
+        else:
+            i_item.count += 1
+        return None
+    
     def checkItem(self,index:int):
         '''
            *Run checks on item to make sure that it is valid
@@ -183,6 +199,32 @@ class Hotbar:
     def seeIndex(self,hotbarIndex:int):
         return self._inv.inventory[self.spaces[hotbarIndex]]
     
+    def _addItemAsOne(self,item:"Item",index:int):
+        self._inv._addItemAsOne(item,self.spaces[index])
+
+    def fitItem(self,item:Optional["Item"]):
+        empty_slots = []
+        for index in self.spaces:
+            inventory_item = self._inv.inventory[index]
+            if inventory_item is None:
+                empty_slots.append(index)
+            elif inventory_item.stackCompatible(item):
+                assert not isinstance(item, type(None))
+                item = self._inv._addItem(item,index)
+                if item is None:
+                    return None
+
+        del index, inventory_item #type: ignore
+        #if it has reached here then there is no previously existing item of the same type but there are empty slots
+        for slot in empty_slots:
+            if slot in self._inv.slot_restrictions:
+                if self._inv.slot_restrictions[slot](item): #type: ignore
+                    self._inv.inventory[slot] = item
+                    return None
+            else:
+                self._inv.inventory[slot] = item
+                return 
+        return item
     @property
     def item_selected(self):
         return self._inv.inventory[self.spaces[self.selected]]

@@ -117,6 +117,17 @@ class Item:
     
     #This function will also be called when the item stops being in main hand or on right click up
     def stopUse(self,inventory:UniversalInventory) -> None: ...
+
+    def takeOne(self):
+        assert self.count > 0, 'cannot takeOne from an item that is already zero '
+        self.count -=1 
+        return self.copy()
+
+    def copy(self):
+        try: 
+            return self.__class__() #type: ignore
+        except:
+            raise RuntimeError('Cannot Create a copy of '+self.__class__.__name__)
     
     def stackCompatible(self,other :Optional["Item"]) -> bool:
         '''
@@ -223,6 +234,7 @@ class BunnyEgg(Item):
 class ItemArrow(Item):
     bow_shootable = True
     base_projectile = 'arrow'
+    lore = 'chickeN!!!!'
     __slots__ = 'projectile'
     def __init__(self):
         super().__init__(ITAG_ARROW)
@@ -234,6 +246,15 @@ class ItemArrowExplosive(Item):
     __slots__ = 'projectile'
     def __init__(self):
         super().__init__(ITAG_ARROW_EXPLOSIVE)
+        self.projectile = self.base_projectile
+
+class ItemArrowFunny(Item):
+    bow_shootable = True
+    base_projectile = 'funnyarrow'
+    lore = 'get rekt'
+    description = 'secretly OP'
+    def __init__(self):
+        super().__init__(ITAG_ARROW_FUNNY)
         self.projectile = self.base_projectile
 
 class BowBase(Item):
@@ -268,15 +289,14 @@ class BowBase(Item):
                 item.count -= 1
                 return inventory.checkItem(i)  # return None
     
-    def stopUse(self,inventory) -> None:
+    def stopUse(self,inventory:UniversalInventory) -> None:
         if self.startTime is None or self.loaded_item is None: return
         assert isinstance(inventory,UniversalInventory)
         time = min(Time.time - self.startTime,self.max_pull_time)
         speed_modifier = self.getArrowSpeedFromTime(time)
         direction = (Camera.world_position_from_normalized(Input.m_pos_normalized) - inventory.entity.pos).normalized
         direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
-
-        #spawn_entity(self.loaded_item(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity))
+        inventory.entity.spawn_entity(self.loaded_item(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity)) #type: ignore
         self.loaded_item = None
         self.startTime = None
 

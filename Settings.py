@@ -20,6 +20,7 @@ HITBOX_SIZE:dict[str,tuple[float,float]]= {
     'human':(.5,.6),
     'bunny':(.3,.2),
     'arrow':(.1,.1),
+    'funnyarrow':(.1,.1),
     'item':(.4,.4)
 }
 SURFACE_OFFSET:dict[str,tuple[int,int]] = {
@@ -36,6 +37,7 @@ SURFACE_OFFSET:dict[str,tuple[int,int]] = {
     'spirit'    : (-16,-16),
     'bunny'     : (-16,-16),
     'arrow'     : (-BLOCK_SIZE//2,-BLOCK_SIZE//2),
+    'funnyarrow': (-BLOCK_SIZE//2,-BLOCK_SIZE//2),
     'item'      : (-ITEM_SIZE//2,-ITEM_SIZE//2),
     }
 ENEMIES_TYPES = ['spirit','bamboo','raccoon','squid']
@@ -50,12 +52,13 @@ ACTIONS_BY_SPECIES = {
     'bunny': {'RUN',}
 }
 APPEARANCE_BY_SPECIES:dict[str,tuple[float,float,float]] = {
-    'human' : (0.8,1.5,1.0), #color, size, shape
-    'spirit': (1.0,0.8,0.9),
-    'bunny' : (0.5,0.3,0.5),
-    'item'  : (0.0,0.1,0.5),
-    'arrow' : (0.0,0.1,1.0),
-    'tnt'   : (0.0,1.0,0.5)
+    'human'     : (0.8,1.5,1.0), #color, size, shape
+    'spirit'    : (1.0,0.8,0.9),
+    'bunny'     : (0.5,0.3,0.5),
+    'item'      : (0.0,0.1,0.5),
+    'arrow'     : (0.0,0.1,1.0),
+    'funnyarrow': (0.0,0.1,1.0),
+    'tnt'       : (0.0,1.0,0.5),
 }
 STATS_BY_SPECIES:dict[str,dict[str,int|float]] = {'human':{'constitution': 5,'energy':5,'attack': 5,'defense':0,'speed': 10, 'strength':5,'stamina':5,'attack_range':.3},
                     'spirit':{'constitution': 7, 'energy':8,'attack':3,'defense':5,'speed':9,'strength':1,'stamina':3,'attack_range':.3}, #Reasons: Spirits are by definition ethereal creatures therefore are physically weaker in the real world

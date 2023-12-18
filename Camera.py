@@ -142,7 +142,8 @@ class CSurface:
     def inferOffset(cls,surface:Surface,position:game_math.Vector2):
         return cls(surface,position,(-surface.get_width()//2,-surface.get_height()//2))
 
-
+    def copy(self):
+        return CSurface(self.surf,self.pos.copy(),self.offset)
 
 
 NullCSurface = CSurface(Surface((0,0)),game_math.Vector2.zero,(0,0))

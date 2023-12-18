@@ -43,7 +43,7 @@ class Animation:
         self.surf:pygame.Surface = self.frames["_".join([self.state,self.direction])][self._frame_in_state]
         self.csurface.surf = self.surf
         self.frames_in_state +=1
-        if self._frame_in_state == self.max_frames_in_state-1: self.on_animation_done() #might be unneccesary
+        #if self._frame_in_state == self.max_frames_in_state-1: self.on_animation_done() #might be unneccesary
         
         if self.previous_frame_in_state == self.max_frames_in_state - 1 and self._frame_in_state == 0 == self.frame_in_frame: self.on_animation_done()
 

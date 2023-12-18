@@ -2,7 +2,7 @@ class Appearance:
     """What an entity of 'somthing' looks like in game
     to be used for AI of npc's"""
     __slots__ = 'color','size','shape','species'
-    def __init__(self,color,size,shape,species):
+    def __init__(self,color:float,size:float,shape:float,species:str):
         self.color = color
         self.size = size
         self.shape = shape

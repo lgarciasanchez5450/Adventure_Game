@@ -191,7 +191,6 @@ def _init():
 	global particles_transparent
 	for particle_folder in getFolders('Images\\Particles\\Transparent'):
 		particles_transparent[particle_folder] = tuple(importFolders("Images\\Particles\\Transparent\\"+particle_folder,True).values())
-	print(particles_transparent)
 	'''GROUND ASSETS'''
 	global ground
 	ground = importFolders('Images\\Ground')
@@ -219,12 +218,12 @@ draw.rect(NULL,(255,0,255),(BLOCK_SIZE//2,BLOCK_SIZE//2,BLOCK_SIZE//2,BLOCK_SIZE
 del draw
 
 if __name__ == "11__main__":
-	print('Running Tests on Module Textures')
+	#print('Running Tests on Module Textures')
 	import pygame
 	pygame.init()
 	pygame.display.set_mode((1,1),pygame.NOFRAME)
-	_init()
-	print('All Tests Passed')
+	#_init()
+	#print('All Tests Passed')
 
 
 
@@ -239,13 +238,13 @@ if __name__ == '__main__':
 	import pygame
 	def _compress_and_save():
 		from pygame.image import load,save
-		p = 'Images\\Particles\\Transparent\\Explosion'
-		o = 'Images\\_LegacyUncompressedImages\\Particles\\Transparent\\Explosion'
+		p = 'Images\\Entities\\bunny'
+		o = 'Images\\_LegacyUncompressedImages\\Entities\\bunny'
 		files = getFiles(p)
 		for filename in files:
 
 			save(importTexture(p+'\\'+filename,True),GAME_PATH+f"{o}\\{filename}",'png')
-			save(importTexture(p+'\\'+filename,True,(BLOCK_SIZE,BLOCK_SIZE)),(f"{p}\\{filename}"))
+			save(importTexture(p+'\\'+filename,True,(32,32)),(f"{p}\\{filename}"))
 
 	_ = pygame.display.set_mode((100,10))
 	_compress_and_save()'''

@@ -143,7 +143,6 @@ class Entity(GameObject):
                     print(f"Marking class: {cls.__name__} as abstract!")
                     return 
             raise EntitySetupError(cls.__name__)
-
         if cls.species in Settings.SPAWNABLE_ENTITIES:
             raise RuntimeError("No two entities may share the same species attribute value! Error on -> " + cls.species)
         Settings.SPAWNABLE_ENTITIES[cls.species] = cls
@@ -172,10 +171,10 @@ class Entity(GameObject):
         Camera.remove(self.csurface)
 
     def onDeath(self):
-        if self.dead: return
-        self.dead = True
-        dead_entities.append(self)
-        self.onLeave()
+        if super().onDeath():
+            dead_entities.append(self)
+            return True
+        return False
 
     def update(self):
         if self.dead: return
@@ -253,18 +252,20 @@ class LiveTNT(Entity):
         self.particle_emit = Vector2(0,-0.7)
 
     def onDeath(self):
-        c = Collider.spawnFromCenter(self.pos.x,self.pos.y,self.energy*2,self.energy*2)
-        for x in range(4):
-            #print(Textures.particles_transparent['Explosion'][0].get_size())
-            Particles.spawn_animated(
-                Particles.CheapAnimation(CSurface.inferOffset(Textures.particles_transparent['Explosion'][0],self.pos+ Vector2.randdir/3),Textures.particles_transparent['Explosion'],38+x))
-        damage_function = self.damage_func_getter(self.energy)
-        for entity in collide_entities(c):
-            if entity.typeid == 'tnt': continue #tnt in entity form will be immune to other exploding tnt
-            entity.take_damage(damage_function((self.pos - entity.pos).magnitude()),self.get_attack_type(),None)   
-        for block in collide_blocks(c):
-            block.take_damage(damage_function((self.pos-block.pos).magnitude()),self.get_attack_type(),None)     
-        return super().onDeath()
+        if super().onDeath():
+            c = Collider.spawnFromCenter(self.pos.x,self.pos.y,self.energy*2,self.energy*2)
+            for x in range(4):
+                #print(Textures.particles_transparent['Explosion'][0].get_size())
+                Particles.spawn_animated(
+                    Particles.CheapAnimation(CSurface.inferOffset(Textures.particles_transparent['Explosion'][0],self.pos+ Vector2.randdir/3),Textures.particles_transparent['Explosion'],38+x))
+            damage_function = self.damage_func_getter(self.energy)
+            for entity in collide_entities(c):
+                if entity.typeid == 'tnt': continue #tnt in entity form will be immune to other exploding tnt
+                entity.take_damage(damage_function((self.pos - entity.pos).magnitude()),self.get_attack_type(),None)   
+            for block in collide_blocks(c):
+                block.take_damage(damage_function((self.pos-block.pos).magnitude()),self.get_attack_type(),None)     
+            return True
+        return False
     
 
     def update(self):
@@ -286,13 +287,13 @@ class Arrow(Entity):
     def __init__(self,pos:Vector2,velocity:Vector2,shooter:Entity|None):
         super().__init__(pos)     
         angle = -velocity.get_angle() 
-        if shooter: 
-            velocity += shooter.vel # add the shooters velocity to our own because its relative to the shooters vel in real life
         tex = Textures.rotate(Textures.entity_arrow,angle * 180 / pi)
         self.animation.add_state('going',0,(tex,),(Textures.entity_arrow,))
         self.csurface.offset = (-tex.get_width()//2,-tex.get_height()//2)
         self.animation.set_state('going')
         self.vel = velocity.copy()
+        if shooter: 
+            self.vel += shooter.vel # add the shooters velocity to our own because its relative to the shooters vel in real life
         self.time_til_death = 10 #seconds
         self.range = 2 #blocks
         self.speed = self.vel.magnitude()
@@ -328,7 +329,7 @@ class Arrow(Entity):
         for entity in collide_entities(self.collider):
             if entity.typeid in {'arrow','item'}: continue
             self.onDeath()
-            self.attack(entity)
+            entity.take_damage(self.calculate_damage_to(entity),self.get_attack_type(),self.appearance)
             break
 
     def onLoad(self):
@@ -339,8 +340,9 @@ class Arrow(Entity):
         #Camera.remove_collider(self.collider)
         return super().onLeave()
     
-    def get_attack_damage(self) -> int:
-        return( 0.5 * self.base_damage * (self.vel/2).magnitude_squared() * self.weight * max(0.01,self.penetration)).__trunc__()
+    def calculate_damage_to(self,entity:Entity):
+        return ( 0.5 * self.base_damage * (self.vel - entity.vel/2).magnitude_squared() * self.weight * max(0.01,self.penetration)).__trunc__()
+
 
 class ArrowInciendiary(Arrow):
     species = 'firearrow'
@@ -359,21 +361,29 @@ class ArrowExplosive(Arrow):
         return EXPLOSION_DAMAGE
     
     def onDeath(self):
-        if self.dead: return
-        super().onDeath()
-        d = log(self.energy) + 3.5
-        c = Collider.spawnFromCenter(self.pos.x,self.pos.y,d*2,d*2)
-        for x in range(5):
-            Particles.spawn_animated(Particles.CheapAnimation(CSurface.inferOffset(Textures.blocks['tnt'][0],self.pos+Vector2.randdir/3),Textures.blocks['tnt'],38+x))
-        def damage_from_dist(dist:float) -> int:
-            E = 2.718281828
-            return (self.energy * E ** (-dist)).__trunc__()
-        for entity in collide_entities(c):
-            if entity.typeid == 'tnt':continue #tnt in entity form will be immune to other exploding tnt
-            self.attack_custom_damage(entity,damage_from_dist((self.pos - entity.pos).magnitude()))
-        for block in collide_blocks(c):
-            self.attack_custom_damage(block,damage_from_dist((self.pos - block.pos).magnitude()))
-        return
+        if super().onDeath():
+            d = log(self.energy) + 3.5
+            c = Collider.spawnFromCenter(self.pos.x,self.pos.y,d*2,d*2)
+            for x in range(5):
+                Particles.spawn_animated(Particles.CheapAnimation(CSurface.inferOffset(Textures.blocks['tnt'][0],self.pos+Vector2.randdir/3),Textures.blocks['tnt'],38+x))
+            def damage_from_dist(dist:float) -> int:
+                E = 2.718281828
+                return (self.energy * E ** (-dist)).__trunc__()
+            for entity in collide_entities(c):
+                if entity.typeid == 'tnt':continue #tnt in entity form will be immune to other exploding tnt
+                self.attack_custom_damage(entity,damage_from_dist((self.pos - entity.pos).magnitude()))
+            for block in collide_blocks(c):
+                self.attack_custom_damage(block,damage_from_dist((self.pos - block.pos).magnitude()))
+            return True
+        return False
+
+class ArrowFunny(Arrow):
+    species = 'funnyarrow'
+    def onDeath(self):
+        if super().onDeath():
+            spawn_entity(LiveTNT(self.pos.copy(),1.0,1_000))
+            return True
+        return False
 
 class AliveEntity(Entity):
     abstract = True
@@ -551,10 +561,12 @@ class AliveEntity(Entity):
                 yield entity    
 
     def onDeath(self):
-        super().onDeath()
-        for i in range(10):
-            Particles.spawn(CSurface.inferOffset(Textures.particles_opaque['white'],self.pos + Vector2.random/5),1.0,Vector2.random/2,slows_coef=0)
-        Particles.spawn(CSurface.inferOffset(self.animation.surf.copy(),self.pos.copy()),1.0)
+        if super().onDeath():
+            for i in range(10):
+                Particles.spawn(CSurface.inferOffset(Textures.particles_opaque['white'],self.pos + Vector2.random/5),1.0,Vector2.random/2,slows_coef=0)
+            Particles.spawn(self.animation.csurface.copy(),1.0)
+            return True
+        return False
 
     def set_state(self,number:int):
         '''Returns False if failed.
@@ -653,6 +665,7 @@ class AliveEntity(Entity):
                 print(self.health)
 
     def collect_items(self):
+        print('generic item collect')
         for item in collide_entities_in_range_species(self.pos,self.pickup_range,'item'): # type: ignore
             item:ItemWrapper
             if item.pickup_time < 0 :
@@ -660,6 +673,13 @@ class AliveEntity(Entity):
                 if i is None:
                     item.onDeath()
 
+    ## Interact with the world ##
+
+    def place_block(self,block:Block):
+        place_block(block)
+
+    def spawn_entity(self,entity:Entity):
+        spawn_entity(entity)
 class Player(AliveEntity):
     species ='human'
     __slots__ = 'cx','cy','can_move','attacking','state','showingInventory','hotbar','ui','hbui','walking_particle'
@@ -820,10 +840,14 @@ class Player(AliveEntity):
         self.ui.update()
 
     def collect_items(self): ## TODO : Make it so that in order to pick up items you click on them instead of just getting close to them
+        print('player item collect',Time.time)
+
         for item in collide_entities_in_range_species(self.pos,self.pickup_range,'item'): # type: ignore
             item:ItemWrapper
             if item.pickup_time < 0 :
-                i = self.inventory.fitItem(item.item) #this will never add the same object to both hotbar and inventory becasue the or will only try to add to inventory if the item couldn't be added to the hotbar
+                i = self.hotbar.fitItem(item.item)
+                if i is not None:
+                    i = self.inventory.fitItem(i) #this will never add the same object to both hotbar and inventory becasue the or will only try to add to inventory if the item couldn't be added to the hotbar
                 if i is None:
                     item.onDeath()
 
@@ -931,12 +955,12 @@ class Bunny(AliveEntity):
     #__slots__ = 'right_idle','left_idle','fears','eats','enemies','driver','mark','hunger','sprinting','states'
     def __init__(self,pos):
         super().__init__(pos)
-        idle = tuple(Textures.entities['bamboo']['idle'].values()) #type: ignore
+        #idle = tuple(Textures.entities['bamboo']['idle'].values()) #type: ignore
 
         self.fears = self.fears.copy()
         self.eats = self.eats.copy()
         self.enemies = self.enemies.copy()
-        self.animation.add_state('idle',8,idle,idle)        
+        self.animation.add_state('idle',8,tuple(Textures.entities[self.species].values()))     #type: ignore    
         self.animation.set_state('idle')
         self.vision_collider = Collider(0,0,Settings.VISION_BY_SPECIES['bunny']*2,Settings.VISION_BY_SPECIES['bunny']*2)
         self.vision_squared = Settings.VISION_BY_SPECIES['bunny'] ** 2
@@ -946,7 +970,8 @@ class Bunny(AliveEntity):
         self.timer_to_vision = 1
         self.states = ['idle','wander','afraid','hungry']
         for state in self.states:
-            self.animation.add_state(state,8,idle,idle)
+            self.animation.add_state(state,8,tuple(Textures.entities[self.species].values()))     #type: ignore    
+
         self.state = self.states[0]
         self.mark:Entity|None = None
 
@@ -962,7 +987,7 @@ class Bunny(AliveEntity):
         return closest 
     
     def set_state(self, number: int):
-        if super().set_state(number) is False: return
+        if super().set_state(number) is False: return False
         if number == 0:
             self.vel.reset()
         elif number == 1:
@@ -1081,7 +1106,7 @@ class Driver:
 import Items #This must happen after all entities have been initialized
 
 
-########## NOTE : for custom classes that dont define __eq__ method python defaults to check identity being equal to "is"
+########## NOTE : for custom classes that dont define __eq__ method python defaults to check identity, being equal to "is"
 
 #### UI ####
 class InventoryUI(InScreenUI):
@@ -1173,12 +1198,17 @@ class InventoryUI(InScreenUI):
                     curr_position = slot.pos #type: ignore
                     current_inventory_hover_index = slot.index
 
-                    if Input.m_d1:# and self.inventory is not None:
+                    if Input.m_u1:# and self.inventory is not None:
                         self.in_hand = self.inventory.setItem(self.in_hand,slot.index)
                     elif Input.m_3 and self.in_hand is not None:
-                        if (curr_hover is not None and curr_hover.stackCompatible(self.in_hand) and slot.index not in self.putted_inv):
+                        if slot.index not in self.putted_inv:
+                            if curr_hover is None or curr_hover.stackCompatible(self.in_hand):
+                                if self.inventory._addItemAsOne(self.in_hand.takeOne(),slot.index) is not None: # the .takeOne method remove one from count 
+                                    self.in_hand.count += 1
+                                if self.in_hand.count == 0:
+                                    self.in_hand = None
+                        self.putted_inv.add(slot.index)
                             
-                            self.putted_inv.add(slot.index)
 
             if self.has_hotbar:
                 for slot in self.hb_slots:
@@ -1188,9 +1218,16 @@ class InventoryUI(InScreenUI):
                         curr_position = slot.pos #type: ignore
 
                         current_inventory_hover_index = self.hotbar.spaces[slot.index]
-                        if Input.m_d1:
+                        if Input.m_u1:
                             self.in_hand = self.hotbar.setItem(self.in_hand,slot.index)   
-           
+                        elif Input.m_3 and self.in_hand is not None:
+                            if slot.index not in self.putted_hotbar:
+                                if curr_hover is None or curr_hover.stackCompatible(self.in_hand):
+                                    if self.hotbar._addItemAsOne(self.in_hand.takeOne(),slot.index) is not None: # the .takeOne method remove one from count 
+                                        self.in_hand.count += 1
+                                    if self.in_hand.count == 0:
+                                        self.in_hand = None
+                            self.putted_hotbar.add(slot.index)
             if current_inventory_hover_index != -1 and self.inventory is not None:
                 if '1' in Input.KDQueue: #and current_inventory_hover_index != self.hotbar.spaces[0]:
                     self.inventory.swapIndex(current_inventory_hover_index,self.hotbar.spaces[0])
@@ -1216,7 +1253,7 @@ class InventoryUI(InScreenUI):
                 if slot.state == slot.HOVER:
                     curr_position = slot.pos #type: ignore
                     curr_hover = self.armour_inventory.seeIndex(slot.index) #type: ignore
-                    if Input.m_d1:
+                    if Input.m_u1:
                         self.in_hand = self.armour_inventory.set_armour(self.in_hand,slot.index) #type: ignore
 
         else:
