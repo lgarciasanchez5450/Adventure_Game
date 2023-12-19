@@ -1,5 +1,6 @@
 # Adventure_Game
 A very ambitious adventure game
+Python Version 3.10 (very important)
 Pip dependencies:
     - Pygame (ce is preferable)
     - moderngl
