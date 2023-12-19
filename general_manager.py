@@ -2077,6 +2077,11 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
         raylen = dist_to_closest(x,y)
     return False
 
+explosion_particles
+
+
+
+
 def generate_world():
     '''Generate the world, should run once per world'''
     def checkIsGen() -> None:
