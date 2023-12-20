@@ -45,7 +45,7 @@ class Actions:
 
 #### BLOCKS ####
 class Block(GameObject):
-    tex_name = 'BLCOK_TEXTURE_NAME NOT SET!!!'
+    tex_name = '<tex_name> NOT SET!!!'
     anim_fps = 0
     @staticmethod
     def spawnable_on(ground):
