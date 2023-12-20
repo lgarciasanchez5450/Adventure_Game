@@ -285,8 +285,12 @@ def run_tests():
         print(f'Tests Passed in {perf_counter() - start} seconds')
     print("Starting Stress Test. Rating Goal: 500")
     cycles = 1_000
-    start = perf_counter()
-    [noise2(x,y) for x in range(cycles) for y in range(cycles)]
+    import multiprocessing
+    cache = [(x,y) for x in range(cycles) for y in range(cycles)]
+    with multiprocessing.Pool() as pool:
+        start = perf_counter()
+        pool.starmap(noise2,[(x,y) for x in range(cycles) for y in range(cycles)])
+        #[noise2(x,y) for x in range(cycles) for y in range(cycles)]
     time = perf_counter()-start
     cycles_per_second = cycles*cycles / time
     print("Rating:",cycles_per_second.__trunc__()/1000)

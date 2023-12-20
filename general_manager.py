@@ -33,7 +33,7 @@ from sys import intern
 from GameObject import GameObject
 from Appearance import Appearance
 from EntityEffects import *
-
+from Explosion import Explosion
 dead_entities = []
 
 
@@ -2077,10 +2077,22 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
         raylen = dist_to_closest(x,y)
     return False
 
-explosion_particles
+explosions:list[Explosion] = []
 
+def create_explosion(pos:Vector2,energy:float):
+    e = Explosion(pos,energy)
+    #e.reachable_dynamic_entities.extend(collide_entities_in_range(pos,))
+    explosions.append(e)
 
-
+def update_explosions():
+    a = 0
+    while a < explosions.__len__():
+        explosions[a].update()
+        if explosions[a].isDone:
+            explosions.pop(a) 
+        else:
+            a+=1 
+        
 
 def generate_world():
     '''Generate the world, should run once per world'''

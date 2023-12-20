@@ -210,6 +210,9 @@ class Vector2:
 	def __bool__(self):
 		return (self.x or self.y).__bool__()
 	
+	def __array__(self):
+		return np.array((self.x,self.y))
+
 	def __iter__(self):
 		yield self.x
 		yield self.y
