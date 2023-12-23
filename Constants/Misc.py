@@ -10,6 +10,7 @@ POSITIVE_INFINITY = float('inf')
 NEGATIVE_INFINITY = float('-inf')
 DEBUG:Final = True
 TEXTURE_FANCY_IMPORT:Final = True
+TWO_PI = 6.283185307197959
 
 '''Game States'''
 MAIN_MENU = 0

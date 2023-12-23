@@ -33,7 +33,7 @@ from sys import intern
 from GameObject import GameObject
 from Appearance import Appearance
 from EntityEffects import *
-from Explosion import Explosion
+import Explosion
 dead_entities = []
 
 
@@ -41,6 +41,7 @@ dead_entities = []
 class Actions:
     def __init__(self):
         pass
+
 
 
 #### BLOCKS ####
@@ -116,7 +117,7 @@ class TNT(Block):
 
     def onDeath(self):
         if super().onDeath():
-            spawn_entity(LiveTNT(self.pos,4.0,15))
+            spawn_entity(LiveTNT(self.pos,4.0,10))
             return True
         return False
 
@@ -253,17 +254,18 @@ class LiveTNT(Entity):
 
     def onDeath(self):
         if super().onDeath():
-            c = Collider.spawnFromCenter(self.pos.x,self.pos.y,self.energy*2,self.energy*2)
-            for x in range(4):
-                #print(Textures.particles_transparent['Explosion'][0].get_size())
-                Particles.spawn_animated(
-                    Particles.CheapAnimation(CSurface.inferOffset(Textures.particles_transparent['Explosion'][0],self.pos+ Vector2.randdir/3),Textures.particles_transparent['Explosion'],38+x))
-            damage_function = self.damage_func_getter(self.energy)
-            for entity in collide_entities(c):
-                if entity.typeid == 'tnt': continue #tnt in entity form will be immune to other exploding tnt
-                entity.take_damage(damage_function((self.pos - entity.pos).magnitude()),self.get_attack_type(),None)   
-            for block in collide_blocks(c):
-                block.take_damage(damage_function((self.pos-block.pos).magnitude()),self.get_attack_type(),None)     
+            create_explosion(self.pos,self.energy)
+            #c = Collider.spawnFromCenter(self.pos.x,self.pos.y,self.energy*2,self.energy*2)
+            #for x in range(4):
+            #    #print(Textures.particles_transparent['Explosion'][0].get_size())
+            #    Particles.spawn_animated(
+            #        Particles.CheapAnimation(CSurface.inferOffset(Textures.particles_transparent['Explosion'][0],self.pos+ Vector2.randdir/3),Textures.particles_transparent['Explosion'],38+x))
+            #damage_function = self.damage_func_getter(self.energy)
+            #for entity in collide_entities(c):
+            #    if entity.typeid == 'tnt': continue #tnt in entity form will be immune to other exploding tnt
+            #    entity.take_damage(damage_function((self.pos - entity.pos).magnitude()),self.get_attack_type(),None)   
+            #for block in collide_blocks(c):
+            #    block.take_damage(damage_function((self.pos-block.pos).magnitude()),self.get_attack_type(),None)     
             return True
         return False
     
@@ -381,7 +383,7 @@ class ArrowFunny(Arrow):
     species = 'funnyarrow'
     def onDeath(self):
         if super().onDeath():
-            spawn_entity(LiveTNT(self.pos.copy(),1.0,1_000))
+            spawn_entity(LiveTNT(self.pos.copy(),1.0,5))
             return True
         return False
 
@@ -390,7 +392,7 @@ class AliveEntity(Entity):
     __slots__ = 'actions','pickup_range','inventory','armour_inventory','stats','exp','max_speed','total_health','defense','regen_multiplier','health','strength','max_energy', \
     'energy','attack_speed','time_between_attacks','time_to_attack','time_to_regen','regen_time','vision_collider','vision_squared','states','ground','invulnerability_time', \
     'time_til_vulnerable','direction','extra_speed','extra_speed_sum','extra_total_health','extra_total_health_sum','extra_regen','extra_regen_sum','extra_strength' ,\
-    'extra_strength_sum','extra_energy','extra_energy_sum','extra_defense','extra_defense_sum','effects','state'
+    'extra_strength_sum','extra_energy','extra_energy_sum','extra_defense','extra_defense_sum','effects','state','healthbar'
     def __init__(self,pos):
         super().__init__(pos)
         self.actions = Settings.ACTIONS_BY_SPECIES[self.species]
@@ -436,6 +438,7 @@ class AliveEntity(Entity):
         self.extra_defense:dict[str,int] = {}; self.extra_defense_sum = 0.0
 
         self.effects:list[EntityEffect] = []
+        self.healthbar = HealthBar(self)
 
     ### SET STATS ###
     
@@ -592,8 +595,6 @@ class AliveEntity(Entity):
 
     def update(self):
         if self.dead: return
-        if self.time_til_vulnerable == NEGATIVE_INFINITY:
-            self.time_til_vulnerable = self.invulnerability_time
         self.time_to_attack -= Time.deltaTime
         self.time_til_vulnerable -= Time.deltaTime
         frame_speed = (self.getTotalSpeed()) * Time.deltaTime
@@ -619,6 +620,7 @@ class AliveEntity(Entity):
         for effect in self.effects:
             effect.update()
         self.animation.animate()
+        self.healthbar.update()
 
     def get_damage_resisted(self,damage:int,type:str) -> int:
         '''Returns damage resisted'''
@@ -639,7 +641,6 @@ class AliveEntity(Entity):
             print('taking damage',damage,'now health is',self.health)
             if self.health <= 0:
                 self.onDeath()
-            self.time_til_vulnerable = NEGATIVE_INFINITY
     
     def get_energy_multiplier(self) -> float:
         return (self.energy/self.stats['energy'] + 1)/2
@@ -665,7 +666,6 @@ class AliveEntity(Entity):
                 print(self.health)
 
     def collect_items(self):
-        print('generic item collect')
         for item in collide_entities_in_range_species(self.pos,self.pickup_range,'item'): # type: ignore
             item:ItemWrapper
             if item.pickup_time < 0 :
@@ -680,6 +680,7 @@ class AliveEntity(Entity):
 
     def spawn_entity(self,entity:Entity):
         spawn_entity(entity)
+
 class Player(AliveEntity):
     species ='human'
     __slots__ = 'cx','cy','can_move','attacking','state','showingInventory','hotbar','ui','hbui','walking_particle'
@@ -743,8 +744,10 @@ class Player(AliveEntity):
             c = Collider(self.pos.x-.7,self.pos.y-.5,.5,1)
 
     def take_damage(self, damage: int, type: str,appearance:Appearance|None = None) -> None:
-        
-        super().take_damage(damage, type,appearance)
+        if type is EXPLOSION_DAMAGE:
+            print(damage, 'of explosion type')
+        else:
+            super().take_damage(damage, type,appearance)
     
     def input(self): #Time.deltaTime is in seconds
         if 'e' in Input.KDQueue:
@@ -764,8 +767,12 @@ class Player(AliveEntity):
         if 'b' in Input.KDQueue:
             b = Bunny(self.pos.copy())
             spawn_entity(b)
+        
+        if 'h' in Input.KDQueue:
+            create_explosion(Camera.world_position_from_normalized(Input.m_pos_normalized) ,20)
     
         if 'n' in Input.KDQueue:
+            return
             velocity = (Camera.world_position_from_normalized(Input.m_pos_normalized) - self.pos).normalized
             if velocity.isZero:
                 velocity = Vector2.randdir
@@ -800,6 +807,10 @@ class Player(AliveEntity):
             self.hotbar.stop_use_selected()
         elif Input.m_3:
             self.hotbar.during_use_selected()
+
+        if Input.m_2 and Time.frameCount%21 == 0:
+            Particles.spawn_smoke_particle(Camera.world_position_from_normalized(Input.m_pos_normalized),Vector2.randdir,(Vector2.random.x*100).__trunc__())
+
 
     def move(self):
         super().update() 
@@ -840,7 +851,6 @@ class Player(AliveEntity):
         self.ui.update()
 
     def collect_items(self): ## TODO : Make it so that in order to pick up items you click on them instead of just getting close to them
-        print('player item collect',Time.time)
 
         for item in collide_entities_in_range_species(self.pos,self.pickup_range,'item'): # type: ignore
             item:ItemWrapper
@@ -852,7 +862,7 @@ class Player(AliveEntity):
                     item.onDeath()
 
     def update(self):
-        Camera.program['danger'] = 1-(self.health / self.total_health)
+        #Camera.program['danger'] = 1-(self.health / self.total_health)
         if self.showingInventory:
             self.update_inventory_ui()
         self.input()
@@ -1836,7 +1846,22 @@ def collide_blocks(collider:Collider):
         for obstacle in chunk.blocks:
             if collider.collide_collider(obstacle.collider):
                 yield obstacle
-                
+
+def collide_blocks_in_range(pos:Vector2,range:float):
+    range_sqrd = range*range
+    checked = set()
+    for y in inclusive_range((pos.y-range).__floor__(),(pos.y+range).__ceil__(),CHUNK_SIZE):
+        for x in inclusive_range((pos.x-range).__floor__(),(pos.x+range).__ceil__(),CHUNK_SIZE):  
+            cpos = (x//CHUNK_SIZE,y//CHUNK_SIZE)
+            if cpos in checked:continue
+            checked.add(cpos)
+            chunk = chunks.get(cpos)
+            if chunk is not None:
+                for block in chunk.blocks:
+                    if not block.dead and (block.pos-pos).magnitude_squared() <= range_sqrd:
+                        yield block
+
+
 def collision_horizontal(collider:Collider,vx:int|float) -> bool:
     '''Returns whether the collider collided with any block'''
     if not vx: return False
@@ -2077,11 +2102,13 @@ def ray_can_reach(pos:Vector2,end_pos:Vector2):
         raylen = dist_to_closest(x,y)
     return False
 
-explosions:list[Explosion] = []
+explosions:list[Explosion.Explosion] = []
 
 def create_explosion(pos:Vector2,energy:float):
-    e = Explosion(pos,energy)
-    #e.reachable_dynamic_entities.extend(collide_entities_in_range(pos,))
+    e = Explosion.Explosion(pos,energy)
+    e.setEntities(collide_blocks_in_range(pos,Explosion.prediction(energy)),collide_entities_in_range(pos,Explosion.prediction(energy)))
+    for vx,vy in zip(e.particles.vx[::5],e.particles.vy[::5]):
+        Particles.spawn_smoke_particle(pos.copy(),Vector2(vx,vy),(Vector2.random.x*360).__trunc__())
     explosions.append(e)
 
 def update_explosions():
@@ -2092,8 +2119,21 @@ def update_explosions():
             explosions.pop(a) 
         else:
             a+=1 
-        
+def draw_explosions():
+    exp_points = np.empty((Explosion.PARTICLES_TO_SIMULATE//2,2),dtype = np.float64)
+    #angles = 180
+    #to_skip = Explosion.PARTICLES_TO_SIMULATE // angles
+    for exp in explosions:
+        #if exp.timer <=0:
+        #    exp.timer = 0.25
+        #    cond = exp.particles.valid_particles
+        #    for px,py in zip(exp.particles.px[::to_skip],exp.particles.py[::to_skip]):
+        #        Particles.spawn_smoke_particle(Vector2(px,py),Vector2.randdir/5,(Vector2.random.x*360).__trunc__())
+        exp_points[:,0] =  exp.particles.px[::2] * BLOCK_SIZE - Camera.camera_offset_x + Camera.HALFWIDTH
+        exp_points[:,1] =  exp.particles.py[::2] * BLOCK_SIZE - Camera.camera_offset_y + Camera.HALFHEIGHT
 
+        pygame.draw.lines(Camera.screen,'red',True,exp_points) #t
+    #draw_explosions()
 def generate_world():
     '''Generate the world, should run once per world'''
     def checkIsGen() -> None:

@@ -5,8 +5,11 @@ import pygame
 import Textures
 import Time
 from Animation import SimpleAnimation
-from Constants import POSITIVE_INFINITY
+from Constants import POSITIVE_INFINITY, PERF_VS_MEMORY, TWO_PI, BLOCK_SIZE
 from Game_Typing import *
+import numpy as np
+from game_math import Vector2
+from debug import profile
 if TYPE_CHECKING:
     from general_manager import GameObject
 
@@ -46,9 +49,19 @@ class Particle:
         self.k_f = friction 
         self.anim = animation
 
-    def update(self):
-        self.anim.animate()
+    @property
+    def pos(self):
+        return self.anim.csurface.pos
+    
+    @property
+    def csurf(self):
+        return self.anim.csurface
 
+    def update(self):
+        self.time -= Time.deltaTime
+        self.anim.animate()
+        self.anim.csurface.pos += self.vel * Time.deltaTime
+        self.vel -= self.vel * Time.deltaTime * self.k_f
     @classmethod
     def noAnimation(cls,csurf:Camera.CSurface,vel:game_math.Vector2,time:float,friction:float):
         return cls(EvenCheaperAnimation(csurf),vel,time,friction)
@@ -57,10 +70,171 @@ class Particle:
     def withAnimation(cls,animation:CheapAnimation,vel:game_math.Vector2,friction:float):
         return cls(animation,vel,animation.time_per_cycle,friction)
 
+
+    def draw(self):
+        Camera.blit_csurface(self.anim.csurface)
+
+class SmokeParticle:
+    ROTATIONS_CACHED = (180)
+    SIZES_CACHED = (50)
+    smallest_size = 24
+    starting_alpha = 150
+    base_tex:Surface#pygame.transform.grayscale((Textures.particles_opaque['smoke']).convert())
+    cached_particles:dict[int,dict[int,Surface]] = {} # size -> rot(degrees)
+    initialized = False
+    @classmethod
+    def get_particle(cls,size:int,rot:int):
+        s = cls.cached_particles[size]
+        return s[(rot%360)&0b111111110].copy() #bit magic to make sure the number is always even because of when it is initialized it will be on an even number
+    
+    @classmethod
+    def initialize_caches(cls):
+        cls.base_tex = (Textures.particles_opaque['new_smoke']).convert()
+        cls.base_tex.set_colorkey((0,0,0))
+        for size in range(cls.SIZES_CACHED):
+            size += cls.smallest_size
+            sizes = cls.cached_particles[size] = {}
+            curr = pygame.transform.scale(cls.base_tex,(size,size))
+            for rot in range(cls.ROTATIONS_CACHED):
+                rot = (rot * 360 // cls.ROTATIONS_CACHED)
+                sizes[rot] = pygame.transform.rotate(curr,rot)
+                
+
+    __slots__ ='rot','alpha','pos','time','vel','size','t','state','csurf'
+    def __init__(self, pos:Vector2, vel: Vector2, time: float,rot:int):
+        if not SmokeParticle.initialized:
+            self.initialize_caches()
+            SmokeParticle.initialized = True
+        self.pos = pos
+        self.vel = vel
+        self.time = time
+        self.rot = rot
+        self.alpha = float(self.starting_alpha)
+        self.size = float(self.smallest_size)
+        self.t = 0.0
+        self.state = (self.size.__trunc__(), (self.rot * 360).__trunc__() // self.ROTATIONS_CACHED)
+        self.csurf = Camera.CSurface(self.get_particle(*self.state),self.pos,(0,0))
+        self.csurf.offset = (-(self.csurf.surf.get_width()//2),-(self.csurf.surf.get_height()//2))
+
+
+    @staticmethod
+    def speed_function(t:float):
+        return 1/((t+1)**5)
+
+    def update(self):
+        self.t += Time.deltaTime
+        self.size += 20 *Time.deltaTime
+        if self.size > 50:
+            self.size = 50
+        self.rot += 30 * self.speed_function(self.t/3) * Time.deltaTime
+        
+        self.alpha -= 40* Time.deltaTime
+        if self.alpha < 0:
+            self.alpha = 0.0
+        self.pos += self.speed_function(self.t) * Time.deltaTime * self.vel
+        self.vel *= 1 - Time.deltaTime
+        state = (self.size.__trunc__(), (self.rot * 360 // self.ROTATIONS_CACHED).__trunc__())
+        if state != self.state:
+            self.state = state
+            self.csurf.surf = self.get_particle(state[0],state[1])
+            self.csurf.offset = (-(self.csurf.surf.get_width()//2),-(self.csurf.surf.get_height()//2))
+        if self.alpha == 0:
+            self.time = -1
+
+    def draw(self):
+        self.csurf.surf.set_alpha(self.alpha.__trunc__())
+        Camera.blit_csurface(self.csurf)
+
+
+class Smoke:
+    ROTATIONS_CACHED = (180)
+    SIZES_CACHED = (50)
+    smallest_size = 24
+    starting_alpha = 150
+    base_tex:Surface#pygame.transform.grayscale((Textures.particles_opaque['smoke']).convert())
+    cached_particles:dict[int,dict[int,Surface]] = {} # size -> rot(degrees) -> Surface
+    cached_offset:dict[int,dict[int,np.ndarray]] = {} # size -> rot(degrees) -> offset(half of surface size)
+    initialized = False
+    @classmethod
+    def get_particle(cls,size:int,rot:int):
+        s = cls.cached_particles[size]
+        return s[(rot%360)&0b111111110] #bit magic to make sure the number is always even because of when it is initialized it will be on an even number
+    
+    @classmethod
+    def initialize_caches(cls):
+        cls.base_tex = (Textures.particles_opaque['new_smoke']).convert()
+        cls.base_tex.set_colorkey((0,0,0))
+        for size in range(cls.SIZES_CACHED):
+            size += cls.smallest_size
+            sizes = cls.cached_particles[size] = {}
+            sizes2 = cls.cached_offset[size] = {}
+            curr = pygame.transform.scale(cls.base_tex,(size,size))
+            for rot in range(cls.ROTATIONS_CACHED):
+                rot = (rot * 360 // cls.ROTATIONS_CACHED)
+                sizes[rot] = pygame.transform.rotate(curr,rot)
+                sizes2[rot] = -np.ndarray(sizes[rot].get_size(),dtype = np.int32)//2
+                
+    
+
+    def __init__(self, px:np.ndarray,py:np.ndarray, vx:np.ndarray,vy:np.ndarray, time: float):
+        if not SmokeParticle.initialized:
+            self.initialize_caches()
+            SmokeParticle.initialized = True
+        self.px = px
+        self.py = py
+        self.time = time
+        self.rots = np.random.rand(px.shape[0])
+        self.alpha = self.starting_alpha
+        self.size = self.smallest_size
+        self.t = 0.0
+        self.csurf = Camera.CSurface(self.get_particle(0,0),Vector2.zero,(0,0))
+        self.csurf.offset = (-(self.csurf.surf.get_width()//2),-(self.csurf.surf.get_height()//2))
+        self.drawing_positions = np.empty((px.shape[0],2))
+
+
+    def update(self):
+        s = self.cached_particles[self.size]    
+        for rot in self.rots:
+            s[(rot%360)&0b111111110].set_alpha(self.alpha)
+
+        
+    def draw(self):
+        self.drawing_positions[:,0] = self.px * BLOCK_SIZE - Camera.camera_offset_x + Camera.HALFWIDTH
+        self.drawing_positions[:,1] = self.py * BLOCK_SIZE - Camera.camera_offset_y + Camera.HALFHEIGHT
+        s = self.cached_particles[self.size]  
+        s2 = self.cached_offset[self.size]  
+        Camera.screen.blits(((s[(rot%360)&0b111111110],pos + s2[(rot%360)&0b111111110]) for pos,rot in zip(self.drawing_positions,self.rots)))
+
+if __name__ == '__main__':
+    s = pygame.display.set_mode((1,1))
+
+
+    Textures.initInThread()
+    from debug import profile
+    while True:
+        if not Textures.done_loading:
+            Textures.ready_for_next = True
+        else:
+            break
+    Time.sleep(10)
+    SmokeParticle(Vector2(0,0),Vector2.zero,1.0,0)
+    Time.sleep(10)
+
+
+
 gravity = game_math.Vector2(0,1)
 
 g_particles:list[Particle] = []
 ng_particles:list[Particle] = []
+
+
+
+
+
+
+
+
+
 
 
 def spawn(csurf:Camera.CSurface,time:float,vel:game_math.Vector2|None = None,has_gravity:bool = False,slows_coef:float = 1.0):
@@ -83,24 +257,24 @@ def spawn_hit_particles(pos:game_math.Vector2,time:float,amount:int = 5):
     for x in range(amount):
         spawn(Camera.CSurface.inferOffset(Textures.particles_opaque['death'],pos+game_math.Vector2.random/10),time,game_math.Vector2.random)
 
+def spawn_smoke_particle(pos:Vector2,vel:Vector2,rot:int):
+    default_time = 20.0
+    ng_particles.append(SmokeParticle(pos,vel,default_time,rot)) #type: ignore
+
 def update_list(myList:list[Particle],has_gravity:bool):
     to_remove = []
     for index,particle in enumerate(myList):
-        particle.time -= Time.deltaTime
+        particle.update()
         if particle.time < 0:
             to_remove.append(index)
             continue
-        particle.update()
-        p:game_math.Vector2 = particle.anim.csurface.pos 
-        v:game_math.Vector2 = particle.vel
-        p += v * Time.deltaTime
         if has_gravity:
-            v += gravity * Time.deltaTime
+            particle.vel += gravity * Time.deltaTime
         
-        v -= v * Time.deltaTime * particle.k_f
     #we can actually do this because it is being iterated over backwards
     for index in to_remove.__reversed__():
         myList.pop(index)
+
 def update():
     update_list(ng_particles,False)
     update_list(g_particles,True)
@@ -109,14 +283,11 @@ def update():
 
 
 
-
-
-
    
 def draw():
     for particle in ng_particles:
-        Camera.blit_csurface(particle.anim.csurface)
+        particle.draw()
     for particle in g_particles:
-        Camera.blit_csurface(particle.anim.csurface)
+        particle.draw()
 
 

@@ -6,4 +6,6 @@ WIDTH = 900
 HEIGHT = 600
 HALFWIDTH = WIDTH//2
 HALFHEIGHT = HEIGHT//2
-FPS = 500 #Target Framerate
+FPS = 60 #Target Framerate
+
+PERF_VS_MEMORY:float = 1.0 #[(0: full memory save) -----  (1: cache everything 4 perf)]  number between 0 ane 1 that the game will use to optmize for performance or memory

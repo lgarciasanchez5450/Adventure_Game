@@ -62,7 +62,7 @@ HALF_HEIGHT_OVER_BLOCK_SIZE:float
 queue = []
 collider_queue = []
 background_queue = []
-UIs:list[Callable[[],ImplementsDraw]] = []
+UIs:list[tuple[ImplementsDraw,int]] = []
 focus = game_math.Vector2.zero
 halfscreensize:game_math.Vector2
 screen_size:game_math.Vector2
@@ -126,9 +126,16 @@ def onResize(_width,_height):
     screen_size.x = width-1
     screen_size.y = height-1
 add_OnResize(onResize)
-def ui_draw_method(object):
-    UIs.append(object)
+def ui_draw_method(object,order:int = 0):
+    UIs.append((object,order))
+    UIs.sort(key = lambda x:x[1])
     return object
+
+def ui_draw_method_remove(object):
+    for i,(obj,order) in enumerate(UIs):
+        if (obj is object):
+            UIs.pop(i)
+            return
 
 class CSurface:
     __slots__ = 'surf','pos' ,'offset'
@@ -309,7 +316,7 @@ def draw_background():
         blit_csurface(thing)
 
 def draw_UI():
-    for ui in UIs:
+    for ui,_ in UIs:
         ui.draw()
 
 def translate_to_opengl():

@@ -8,9 +8,11 @@ from Constants import HEIGHT, WIDTH
 import Time
 from game_math import Vector2, Collider,ones,deque, Vector2Int
 import Input
+from Textures import NULL_COLOR
 from Game_Typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from Items import Item
+    from general_manager import AliveEntity
 tex_location = 1
 
 class UI:
@@ -152,6 +154,70 @@ class ItemDescriptionUI:
     def draw(self,surface:pygame.Surface,pos:Vector2Int): 
         if self.item is None: return
         surface.blit(self.surf,pos.tuple)
+
+class HealthBar:
+    PRIMARY_COLOR = (255,255,255)
+    OUTLINE_COLOR = (255,255,255)
+    OUTLINE_WIDTH = 1
+    BAR_WIDTH = 3 # in pixels
+    BAR_HEIGHT = 7 # in pixels
+    BAR_SPACING = 1
+    def __init__(self,entity:"AliveEntity",percents:tuple[float,...] = (0.10,0.40,0.60,0.75)):
+        assert percents == tuple(sorted(percents)), f'percents must be sorted {percents} vs {tuple(sorted(percents))}'
+        self.entity = entity
+        self.offset = Vector2(0,-.7)
+        
+        self.bars = len(percents)
+        self.percents = percents
+
+        width = self.BAR_SPACING + (self.BAR_WIDTH + self.BAR_SPACING) * self.bars + 2 * self.OUTLINE_WIDTH
+        height = self.BAR_HEIGHT + 2 * (self.OUTLINE_WIDTH + self.BAR_SPACING)
+        self.csurf = Camera.CSurface.inferOffset(Camera.Surface((width,height)),self.entity.pos + self.offset)
+        self.csurf.surf.set_colorkey(NULL_COLOR)
+        self.current_bars = self.calculate_bars()
+        self._draw_surface()
+        Camera.ui_draw_method(self,-1)
+
+    def calculate_bars(self) -> int:
+        assert self.entity is not None
+        percent_health = self.entity.health / self.entity.total_health
+        for i,percent in enumerate(self.percents):
+            if percent_health < percent:
+                return i
+        return self.bars
+            
+
+    def _draw_surface(self):
+        self.csurf.surf.fill(NULL_COLOR)
+        #draw the outlines
+        for i in range(self.OUTLINE_WIDTH): # we draw smaller 1 pixel outlines until we get the desired width
+            pygame.draw.lines(self.csurf.surf,self.OUTLINE_COLOR,True,([i,i],[self.csurf.surf.get_width()-i-1,i],[self.csurf.surf.get_width()-i-1,self.csurf.surf.get_height()-1-i],[i,self.csurf.surf.get_height()-i-1]))
+
+        top = self.OUTLINE_WIDTH + self.BAR_SPACING
+        width = self.OUTLINE_WIDTH + self.BAR_SPACING
+        for _ in range(self.current_bars):
+            pygame.draw.rect(self.csurf.surf,self.PRIMARY_COLOR,(width,top,self.BAR_WIDTH,self.BAR_HEIGHT))
+            width += self.BAR_WIDTH + self.BAR_SPACING
+
+    def update(self):
+        if self.entity is None: return
+        self.csurf.pos = self.entity.pos + self.offset
+        if self.current_bars != (bars := self.calculate_bars()):
+            self.current_bars = bars
+            self._draw_surface()
+        if self.entity.dead:
+            self.entity = None
+            Camera.ui_draw_method_remove(self)
+    
+    def draw(self):
+        if self.entity is None or self.entity.dead:
+            self.entity = None
+            try:
+                Camera.ui_draw_method_remove(self)
+            except ValueError as err:
+                print(err)
+
+        Camera.blit_csurface(self.csurf)
 
 itemDescriptor = ItemDescriptionUI()
 

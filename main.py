@@ -34,7 +34,6 @@ def onGameAwake():
     Music.init()
     Pause_Menu.init()
 
-
 def onGameStart():
     
     screen = pygame.Surface((WIDTH,HEIGHT))
@@ -52,7 +51,7 @@ def onGameStart():
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,0),Items.DivineBow()))
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(-2,0),Items.Bow()))
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,2),Items.ItemArrowFunny().setCount(64)))
-    general_manager.spawn_item(Items.StrengthPotion(),Vector2(1,0),Vector2(0,2))
+    general_manager.spawn_item(Items.SpeedPotion(),Vector2(1,0),Vector2(0,2))
     Camera.set_focus(player.pos)
     Camera.set_mouse_pull_strength(13)
     #Events.call_OnResize(WINDOW_WIDTH,WINDOW_HEIGHT)
@@ -82,6 +81,7 @@ while True:
         general_manager.update()
         general_manager.update_entities()
         general_manager.manage_chunks()
+        general_manager.update_explosions()
 
         Particles.update()
         if Input.KDQueue:
@@ -97,6 +97,7 @@ while True:
         Camera.sorted_draw_from_queue()
 
         Camera.draw_collider_queue()
+        general_manager.draw_explosions()
         Camera.draw_UI()
         debug.debug(general_manager.active_entity_count(),(200,200))
         debug.debug(Time.get_frameRateInt())

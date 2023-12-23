@@ -2,7 +2,7 @@ from Constants import BLOCK_SIZE,PARTICLE_SIZE,ITEM_SIZE
 from os import walk,scandir
 from time import sleep
 from pygame import Surface
-from Constants.Misc import TEXTURE_FANCY_IMPORT
+from Constants.Misc import TEXTURE_FANCY_IMPORT, DEBUG
 if TEXTURE_FANCY_IMPORT:
 	from pygame.image import load as _load
 	### INNER VARIABLES ###
@@ -44,6 +44,7 @@ __all__ = [
 ]
 
 NULL = Surface((BLOCK_SIZE,BLOCK_SIZE))
+NULL_COLOR = (200,50,200)
 
 player_attack:tuple[Surface,...]
 player_death:tuple[Surface,...]
@@ -137,8 +138,10 @@ def initInThread():
 
 def initInThreadSimple(): #this should just be used for testing other modules which require Textures to this loads them
 	thread = initInThread()	
+	print('importing')
 	global ready_for_next
 	while not done_loading:
+		if (ready_for_next): print('imported one')
 		ready_for_next = False
 		sleep(0.02)
 	thread.join()
@@ -154,7 +157,7 @@ def _init():
 	player_idle = tuple(importFolders('Images\\Entities\\player\\idle').values())
 	#player_run = tuple(importFolders('Images\\Entities\\player\\run').values())
 	player_walk = tuple(importFolders('Images\\Entities\\player\\walk').values())
-
+	if DEBUG : print('imported player assets')
 
 	global entity_arrow
 	entity_arrow = scale(rotate(importTexture('Images\\Entities\\arrow\\default_arrow.png').convert_alpha(),90+47),(BLOCK_SIZE,BLOCK_SIZE))
@@ -165,18 +168,21 @@ def _init():
 	'''ITEMS ASSETS'''
 	for item_folder in getFolders('Images\\Items'):
 		items[item_folder] = tuple(importFolders("Images\\Items\\"+item_folder,True,(ITEM_SIZE,ITEM_SIZE)).values())
+	if DEBUG : print('imported item assets')
 
 	'''BLOCK ASSETS'''
 	for block_folder in getFolders('Images\\Blocks'):
 		blocks[block_folder] = tuple(importFolders("Images\\Blocks\\"+block_folder,False).values())
+	if DEBUG : print('imported block assets')
 
 	'''ENTITY ASSETS'''
 	global entities
 	entities = recursivelyImportPath('Images\\Entities')
+	if DEBUG : print('imported entity assets')
 
 	'''PARTICLE ASSETS'''
 	global particles_opaque, particles_transparent
-	particles_opaque = importFolders('Images\\Particles\\Opaque',False,(PARTICLE_SIZE,PARTICLE_SIZE))
+	particles_opaque = importFolders('Images\\Particles\\Opaque',False)
 	## Get Solild Particles from json
 	import json
 	with open('Images\\Particles\\Opaque\\Solids.json', 'r') as solids_file:
@@ -197,6 +203,8 @@ def _init():
 
 	global user_interface
 	user_interface = recursivelyImportPath('Images\\UI')
+
+	if DEBUG : print('done')
 
 	global done_loading
 	done_loading = True

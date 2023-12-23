@@ -1,5 +1,5 @@
 from pygame.time import Clock
-from time import perf_counter as _getTime # can switch to normal time 
+from time import perf_counter as _getTime, sleep # can switch to normal time 
 import time as _time
 from typing import Callable
 from Constants.Display import FPS
@@ -92,7 +92,8 @@ def update():
     global frameCount,deltaTime,time,fixedDeltaTime,fixedTime,_prev_time,_start_time,_clock
     frameCount += 1
     if FPS: 
-      _clock.tick(FPS) #can be changed to .tick_busy_loop for MUCH more accurate timing 
+      _clock.tick(FPS) #can be changed to .tick_busy_loop for MUCH more accurate timing
+       
     #update dynamic time
     current_time = _getTime()
     deltaTime = current_time - _prev_time
@@ -100,6 +101,10 @@ def update():
     _prev_time = current_time
     #update fixed time
     fixedTime += fixedDeltaTime
+    if __debug__:
+      if 1/deltaTime < FPS/3:
+        print("intense lag! -> Curr FPS:",1/deltaTime) 
+
 
 if __name__ == '__main__':
   pass

@@ -273,6 +273,10 @@ class Vector2:
 	def asMagnitudeOf(self,other:scalar) -> Vector2:
 		m = sqrt(self.x * self.x + self.y * self.y)
 		return Vector2(self.x * other/m, self.y * other/m)
+	
+	@classmethod
+	def fromAngle(cls,theta:float):
+		return 
 
 ones= Vector2(1,1)
 
@@ -486,6 +490,9 @@ class Collider:
 	@property
 	def size(self) -> tuple[float|int,float|int]:
 		return self.width,self.height
+	
+	def get_size(self):
+		return Vector2(self.width,self.height)
 
 	@property
 	def centerx(self) -> float:
@@ -601,6 +608,23 @@ class Array(list,Generic[T]):
 
 	def swapIndices(self,__index1:int, __index2:int):
 		self[__index1],self[__index2] = self[__index2],self[__index1]
+class Counter(Generic[T]):
+	__slots__ = 'obj','a','b'
+	def __init__(self,obj1:T,a:float = 0.0,):
+		self.obj = obj1
+		self.a = a
+		self.b = 0
+
+	def __iter__(self):
+		yield self.obj
+		yield self.a
+		yield self.b
+
+	def __getitem__(self,__index:int):
+		assert __index in (0,1), 'Counter only supports 0 and 1 as indexes'
+		return self.b if __index else self.a
+
+
 
 def make2dlist(x,y = None) -> tuple[list[None],...]:
 	y = x if y is None else y

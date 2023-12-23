@@ -18,6 +18,20 @@ def debug(info,pos = (10,10)):
     surf.blit(font.render(str(info),True,(255,255,255)),pos)
 
 times:dict[str,list] = {}
+def profile_as(name:str):
+    times[str(name)] = []
+    def wrapper(func):
+        def inner(*args,**kwargs):
+            global times 
+            start = time()
+            value = func(*args,**kwargs)
+            end = time()
+            times[str(name)].append(end-start)
+            if (end - start) > 0.00001:
+                print(f"{name} took {end - start} seconds")
+            return value
+        return inner
+    return wrapper
 def profile(func):
     times[str(func.__name__)] = []
     def inner(*args,**kwargs):
@@ -26,7 +40,8 @@ def profile(func):
         value = func(*args,**kwargs)
         end = time()
         times[str(func.__name__)].append(end-start)
-        print(f"{func.__name__} took {end - start} seconds")
+        if (end - start) > 0.00001:
+            print(f"{func.__name__} took {end - start} seconds")
         return value
     return inner
 

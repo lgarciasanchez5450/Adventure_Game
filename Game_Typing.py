@@ -1,8 +1,8 @@
 from Constants import DEBUG
-from typing import Protocol,Any, Union, Callable, TypeVar, Dict, TYPE_CHECKING, Optional,final
+from typing import Protocol,Any, Union, Callable, TypeVar, Dict, TYPE_CHECKING, Optional,final, Iterable, Generic
 from warnings import warn
 from Errors import return_error,UnInstantiableError
-from game_math import Vector2
+from game_math import Vector2, Collider
 from Appearance import Appearance
 from pygame import Surface
 T = TypeVar("T")
@@ -19,6 +19,15 @@ class Moves(Protocol):
     typeid:str
     vel:Vector2
     pos:Vector2
+    dead:bool
+    collider:Collider
+    def take_damage(self,damage:int,type:str,appearance:Appearance|None = None): ...
+
+class NotMoves(Protocol):
+    typeid:str
+    pos:Vector2
+    collider:Collider
+    dead:bool
     def take_damage(self,damage:int,type:str,appearance:Appearance|None = None): ...
 
 if DEBUG:
