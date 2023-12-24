@@ -491,7 +491,7 @@ class Collider:
 	def size(self) -> tuple[float|int,float|int]:
 		return self.width,self.height
 	
-	def get_size(self):
+	def get_size(self) -> Vector2:
 		return Vector2(self.width,self.height)
 
 	@property

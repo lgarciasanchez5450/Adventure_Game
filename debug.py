@@ -56,6 +56,11 @@ def getrefcount(memory_addres):
     assert isinstance(memory_addres,int),"must pass in memory address by using id(variable) and not the variable itself"
     return ctypes.c_long.from_address(memory_addres).value
 
+def model_function(func:Callable,xs:np.ndarray):
+    from matplotlib import pyplot
+    pyplot.plot(xs,func(xs))
+    pyplot.show()
+
 class MemoryTracker:
     COLOR = (0,255,0)
     def __init__(self,tracking_size:int = 100,screen_pos:tuple = (400,20),every:int = 10):

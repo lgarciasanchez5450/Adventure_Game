@@ -5,7 +5,9 @@ from Errors import return_error,UnInstantiableError
 from game_math import Vector2, Collider
 from Appearance import Appearance
 from pygame import Surface
+import numpy
 T = TypeVar("T")
+Numeric = TypeVar("Numeric",numpy.ndarray,float)
 PATH_DICT_TYPE = Union[Surface,Dict[str,"PATH_DICT_TYPE"]]
 
 class ImplementsDraw(Protocol):
@@ -39,8 +41,8 @@ if DEBUG:
         default_abstract_method.__name__ = func.__name__
         return default_abstract_method
 
-    def assert_type(object:object,type:type[T]) ->T:
-        assert isinstance(object,type), f"Unexpected Type: Got ->{repr(object)}  Expected ->{type}"
+    def assert_type(object:object,type_:type[T]) ->T:
+        assert isinstance(object,type_), f"Unexpected Type: Got -> {repr(object)}({type(object)})  Expected ->{type_}"
         return object
 
     def is_collider(object:object) -> bool:

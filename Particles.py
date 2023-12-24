@@ -6,10 +6,12 @@ import Textures
 import Time
 from Animation import SimpleAnimation
 from Constants import POSITIVE_INFINITY, PERF_VS_MEMORY, TWO_PI, BLOCK_SIZE
+
 from Game_Typing import *
 import numpy as np
 from game_math import Vector2
-from debug import profile
+from Explosion import ExplosionParticles, PARTICLE_SPEED_THRESHOLD
+from debug import profile, model_function
 if TYPE_CHECKING:
     from general_manager import GameObject
 
@@ -145,6 +147,7 @@ class SmokeParticle:
         self.csurf.surf.set_alpha(self.alpha.__trunc__())
         Camera.blit_csurface(self.csurf)
 
+TOSKIP = 10
 
 class Smoke:
     ROTATIONS_CACHED = (180)
@@ -172,38 +175,59 @@ class Smoke:
             for rot in range(cls.ROTATIONS_CACHED):
                 rot = (rot * 360 // cls.ROTATIONS_CACHED)
                 sizes[rot] = pygame.transform.rotate(curr,rot)
-                sizes2[rot] = -np.ndarray(sizes[rot].get_size(),dtype = np.int32)//2
-                
+                sizes2[rot] = -np.array(sizes[rot].get_size(),dtype = np.int32)//2
     
 
-    def __init__(self, px:np.ndarray,py:np.ndarray, vx:np.ndarray,vy:np.ndarray, time: float):
+    def __init__(self, particles:ExplosionParticles, time: float):
         if not SmokeParticle.initialized:
             self.initialize_caches()
             SmokeParticle.initialized = True
-        self.px = px
-        self.py = py
+        self.particles = particles
         self.time = time
-        self.rots = np.random.rand(px.shape[0])
+        self.rots = np.random.rand(len(particles.px)) * 360
         self.alpha = self.starting_alpha
         self.size = self.smallest_size
         self.t = 0.0
-        self.csurf = Camera.CSurface(self.get_particle(0,0),Vector2.zero,(0,0))
+        self.csurf = Camera.CSurface(self.get_particle(self.smallest_size,0),Vector2.zero,(0,0))
         self.csurf.offset = (-(self.csurf.surf.get_width()//2),-(self.csurf.surf.get_height()//2))
-        self.drawing_positions = np.empty((px.shape[0],2))
+        self.drawing_positions = np.empty((particles.px.shape[0]//TOSKIP,2))
 
 
     def update(self):
-        s = self.cached_particles[self.size]    
-        for rot in self.rots:
-            s[(rot%360)&0b111111110].set_alpha(self.alpha)
+        self.time -= Time.deltaTime
+        self.size += Time.deltaTime * 30
+        self.alpha -= Time.deltaTime * 20
+        if self.size >= self.SIZES_CACHED + self.smallest_size:
+            self.size = self.SIZES_CACHED + self.smallest_size-1
+        self.rots += 30 * Time.deltaTime
 
+    @staticmethod
+    def alphas_function(x:Numeric) -> Numeric:
+        x = np.maximum(10,x) #type: ignore
+        return 150 - 150/(x-9)
         
     def draw(self):
-        self.drawing_positions[:,0] = self.px * BLOCK_SIZE - Camera.camera_offset_x + Camera.HALFWIDTH
-        self.drawing_positions[:,1] = self.py * BLOCK_SIZE - Camera.camera_offset_y + Camera.HALFHEIGHT
-        s = self.cached_particles[self.size]  
-        s2 = self.cached_offset[self.size]  
-        Camera.screen.blits(((s[(rot%360)&0b111111110],pos + s2[(rot%360)&0b111111110]) for pos,rot in zip(self.drawing_positions,self.rots)))
+        self.drawing_positions[:,0] = self.particles.px[::TOSKIP] * BLOCK_SIZE - Camera.camera_offset_x + Camera.HALFWIDTH
+        self.drawing_positions[:,1] = self.particles.py[::TOSKIP] * BLOCK_SIZE - Camera.camera_offset_y + Camera.HALFHEIGHT
+        alphas = np.maximum(0,self.alphas_function(self.particles.s[::TOSKIP]))
+        if np.sum(alphas) ==0 :
+            self.time = -1
+        
+        #alphas = np.maximum(0,(2*self.particles.s[::TOSKIP]).astype(int))
+        #print(np.average(alphas),alphas[::50])
+        s = self.cached_particles[self.size.__trunc__()]  
+        s2 = self.cached_offset[self.size.__trunc__()]  
+        rots = self.rots.astype(int)%360 & 0b111111110
+        for rot,alpha in zip(rots,alphas):
+            s[rot].set_alpha(alpha)
+        #toblit = [(s[(rot%360)&0b111111110],pos + s2[(rot%360)&0b111111110]) for pos,rot in zip(self.drawing_positions,self.rots.astype(int))]
+        #toblit = []
+        #for pos,rot in zip(todraw,self.rots.astype(int)):
+        #for pos,rot in zip(todraw,rots):
+        #    toblit.append(( s[rot],pos + s2[rot]))
+        
+        Camera.screen.blits((s[rot],pos + s2[rot]) for pos,rot in zip(self.drawing_positions,rots))
+
 
 if __name__ == '__main__':
     s = pygame.display.set_mode((1,1))
@@ -260,6 +284,9 @@ def spawn_hit_particles(pos:game_math.Vector2,time:float,amount:int = 5):
 def spawn_smoke_particle(pos:Vector2,vel:Vector2,rot:int):
     default_time = 20.0
     ng_particles.append(SmokeParticle(pos,vel,default_time,rot)) #type: ignore
+
+def spawn_smoke(particles,time:float):
+    ng_particles.append(Smoke(particles,time)) #type: ignore
 
 def update_list(myList:list[Particle],has_gravity:bool):
     to_remove = []

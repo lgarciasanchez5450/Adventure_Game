@@ -21,7 +21,8 @@ HITBOX_SIZE:dict[str,tuple[float,float]]= {
     'bunny':(.3,.2),
     'arrow':(.1,.1),
     'funnyarrow':(.1,.1),
-    'item':(.4,.4)
+    'item':(.4,.4),
+    'woodplank':(1.0,1.0)
 }
 SURFACE_OFFSET:dict[str,tuple[int,int]] = {
     'player'    : (-32,-45),
@@ -39,6 +40,7 @@ SURFACE_OFFSET:dict[str,tuple[int,int]] = {
     'arrow'     : (-BLOCK_SIZE//2,-BLOCK_SIZE//2),
     'funnyarrow': (-BLOCK_SIZE//2,-BLOCK_SIZE//2),
     'item'      : (-ITEM_SIZE//2,-ITEM_SIZE//2),
+
     }
 ENEMIES_TYPES = ['spirit','bamboo','raccoon','squid']
 SPECIES = ENEMIES_TYPES + ['human']

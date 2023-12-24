@@ -12,7 +12,7 @@ PARTICLES_TO_SIMULATE = 2_000
 PARTICLE_SPEED_THRESHOLD = 10 #in units/second (not inclusive, meaining if particles are exactly at 0.5 speed then they will not be counted)
 PARTICLES_THRESHOLD = 10
 DYNAMIC_ENTITY_VELOCITY_MODIFIER = 0.2 # a value of 1 will completely cancel out the damage from explosion when going directly away from explosion
-DEFAULT_PARTICLE_TOUCHING_DRAG = .1 #[0,1] #how much the particles will slow down when touching an object
+DEFAULT_PARTICLE_TOUCHING_DRAG = .25 #[0,1] #how much the particles will slow down when touching an object
 FALLOFF = 0.0005
 CONSTANT_SPEED_LOSS_AT_CRITICAL_VELOCITY = 2
 # cache variables, dont change!
@@ -148,7 +148,7 @@ class Explosion:
         dx = p.px - obj.pos.x
         dy = p.py - obj.pos.y
         try:
-            ht = max(self.hit_size,obj.collider.get_size().magnitude() * 2)
+            ht = max((self.hit_size,obj.collider.get_size()/2).magnitude() * 1.5) #type: ignore
         except:
             ht = self.hit_size
         return _dmg_to_ent(dx,dy,p.vx,p.vy,ht,self.speed_changes,self.energy_per_particle,p.valid_particles,self.ptd,p.s)

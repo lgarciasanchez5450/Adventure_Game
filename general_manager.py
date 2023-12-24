@@ -53,16 +53,16 @@ class Block(GameObject):
       return True
     __slots__ = 'collider','tags','blast_resistance','hardness','animation'
     def __init__(self,pos: Vector2Int,typeid:str):
-        hb = Settings.HITBOX_SIZE[typeid]
+        hb = Settings.HITBOX_SIZE.get(typeid,(1,1))
         self.collider = Collider.SpawnOnBlockCenter(pos.x,pos.y,hb[0],hb[1])
         super().__init__(Vector2(*self.collider.center),typeid)#hp -> huan pablo
         self.tags = set()
-        self.csurface = CSurface.inferOffset(Textures.blocks[typeid][0],self.pos)
+        self.csurface = CSurface.inferOffset(Textures.blocks[self.tex_name][0],self.pos)
         self.blast_resistance = 0 
         self.hardness = 1
         self.animation = Animation.SimpleAnimation(self.csurface,self.anim_fps,Textures.blocks[self.tex_name])
         self.dead = False
-        self.csurface.offset = Settings.SURFACE_OFFSET[typeid]
+        self.csurface.offset = Settings.SURFACE_OFFSET.get(typeid,(-BLOCK_SIZE//2,-BLOCK_SIZE//2))
 
     def take_damage(self,damage:int,type:str,appearance:Appearance|None = None):
         if type is EXPLOSION_DAMAGE:
@@ -87,7 +87,7 @@ class Tree(Block):
 
     @staticmethod
     def spawnable_on(ground:ground.Ground) -> bool:
-        return ground.name is GROUND_DIRT
+        return ground.name is Settings.GROUND_NAME_BY_NUMBER[GROUND_DIRT]
     #this class is an "obstacle" 
     def __init__(self,pos:Vector2Int,ground:ground.Ground):
         assert Tree.spawnable_on(ground), f"Tree was spawned on illegal block: {ground}"
@@ -122,16 +122,17 @@ class TNT(Block):
         return False
 
 class WoodenPlank(Block):
-    tex_name = 'tree'
+    tex_name = 'Wooden_Plank'
     anim_fps = 0
     @staticmethod
     def spawnable_on(ground:ground.Ground):
         return ground.is_solid
     __slots__ = ()
     def __init__(self,pos:Vector2Int):
-        super().__init__(pos,'woodenplank')
+        super().__init__(pos,'woodplank')
         surf = Textures.blocks[self.tex_name][0]
         self.csurface.surf = surf
+        self.blast_resistance = 1000
 
 #### ENTITIES ####
 class Entity(GameObject):
@@ -762,7 +763,7 @@ class Player(AliveEntity):
 
         if 'r' in Input.KDQueue:
             #print('position is ',self.pos)
-            place_block(TNT(Camera.world_position_from_normalized(Input.m_pos_normalized).floored()))
+            place_block(WoodenPlank(Camera.world_position_from_normalized(Input.m_pos_normalized).floored()))
 
         if 'b' in Input.KDQueue:
             b = Bunny(self.pos.copy())
@@ -2107,19 +2108,22 @@ explosions:list[Explosion.Explosion] = []
 def create_explosion(pos:Vector2,energy:float):
     e = Explosion.Explosion(pos,energy)
     e.setEntities(collide_blocks_in_range(pos,Explosion.prediction(energy)),collide_entities_in_range(pos,Explosion.prediction(energy)))
-    for vx,vy in zip(e.particles.vx[::5],e.particles.vy[::5]):
-        Particles.spawn_smoke_particle(pos.copy(),Vector2(vx,vy),(Vector2.random.x*360).__trunc__())
+    Particles.spawn_smoke(e.particles,10)
+    #for vx,vy in zip(e.particles.vx[::5],e.particles.vy[::5]):
+    #    Particles.spawn_smoke_particle(pos.copy(),Vector2(vx/2,vy/2),(Vector2.random.x*360).__trunc__())
     explosions.append(e)
 
 def update_explosions():
     a = 0
     while a < explosions.__len__():
         explosions[a].update()
+        t = explosions[a].particles.s[explosions[a].particles.s > explosions[a].energy]
         if explosions[a].isDone:
             explosions.pop(a) 
         else:
             a+=1 
 def draw_explosions():
+    raise DeprecationWarning("Bruh we no longer need this, the smoke particles provide visuals for explosions")
     exp_points = np.empty((Explosion.PARTICLES_TO_SIMULATE//2,2),dtype = np.float64)
     #angles = 180
     #to_skip = Explosion.PARTICLES_TO_SIMULATE // angles
