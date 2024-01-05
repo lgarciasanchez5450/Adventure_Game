@@ -29,10 +29,6 @@ def init(randomize=True):
   if randomize:
     random.shuffle(song_queue)
    
-
-   
-      
-
 def onMusicEnd():
   song_queue.append(song_queue.popleft())
   play(song_queue[0])

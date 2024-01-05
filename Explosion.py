@@ -30,6 +30,7 @@ def _dmg_to_ent(dx,dy,vx,vy, hit_size,speed_changes,energy_per_particle,valid_pa
     #quick intermission to slow down the objects which are being collided
     dists = dists + hit_size
     dists /= hit_size
+
     speed_changes[cond] *= np.square(dists[cond]) * touching_drag + (1 - touching_drag) #TODO: add logic to make sure only the particles which a moving towards the entities are beingslowd down   
     #resume the normal stuff
     damage =np.sum(np.multiply(np.square(1-dists),s))* energy_per_particle * 0.1 #we need to negate the np.sum because dists are all negitve
@@ -114,8 +115,7 @@ class Explosion:
         #print('total entities =',len(self.reachable_dynamic_entities)+len(self.reachable_static_entities))
         self.speed_changes[:] = 1.0
         any_touched = False
-        for obj in self.reachable_static_entities:
-            
+        for obj in self.reachable_static_entities: 
             dmg = self.calculate_damage_to_entity(obj).__trunc__() 
             if dmg: 
                 any_touched = True
