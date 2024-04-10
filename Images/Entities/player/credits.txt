@@ -1,2 +1,3 @@
 This player has been rightfully taken from 
 https://penzilla.itch.io/hooded-protagonist
+TODO: when game is done, credit "Penzilla" as artist for character

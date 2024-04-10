@@ -17,8 +17,16 @@ from Constants.Misc import DEBUG
 from typing import Callable,ParamSpec,TypeVar
 
 from warnings import warn 
-
-import entity_manager
+try:
+	import entity_manager
+	def inclusive_range(start:int,stop:int,step:int) -> tuple[...]: #type: ignore
+		#yield from range(start,stop,step)
+		#yield stop
+		return entity_manager.inclusive_range(start,stop,step)
+except:
+	def inclusive_range(start:int,stop:int,step:int):
+		yield from range(start,stop,step)
+		yield stop
 half_sqrt_2 = (2**(1/2))/2
 from os.path import dirname,realpath
 GAME_PATH = dirname(realpath(__file__)) + '\\'
@@ -45,7 +53,6 @@ def restrainMagnitude(x:float,y:float,mag:float):
 	return x,y
 
 def getNamesOfObject(object):
-	
 	return [local for local in dir(object) if not local.startswith('__')]
 
 @njit(cache = True)
@@ -70,11 +77,6 @@ def get_most_sig_bits(x:int,bits:int) -> int:
 		output |= (x>>(bit_length-i) ) & 1
 	return output
 
-
-def inclusive_range(start:int,stop:int,step:int):
-	#yield from range(start,stop,step)
-	#yield stop
-	return entity_manager.inclusive_range(start,stop,step)
 
 def serial_iter(iter1,iter2):
 	yield from iter1
@@ -544,8 +546,7 @@ class Collider:
 	def bottomright(self,newVal): raise SyntaxError('This Value cannot be set!')
 	
 
-	def collide_collider(self,c):
-		assert isinstance(c,Collider), "argument <c> must be of type 'Collider'"
+	def collide_collider(self,c:'Collider'):
 		return rectangle_overlap(self.left,self.top,self.right,self.bottom,c.left,c.top,c.right,c.bottom)
 
 	def collide_point_inclusive(self,point:tuple[int|float,int|float]):

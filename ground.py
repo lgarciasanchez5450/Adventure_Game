@@ -48,7 +48,7 @@ class SolidGround(Ground):
 class Invalid(Ground):
     id = GROUND_INVALID
     surface_friction = 0
-    __slots__ = tuple()
+    __slots__ = ()
     @staticmethod
     def __custom_init__(inst: T)  -> T:
         return inst
@@ -57,7 +57,7 @@ class Invalid(Ground):
 @final
 class Stone(SolidGround):
     id = GROUND_STONE
-    __slots__ = tuple()
+    __slots__ = ()
     @staticmethod
     def __custom_init__(inst:'Ground') -> "Ground":
         inst.surface_friction = 10
@@ -65,7 +65,7 @@ class Stone(SolidGround):
     
 class Water(Ground):
     id = GROUND_WATER
-    __slots__ = tuple()
+    __slots__ = ()
     @staticmethod
     def __custom_init__(inst:'Ground') -> "Ground":
         inst.surface_friction = 2
@@ -73,7 +73,7 @@ class Water(Ground):
     
 class Dirt(SolidGround):
     id = GROUND_DIRT
-    __slots__ = tuple()
+    __slots__ = ()
     @staticmethod
     def __custom_init__(inst:'Ground') -> "Ground":
         inst.surface_friction = 9
@@ -81,7 +81,7 @@ class Dirt(SolidGround):
     
 class Grass(SolidGround):
     id = GROUND_GRASS
-    __slots__ = tuple()
+    __slots__ = ()
     @staticmethod
     def __custom_init__(inst: "Ground") -> "Ground":
         inst.surface_friction = 9

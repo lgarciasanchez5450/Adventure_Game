@@ -12,7 +12,6 @@ float distance_to_edge( vec2 coord) {
     return hypot(abs(coord.x-.5)*1.414,abs(coord.y-.5)*1.414);
 }
 vec4 addOnTop(vec4 canvas, vec4 source) {
-
     return vec4(canvas.rgb * (1-source.a) + source.rgb * source.a,max(canvas.a,source.a));
 }
 

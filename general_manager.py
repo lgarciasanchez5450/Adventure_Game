@@ -1426,6 +1426,7 @@ class Chunk:
             return cls._insts[pos]
         else:
             chunk = super(Chunk,cls).__new__(cls)
+            chunk.chunk_pos = pos[0].__floor__(),pos[1].__floor__()
             chunk.pos = Vector2(pos[0] * CHUNK_SIZE,pos[1] * CHUNK_SIZE)
 
             chunk.blocks = []
@@ -1448,20 +1449,23 @@ class Chunk:
     __slots__ = ('chunk_pos','pos','collider','id','data','blocks','biome','active','ground','onCreationFinish','csurf','dead_blocks')
     # removed slots 'x','y','subdivision_lengths','items','items_sub',
     def __init__(self,pos:tuple[int,int]):
-        self.chunk_pos = (pos[0]).__floor__(),pos[1].__floor__()
+        self.chunk_pos:tuple[int,int]
         #for drawing to screen
         #self.x,self.y = pos[0] * CHUNK_SIZE, pos[1] * CHUNK_SIZE 
         self.pos:Vector2# = Vector2(pos[0] * CHUNK_SIZE,pos[1] * CHUNK_SIZE)
         self.collider:Collider
         
         self.id:int = hash(self.chunk_pos)
-        self.data:np.ndarray #numpy.ndarray
+        '''identifiying integer'''
+        self.data:np.ndarray #numpy.ndarray 
+        '''Heightmap'''
         self.blocks:list[Block]
+
       
         self.biome:int
         self.active:bool
         self.ground:tuple[list[ground.Ground]]
-        self.onCreationFinish:list
+        self.onCreationFinish:list[Callable]
         self.csurf:CSurface 
         self.dead_blocks:list[Block]
 
@@ -1556,6 +1560,9 @@ NormalNP = LayeredNoiseMap(
     (1.0,0.5)
 )
 ExperimentalNP = WorleyNoiseSimple(2,SCALE*.4)
+from WorldGen import Gen, Village
+gen = Gen()
+gen.passes.append(Village())
 
 def _create(chunk:Chunk):
     ## PHASE 1 ##
@@ -1610,6 +1617,8 @@ def _create(chunk:Chunk):
         g = chunk._get_ground(x,y)
         if Tree.spawnable_on(g) and isValid(x,y):
             chunk.blocks.append(Tree(Vector2Int(x,y),g))
+    yield
+    gen.processChunk(chunk)
     yield
     chunks[chunk.chunk_pos] = chunk
     for cmd in chunk.onCreationFinish:

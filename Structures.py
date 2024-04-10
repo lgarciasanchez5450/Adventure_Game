@@ -1,5 +1,5 @@
 from Constants import *
-import perlin
+import Perlin
 import rng
 from pygame import display, Surface
 from os import walk,mkdir
@@ -27,17 +27,16 @@ decor = pygame.Surface((size,size))
 decor.set_colorkey((0,0,0))
 decor.blit(font.render("D",True,'white'),(0,0))
 ground = [
-    Textures.scale_image(Textures.load_image('Images/structure_void.png'),(size,size)),
+    Textures.scale(Textures._load('Images/structure_void.png'),(size,size)),
     decor,
-    Textures.scale_image(Textures.load_image('Images/tiles/'+g.Dirt.tex),(size,size)),
-    
+    Textures.scale(Textures._load('Images/Ground/'+g.Settings.GROUND_TEXTURE_BY_ID[g.Dirt.id] + ".png"),(size,size)),
 ]
+    
 blocks = ground
 
 
 class Decoration:
     pass
-
 import numpy as np
 def arrary_to_dict(array:np.ndarray):
     myDict = {}
@@ -144,18 +143,19 @@ class Structure:
         self.variant = variant
         self.x = x
         self.y = y
-        self.rotation = rotation
-        self.e_ground = self.get_ground()
-        self.e_blocks = self.get_blocks()
         if struct_exists(self.path):
             self.load()
         else:
             print('this struct does not currently exist in storage\ncreating a copy in path:',self.path)
             self.save()
+            self.load()
+        self.rotation = rotation
+        self.e_ground = self.get_ground()
+        self.e_blocks = self.get_blocks()
         
     
     def load(self):
-        self.ground,self.blocks = load_struct( self.path)
+        self.ground,self.blocks = load_struct(self.path)
         self.rotation  = 0
         return self
     
