@@ -37,7 +37,7 @@ def set_seed(x:int):
 '''*
     * 2D OpenSimplex2S/SuperSimplex noise, standard lattice orientation.
 '''
-def noise2(x, y):
+def noise2(x:float, y:float):
     global SKEW_2D
     # Get points for A2* lattice
     s = SKEW_2D * (x + y)

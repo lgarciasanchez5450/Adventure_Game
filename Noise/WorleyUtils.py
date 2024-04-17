@@ -2,6 +2,16 @@ import numpy
 import random
 from math import floor , hypot, sqrt
 
+
+__all__ = [
+    'modifier',
+    'getAt',
+    'getArr',
+    'getArr2',
+    'njit',
+    'prange'
+]
+
 try:
     from numba import njit,prange
 except ImportError:
@@ -34,7 +44,7 @@ def _get_surrounding_cells(x:int,y:int):
 
 
 
-@njit
+@njit(cache=True)
 def modifier(i):
     val = (1-i*i)
     return val * val 

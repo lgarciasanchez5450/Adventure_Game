@@ -28,7 +28,11 @@ except ImportError as err:
     print("Custom C Module Has not been built, defaulting back to pure python suport, this will slow down Noise creation significantly")
     from Noise.perlin2 import noise2,noise2_array,set_seed
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    def noise2(x:float,y:float) -> float: ...
 class LayeredNoiseMap:
+    __slots__ = 'noise_scales','noise_strengths','noise_counts','noise_normalizer'
     def __init__(self,noise_scales,noise_strengths):
         assert len(noise_scales) == len(noise_strengths), "all arguments must be of the same length"
 
@@ -61,9 +65,28 @@ class LayeredNoiseMap:
         return data
     
 def noise1(x:float):
+    '''Returns pseudo-random smooth gradient noise 
+    Range: [-1, 1]'''
     return noise2(2.71828,x)
+from math import sin, cos, pi as PI
+
+if __name__ != '__main__':
+    from ..game_math import Vector2
+class RandomUnitVec2:
+    __slots__ = '__seed','vec'
+    def __init__(self,seed:int=1):
+        self.__seed = seed^0b11001110
+        self.vec = Vector2(0,0)
     
-    
+    def get(self,t:float):
+        r = noise2(t,self.__seed) * 3.1415926535897932
+        self.vec.x = cos(r)
+        self.vec.y = sin(r)
+        return self.vec
+
+    def __call__(self,t:float):
+        return self.get(t)
+        
 def unit_smoothstep(i:ndarray):
     return i * (-i*i+3) / 2
 def rescale(i):

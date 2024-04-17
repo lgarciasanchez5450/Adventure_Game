@@ -18,9 +18,8 @@ from math import ceil,pi,cos
 
 '''
 all taken from the library opensimplex
-
-'''
 import opensimplex
+'''
 STRETCH_CONSTANT2 = -0.211324865405187    # (1/Math.sqrt(2+1)-1)/2
 SQUISH_CONSTANT2 = 0.366025403784439      # (Math.sqrt(2+1)-1)/2
 NORM_CONSTANT2 = 40.7#47 is original

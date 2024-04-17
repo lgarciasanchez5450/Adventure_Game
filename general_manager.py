@@ -1589,7 +1589,11 @@ def _create(chunk:Chunk):
     #yield
     
     if _DEBUG_:
-        draw.lines(chunk.surf,(255,0,0),True,((0,0),(CHUNK_SIZE*BLOCK_SIZE,0),(CHUNK_SIZE*BLOCK_SIZE,CHUNK_SIZE*BLOCK_SIZE),(0,CHUNK_SIZE*BLOCK_SIZE)),3)    
+        draw.lines(chunk.surf,
+                   (255,0,0),
+                   True,
+                   [(0,0),(CHUNK_SIZE*BLOCK_SIZE,0),(CHUNK_SIZE*BLOCK_SIZE,CHUNK_SIZE*BLOCK_SIZE),(0,CHUNK_SIZE*BLOCK_SIZE)], #type: ignore
+                   3)    
     #to make trees we check the 8 immediately surrounding chunks if they exist and add them to a list
     cx ,cy = chunk.chunk_pos
     surrounding_chunks = [(cx-1,cy-1),(cx,cy-1),(cx+1,cy-1),(cx-1,cy),(cx+1,cy),(cx-1,cy+1),(cx,cy+1),(cx+1,cy+1)]
@@ -2151,7 +2155,7 @@ def generate_world():
     '''Generate the world, should run once per world'''
     def checkIsGen() -> None:
         if (Settings.game_state is not GENERATING_WORLD):
-            raise GenerationError('Game state must be <GENERATING_WORLD')
+            raise GenerationError('Game state must be <GENERATING_WORLD>')
     checkIsGen()
 
     if len(Chunk._insts) != 0 or len(chunks) != 0: # if we have tried to create some chunks previously

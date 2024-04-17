@@ -111,6 +111,7 @@ paths = [path_vert,path_horz]
 
 if __name__ == '__main__':
     from utils import hash2D, randomNormalized,paste,getOnesOffset,printArray
+
 else:
     from .utils import hash2D, randomNormalized,paste,getOnesOffset,printArray
 def make_village(cx:int,cy:int, size:tuple[int,int]):
@@ -119,17 +120,16 @@ def make_village(cx:int,cy:int, size:tuple[int,int]):
     blocks = np.zeros(size,dtype = np.uint32)
     connections = []
     state = np.array([hash2D(cx,cy),0],dtype = np.uint32)
-    village_center = np.empty(2,np.int32)
-    village_center[0] = randomNormalized(state) * size[0]/2 + size[0]/4
-    village_center[1] = randomNormalized(state) * size[1]/2 + size[1]/4
+    village_center_pos = np.empty(2,np.int32)
+    village_center_pos[0] = randomNormalized(state) * size[0]/2 + size[0]/4
+    village_center_pos[1] = randomNormalized(state) * size[1]/2 + size[1]/4
     
-    paste(town_hall['blocks'],blocks,village_center)
-    connections.extend(getOnesOffset(town_hall['connections'],village_center,blocks.shape))
+    paste(town_hall['blocks'],blocks,village_center_pos)
+    connections.extend(getOnesOffset(town_hall['connections'],village_center_pos,blocks.shape))
     printArray(blocks)
     print(connections)
     quit()
 
 
 
-    
     

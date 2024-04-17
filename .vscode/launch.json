@@ -3,9 +3,8 @@
     "configurations": [
         {
             "name": "Python: Current File",
-            "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "$C:/Users/Leo/AppData/Local/Programs/Python/Python310/python.exe",
             "console": "integratedTerminal"
         },
 

@@ -6,5 +6,6 @@
         "arrayobject.h": "c",
         "cmath": "c"
     },
-    "python.analysis.typeCheckingMode": "basic"
+    "python.analysis.typeCheckingMode": "basic",
+    "flake8.severity": { }
 }

@@ -46,7 +46,7 @@ def onGameStart():
     Camera.set_mouse_assist(False)
     global player
     player = general_manager.Player(Vector2(0,0))
-    
+    print("Spawned Player")
     general_manager.spawn_entity(player)
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(2,0),Items.DivineBow()))
     general_manager.spawn_entity(general_manager.ItemWrapper(Vector2(-2,0),Items.Bow()))
@@ -134,6 +134,7 @@ while True:
                         Main_Menu.lb.setMax(Constants.TOTAL_GENERATED_CHUNKS).setDone(0)
                         Main_Menu.lt.setText('')
                         Textures.loaded_counter = 0
+                    print('generating world')
                     chunks_finished, _ = next(gen) #type: ignore
                     #print(chunks_finished)
                     Main_Menu.lb.setDone(chunks_finished) 
