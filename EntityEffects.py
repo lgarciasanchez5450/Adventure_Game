@@ -46,10 +46,10 @@ class Speed1(EntityEffect):
     def __init__(self, entity: 'AliveEntity') -> None:
         super().__init__(EntityEffects.EFFECT_SPEED_I,entity)
         self.time = 60
-        entity.setExtraStatSpeed(self.name,5.0)
+        entity.setExtraStatSpeed(self.name,50.0)
     
     def remove(self):
         ## Decouple the effect and the entity so they no  longer know about each other
-        self.entity.removeExtraStatStrength(self.name)
+        self.entity.removeExtraStatSpeed(self.name)
         self.entity.effects.remove(self) 
         del self.entity 

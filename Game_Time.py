@@ -1,17 +1,23 @@
 #for date time
-from time import time,perf_counter
+from time import perf_counter,sleep
 from math import sin,pi,sqrt
 from typing import Literal
-from Noise import noise1
-try:
-    from numba import njit
-except:
-    def njit(*args,**kwargs):
-        def wrapper(func):
-            return func
-        return wrapper
-from Constants import WIDTH,HEIGHT
-three_pi_two = 3 * pi / 2
+from Utils.Noise import noise1
+from Utils.Math.Fast import njit
+
+__all__ = [
+    'year',
+    'month',
+    'day',
+    'hour',
+    'minute',
+    'second',
+    'meridian_designation',
+    'light',
+    'season',
+    'temperature'
+]
+
 @njit(cache=True)
 def full_range_sqrt(x:float) -> float:
     if x < 0:
@@ -31,6 +37,7 @@ def _get_daylight(day_passed):
 
 light = 1.0
 
+#CC = can change
 
 months_in_year = 16#CC
 days_in_month = 25#CC
@@ -60,17 +67,17 @@ _year_passed = 0.0
 _day_passed = 0.0
 _time = 0
 _start_time = 0
-time_speed = 1 #CC
+time_speed = 60*10 #CC
 
 
 #public variables
-year:int
-month:int
-day:int
-hour:int
-minute:int
-second:int
-meridian_designation:Literal['AM','PM']
+year:int = 0
+month:int = 0
+day:int = 0
+hour:int = 0
+minute:int = 0
+second:int = 0
+meridian_designation:Literal['AM','PM'] = 'AM'
 
 def start():
     global _time,_start_time
@@ -111,13 +118,12 @@ def temperature():
     return average_global_temperature + 10*day_temperature() + 30*season_temperature()
 
 
-
-
 def season() -> str:
     return seasons[int((_year_passed + _season_offset) % 1 * len(seasons))] 
 
 def daylight() -> float:
     '''[0,1], 0 -> night, 1 -> sunny'''
+    return min(max(0,1.2*sin(4.47*_day_passed-0.83)),1)
     return _get_daylight(_day_passed)
     
 
@@ -166,3 +172,10 @@ def game_time() -> tuple:
     return (year,month,day,hour,minute,second,meridian_designation)
 
 
+
+# if __name__ == '__main__':
+#     set_time(2024,1,1,1,1,0)
+#     while True:
+#         update()
+#         print(f"Time: {hour:>2}:{minute:>2} {meridian_designation}, Light: {light:.2f}, Temp: {temperature():.2f} Season Temp: {average_global_temperature + 30*season_temperature()}")
+#         sleep(5)

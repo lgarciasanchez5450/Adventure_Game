@@ -1,17 +1,15 @@
 import Time
-import game_math
 import Camera
 import pygame
 import Textures
 import Time
-from Animation import SimpleAnimation
+from GameScreen.Animation import SimpleAnimation
 from Constants import POSITIVE_INFINITY, PERF_VS_MEMORY, TWO_PI, BLOCK_SIZE
 
 from Game_Typing import *
 import numpy as np
-from game_math import Vector2
+from Utils.Math.Vector import Vector2
 from Explosion import ExplosionParticles, PARTICLE_SPEED_THRESHOLD
-from debug import profile, model_function
 if TYPE_CHECKING:
     from general_manager import GameObject
 
@@ -45,7 +43,7 @@ class EvenCheaperAnimation(CheapAnimation):
 
 class Particle:
     __slots__ = 'vel','time', 'k_f','anim'
-    def __init__(self, animation:CheapAnimation, vel:game_math.Vector2, time:float,friction:float):
+    def __init__(self, animation:CheapAnimation, vel:Vector2, time:float,friction:float):
         self.vel = vel
         self.time = time
         self.k_f = friction 
@@ -65,11 +63,11 @@ class Particle:
         self.anim.csurface.pos += self.vel * Time.deltaTime
         self.vel -= self.vel * Time.deltaTime * self.k_f
     @classmethod
-    def noAnimation(cls,csurf:Camera.CSurface,vel:game_math.Vector2,time:float,friction:float):
+    def noAnimation(cls,csurf:Camera.CSurface,vel:Vector2,time:float,friction:float):
         return cls(EvenCheaperAnimation(csurf),vel,time,friction)
     
     @classmethod
-    def withAnimation(cls,animation:CheapAnimation,vel:game_math.Vector2,friction:float):
+    def withAnimation(cls,animation:CheapAnimation,vel:Vector2,friction:float):
         return cls(animation,vel,animation.time_per_cycle,friction)
 
 
@@ -188,7 +186,7 @@ class Smoke:
         self.alpha = self.starting_alpha
         self.size = self.smallest_size
         self.t = 0.0
-        self.csurf = Camera.CSurface(self.get_particle(self.smallest_size,0),Vector2.zero,(0,0))
+        self.csurf = Camera.CSurface(self.get_particle(self.smallest_size,0),Vector2.zero(),(0,0))
         self.csurf.offset = (-(self.csurf.surf.get_width()//2),-(self.csurf.surf.get_height()//2))
         self.drawing_positions = np.empty((particles.px.shape[0]//TOSKIP,2))
 
@@ -241,12 +239,12 @@ if __name__ == '__main__':
         else:
             break
     Time.sleep(10)
-    SmokeParticle(Vector2(0,0),Vector2.zero,1.0,0)
+    SmokeParticle(Vector2(0,0),Vector2.zero(),1.0,0)
     Time.sleep(10)
 
 
 
-gravity = game_math.Vector2(0,1)
+gravity = Vector2(0,1)
 
 g_particles:list[Particle] = []
 ng_particles:list[Particle] = []
@@ -261,25 +259,25 @@ ng_particles:list[Particle] = []
 
 
 
-def spawn(csurf:Camera.CSurface,time:float,vel:game_math.Vector2|None = None,has_gravity:bool = False,slows_coef:float = 1.0):
-    if vel is None: vel = game_math.Vector2.zero
+def spawn(csurf:Camera.CSurface,time:float,vel:Vector2|None = None,has_gravity:bool = False,slows_coef:float = 1.0):
+    if vel is None: vel = Vector2.zero()
     particle = Particle.noAnimation(csurf,vel,time,slows_coef)
     if (has_gravity):
         g_particles.append(particle)
     else:
         ng_particles.append(particle)
 
-def spawn_animated(anim:CheapAnimation,vel:game_math.Vector2|None = None,has_gravity:bool = False,slows_coef:float = 1.0):
-    if vel is None: vel = game_math.Vector2.zero
+def spawn_animated(anim:CheapAnimation,vel:Vector2|None = None,has_gravity:bool = False,slows_coef:float = 1.0):
+    if vel is None: vel = Vector2.zero()
     particle = Particle.withAnimation(anim,vel,slows_coef)
     if (has_gravity):
         g_particles.append(particle)
     else:
         ng_particles.append(particle)
 
-def spawn_hit_particles(pos:game_math.Vector2,time:float,amount:int = 5):
+def spawn_hit_particles(pos:Vector2,time:float,amount:int = 5):
     for x in range(amount):
-        spawn(Camera.CSurface.inferOffset(Textures.particles_opaque['death'],pos+game_math.Vector2.random/10),time,game_math.Vector2.random)
+        spawn(Camera.CSurface.inferOffset(Textures.particles_opaque['death'],pos+Vector2.random()/10),time,Vector2.random())
 
 def spawn_smoke_particle(pos:Vector2,vel:Vector2,rot:int):
     default_time = 20.0

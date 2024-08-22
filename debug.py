@@ -1,8 +1,11 @@
 import pygame,ctypes,sys
 from time import perf_counter as time
 from collections import deque
-from game_math import *
+from typing import Callable
+from Utils.Math.Vector import *
+import numpy as np
 import gc
+
 gc.disable()
 pygame.init()
 def init(display:pygame.Surface):

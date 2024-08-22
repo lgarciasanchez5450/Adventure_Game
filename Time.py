@@ -7,7 +7,7 @@ from Constants.Misc import NEGATIVE_INFINITY
 
 class Stopwatch:
   def __init__(self,function:Callable[[],float] = _time.time):
-    self.startTime = float('-inf')
+    self.startTime = NEGATIVE_INFINITY
     self.extraTime = 0
     self.paused = False
     self.measurement = function
@@ -70,40 +70,40 @@ _clock = Clock()
 
 
 def get_frameRate() -> float:
-    global deltaTime
-    return 1/deltaTime
+  global deltaTime
+  return 1/deltaTime
 
 def get_frameRateInt() -> int:
-    global deltaTime
-    return (1/deltaTime).__trunc__()
+  global deltaTime
+  return (1/deltaTime).__trunc__()
 
 def set_fixedDeltaTime(fdt:float):
-    assert fdt >= 0
-    if fdt < 0: return 
-    global fixedDeltaTime
-    fixedDeltaTime = fdt
+  assert fdt >= 0
+  if fdt < 0: return 
+  global fixedDeltaTime
+  fixedDeltaTime = fdt 
 
 def init():
-    global _prev_time,time,_start_time
-    _start_time = _getTime()
-    _prev_time = _start_time
+  global _prev_time,time,_start_time
+  _start_time = _getTime()
+  _prev_time = _start_time
 
 def update():
-    global frameCount,deltaTime,time,fixedDeltaTime,fixedTime,_prev_time,_start_time,_clock
-    frameCount += 1
-    if FPS: 
-      _clock.tick(FPS) #can be changed to .tick_busy_loop for MUCH more accurate timing
-       
-    #update dynamic time
-    current_time = _getTime()
-    deltaTime = current_time - _prev_time
-    time = current_time - _start_time
-    _prev_time = current_time
-    #update fixed time
-    fixedTime += fixedDeltaTime
-    if __debug__:
-      if 1/deltaTime < FPS/3:
-        print("intense lag! -> Curr FPS:",1/deltaTime) 
+  global frameCount,deltaTime,time,fixedDeltaTime,fixedTime,_prev_time,_start_time,_clock
+  frameCount += 1
+  if FPS: 
+    _clock.tick(FPS) #can be changed to .tick_busy_loop for MUCH more accurate timing
+      
+  #update dynamic time
+  current_time = _getTime()
+  deltaTime = current_time - _prev_time
+  time = current_time - _start_time
+  _prev_time = current_time
+  #update fixed time
+  fixedTime += fixedDeltaTime
+  if __debug__:
+    if 1/deltaTime < FPS/3:
+      print("intense lag! -> Curr FPS:",1/deltaTime) 
 
 
 if __name__ == '__main__':

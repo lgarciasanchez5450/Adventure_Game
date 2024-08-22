@@ -1,10 +1,8 @@
 from Constants import * 
 from Settings import STACK_COUNT_BY_TAG
 from typing import Callable
-_DEBUG_ = True
-import Animation 
-from game_math import Array
-from Game_Typing import UnInstantiable, TYPE_CHECKING, Optional, Any
+from Utils.Math.game_math import Array
+from Game_Typing import TYPE_CHECKING, Optional, Any
 if TYPE_CHECKING: 
     from general_manager import AliveEntity
     from Items import *
@@ -15,7 +13,7 @@ class UniversalInventory:
         self.full = False
         self.entity:'AliveEntity' = entity
         self.selected:int = -1
-        self.slot_restrictions:dict[int,Callable[['Item'],bool]] = {} #will store slot indexes that have restrictions via a function that will accept the item and return True only if it fits
+        self.slot_restrictions:dict[int,Callable[[Item],bool]] = {} #will store slot indexes that have restrictions via a function that will accept the item and return True only if it fits
 
     def setItem(self,item: Optional["Item"],index:int):
         '''

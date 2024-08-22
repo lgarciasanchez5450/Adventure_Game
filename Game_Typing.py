@@ -1,9 +1,10 @@
 from Constants import DEBUG
 from typing import Protocol,Any, Union, Callable, TypeVar, Dict, TYPE_CHECKING, Optional,final, Iterable, Generic
-from warnings import warn
 from Errors import return_error,UnInstantiableError
-from game_math import Vector2, Collider
-from Appearance import Appearance
+from Utils.Math.Vector import Vector2
+from Utils.Math.Collider import Collider
+
+from GameScreen.Appearance import Appearance
 from pygame import Surface
 import numpy
 T = TypeVar("T")
@@ -11,7 +12,7 @@ Numeric = TypeVar("Numeric",numpy.ndarray,float)
 PATH_DICT_TYPE = Union[Surface,Dict[str,"PATH_DICT_TYPE"]]
 
 class ImplementsDraw(Protocol):
-    def draw(self): ...
+    def draw(self,surf:Surface): ...
 
 class UnInstantiable:
     def __init_subclass__(cls) -> None:
@@ -46,5 +47,4 @@ if DEBUG:
         return object
 
     def is_collider(object:object) -> bool:
-        from game_math import Collider
         return isinstance(object,Collider)

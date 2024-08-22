@@ -1,2398 +1,1267 @@
 '''
 Framework for building Graphical User Interfaces for existing applications\n
 This has been used to make:\n
-Ball Simulator (Physics Stuff)\n
+Pixel Art Program\n
+Gravity Sim\n
 Music Player (similar to Spotify)\n
 Notes Application (trashy)
 '''
-# speedup by making <accepts> classmethod into an attribute because its almost four times as fast to access.!!! TODO TODO TODO TODO TODO
-import threading, time
-import colorsys as _colorsys
+
+import time
+import pygame
+pygame.init()
 from pygame import gfxdraw
-from math import sqrt, cos, sin, hypot,atan2,pi,acos,e,exp
-from pygame import mixer
 from pygame import Surface
 from pygame import font
-from pygame import init as pginit
 from pygame import display
 from pygame import image
 from pygame import draw
 from pygame import Rect
-from pygame import event as events
-from pygame.constants import *
-from pygame import mouse
+from pygame import constants as const
 from pygame import scrap
-from os.path import dirname, realpath
-from pygame import error as PygameEngineError
 from pygame import transform
-from pygame import time as pg_time
-from typing import Callable
-import debug
+from pygame.time import Clock
+from Utils import advanced_color
+from Utils import unicode_constants as u_const
+from Utils.events import Event
+from FrameworkTypes import *
+import Input as Input_
+from Input import Input
+from Input import getInput
+from pygame.display import get_window_size as getWindowSize
 import sys
+
+def binaryApproximate(searchFunc:Callable[[int],int|float],target:int|float,start:int,end:int):
+  assert start <= end
+  if start == end: return start
+  mid = (end-start) //2 + start
+  if mid == start:
+    return min(end,start,key=lambda x: abs(target-searchFunc(x)))
+  val = searchFunc(mid)
+  if target > val:
+    return binaryApproximate(searchFunc,target,mid,end)
+  elif target < val:
+    return binaryApproximate(searchFunc,target,start,mid)
+  else:
+    return mid
+
+def toNone(*args):
+  return None
+
 if sys.platform == 'win32':
-  from ctypes import windll
   def maximize_screen():
+    from ctypes import windll
     HWND = display.get_wm_info()['window']
     windll.user32.ShowWindow(HWND, 3)
-    del HWND
 
-def arccos(x):
-  '''Degrees version of acos''' 
-  return acos(x) * 180 / pi
-
-def rgb_to_hsv(r,g,b): 
-
-  M = max(r, g, b)
-  m = min(r, g, b)
-
-  #And then V and S are defined by the equations
-
-  V = M/255
-  S = 1 - m/M  if M > 0 else 0
-
-  #As in the HSI and HSL color schemes, the hue H is defined by the equations
-  d = sqrt(r*r+g*g+b*b-r*g-r*b-g*b)
-  H = arccos((r - g/2 - b/2)/d)  if g >= b else 360 - arccos( (r - g/2 - b/2)/d)  
-  
-def hsv_to_rgb(h,s,v): 
-  h *= 360
-  M = 255*v
-  m = M*(1-s)
-
-  #Now compute another number, z, defined by the equation
-
-  z = (M-m)*(1-abs((h/60)%2-1))
-
-  #Now you can compute R, G, and B according to the angle measure of H. There are six cases. 
-  if 0 <= h < 60:
-    R = M
-    G = z + m
-    B = m
-
-  elif 60 <= h < 120:
-    R = z + m
-    G = M
-    B = m
-
-  elif 120 <= h < 180:
-    R = m
-    G = M
-    B = z + m
-
-  elif 180 <= h < 240:
-    R = m
-    G = z + m
-    B = M
-
-  elif 240 <= h < 300:
-    R = z + m
-    G = m
-    B = M
-
-  elif 300 <= h <= 360:
-    R = M
-    G = m
-    B = z + m
-  else:
-    R = 0
-    G = 0
-    B = 0
-  return round(R),round(G),round(B)
-
-'''
-Random facts about the time module
-**mil = million**
-
-time.perf_counter()
-Very precise, changes at least 10mil times in 2.53 seconds
-Very expensive, takes 2.53 seconds to call 10mil times
-*Changes very quickly, should not be used for game clocks, but for performance measurements, dont call regularly in loop unless measuring performance
-
-
-time.monotonic()
-Low precise, changes about 108 times in 1.67 seconds
-Very fast, takes about 1.67 seconds to call 10mil times
-*Changes every few milliseconds, should be called to measure time longer than .1 seconds, regularly faster to call than time.time() but only by a tiny bit
-
-time.time()
-Medium precise, changes about 1712 time in 1.71 seconds
-Very fast, takes about 1.71 seconds to call 10mil times
-*Changes about every thousandth of a second, anything closer than that and its not useful anymore
-
-time.process_time()
-DONT USE THIS, IT IS WACKY AND DOES NOT GIVE THE TIME YOU NORMALLY WANT
-the others will be sufficient, only use if you know what you're doing!
-'''
-'''
-Optimization Checklist
-#####converting lists and tuples#####
-tuple to tuple is the fastest by far(x = tuple(<tuple data type>))
-list to tuple is the 2nd fastest
-tuple to list is 3rd fastest
-list to list is just behind tuple to list
-
-#####adding is faster than subtracting#####
-#if you have a statement like
-if x - y > z:
-  dostuff()
-#change it to
-if x > y + z:
-  dostuff()
-
-#### if statements are faster than min(max(x,_min),_max) ###
-if you are using min/max statements to check if a single number is out of bounds then
-use if statements
-
-#### converting floats to ints #####
-if you are sure that the number is a float():
-  1) bind float.__trunc__ to a local variable
-  2) use the bound float.__trunc__ as a function that will return the int
-  EX:
-  >>> import random
-  >>> float_to_int = float.__trunc__
-  >>> a = random.random()
-  >>> a = float_to_int(a)
-  #note only works with builtins.float datatypes
-if it might be a float or might be an int then do the same as above but instead of float.__trunc__, bind "int" so the global lookup is faster.
-
-lastly if you dont even need an builtins.int data type just a floored number then use "x//1"
-'''
-'''
-
-'''
-def specify_platform(*supported_platforms):
-  if sys.platform not in supported_platforms:
-    if len(supported_platforms) == 1:
-      raise RuntimeError(f'This program only supports {supported_platforms[0]}, not {sys.platform}')
-    else:
-      raise RuntimeError(f'This program only supports {supported_platforms}, not {sys.platform}')
-
-def filePath():
-  #might be able to optimize if i just use str manipulation on __file__ instead of os functions
-  #but i dont know if it would continue to be portable across different os's
-  return dirname(realpath(__file__))
-tab_unicode = '\t'
-back_unicode = '\x08'
-enter_unicode = '\r'
-delete_unicode = '\x7f'
-escape_unicode = '\x1b'
-paste_unicode = '\x16'
-copy_unicode = '\x03'
-WHEEL_SENSITIVITY = 7
-lowerCaseLetters = {'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'}
-upperCaseLetters = {'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'}
-allLetters = lowerCaseLetters.union(upperCaseLetters)
-numbers = {'1','2','3','4','5','6','7','8','9','0','.','-','\x08'}
-positive_integers = {'1','2','3','4','5','6','7','8','9','0','\x08'}
-scientific_notation = numbers.union({'e',})
-miscCharacters = {'\x08',' '}
-symbolCharacters = {',','`','~','!','@','#','$','%','^','&','*','(',')','_','+','-','=','{','}','[',']','|','\\',';',':','"','<','>','.','?','/','`',"'"}
-fileNameFriendlyCharacters = allLetters.union(numbers).union(miscCharacters).union(symbolCharacters).difference({'<','>','|','/','\\','*',':','?','"'})
-AllCharacters = allLetters.union(numbers).union(symbolCharacters).union(miscCharacters)
-preInitiated = 0
-mixer.music.paused = 0 #type: ignore
-WIDTH, HEIGHT = (0,0)
 minScreenX,minScreenY = 0,0
 inputBoxSelected = False
-fps:int = 60
-clock:pg_time.Clock
 keysThatIgnoreBoxSelected = set()
-PATH = filePath()
-log_path = 'log.txt'
-MUSIC_END = USEREVENT + 1
-currentSoundName = ''
-number = int|float
-dt = 0
-def setFPS(newVal) -> None:
-  global fps
-  fps = newVal
-def addKeysThatIgnore(newKey):
+WHEEL_SENSITIVITY = 7
+MONITOR_WIDTH = display.Info().current_w
+MONITOR_HEIGHT = display.Info().current_h
+DOUBLE_CLICK_THRESHOLD = 0.5
+
+def neg(c:Callable[P,bool]):
+  def wrapper(*args:P.args,**kwargs:P.kwargs):
+    return not c(*args,**kwargs)
+  return wrapper
+
+def addKeyThatIgnores(newKey):
   keysThatIgnoreBoxSelected.add(newKey)
-def set_WHEEL_SENSITIVITY(__value) -> None:
+
+def set_WHEEL_SENSITIVITY(i:int) -> None:
   global WHEEL_SENSITIVITY
-  if isinstance(__value,int) and __value >= 0:
-    global WHEEL_SENSITIVITY
-    WHEEL_SENSITIVITY = __value
-  else:
-    raise TypeError(f'WHEEL_SENSITIVITY does not support type: {type(__value)} or value: {__value} ')
-def get_wheel_sesitivity() -> int:
-  return WHEEL_SENSITIVITY
-def py_line(surface, color, start_pos, end_pos, width=1):
-    """ Draws wide transparent anti-aliased lines. Python implementation"""
-    #if width == 0:return
-    assert width != 0, 'argument <width> was passed with a value of 0'
-
-    x0, y0 = start_pos
-    x1, y1 = end_pos
-    midpnt_x, midpnt_y = (x0+x1)/2, (y0+y1)/2  # Center of line segment.
-    length = hypot(x1-x0, y1-y0)
-    angle = atan2(y0-y1, x0-x1)  # Slope of line.
-    width2, length2 = width/2, length/2
-    sin_ang, cos_ang = sin(angle), cos(angle)
-
-    width2_sin_ang  = width2*sin_ang
-    width2_cos_ang  = width2*cos_ang
-    length2_sin_ang = length2*sin_ang
-    length2_cos_ang = length2*cos_ang
-
-    # Calculate box ends.
-    ul = (midpnt_x + length2_cos_ang - width2_sin_ang,
-          midpnt_y + width2_cos_ang  + length2_sin_ang)
-    ur = (midpnt_x - length2_cos_ang - width2_sin_ang,
-          midpnt_y + width2_cos_ang  - length2_sin_ang)
-    bl = (midpnt_x + length2_cos_ang + width2_sin_ang,
-          midpnt_y - width2_cos_ang  + length2_sin_ang)
-    br = (midpnt_x - length2_cos_ang + width2_sin_ang,
-          midpnt_y - width2_cos_ang  - length2_sin_ang)
-
-    gfxdraw.aapolygon(surface, (ul, ur, br, bl), color)
-    gfxdraw.filled_polygon(surface, (ul, ur, br, bl), color)
-
-class SoundError(BaseException):
-  '''Error with pygame.mixer.music module'''
-  pass
+  WHEEL_SENSITIVITY = i
 
 
-class Input:
-  '''
-  A way to dump all the input gathered by getAllInput() so that it can be directly put into
-  update methods so that they can smartly pick what they need to update things.'''
-  #return Input((mouse.get_pos(),mouse.get_pressed(),scrollUp-scrollDown,mbd,mbu),(keyDownQueue,keyUpQueue),flagsRaised)
-  #mState = mpos, buttons, wheel, downs, ups
-  def __init__(self,mState,KQueues,Events,dt):
-    self.mState = mState
-    try:
-      self.Events = set(Events)    
-      self.KDQueue = KQueues[0]
-      self.KUQueue = KQueues[1]
-      self.mpos:tuple[int,int]  =  mState[0]
-      self.mousex:int  = mState[0][0]
-      self.mousey:int  = mState[0][1]
-      self.mb1:bool  =  mState[1][0]
-      self.mb2:bool  =  mState[1][1]
-      self.mb3:bool  =  mState[1][2]
-      self.wheel:int  = mState[2]
-      self.mb1down:bool  =  mState[3][0]
-      self.mb2down:bool  =  mState[3][1]
-      self.mb3down:bool  =  mState[3][2]
-      self.mb1up = mState[4][0]
-      self.mb2up = mState[4][1]
-      self.mb3up = mState[4][2]
-      self.dt = dt
-      self.quitEvent = False
-    except TypeError:
-      self.quitEvent = True
+class ObjectValue(Generic[T]):
+  __slots__ = 'obj','obj_change_event'
+  def __init__(self,obj:T) -> None:
+    self.obj = obj
+    self.obj_change_event:Event[[T]] = Event()
 
-  def __getattr__(self, __name: str):
-    return self.__dict__[__name]
+  def set(self,obj:T): 
+    self.obj = obj
+    self.obj_change_event.fire(obj)
+
+  def get(self): 
+    return self.obj
+
+class ColorScheme:
+  def __init__(self,r:int,g:int,b:int):
+    self.r = r
+    self.g = g
+    self.b = b
+    
+  def getActive(self): return self.getDark(20)
+  def getIdle(self): return self.getLight(20)
+  def getInactive(self): return self.color
+
+  @property
+  def color(self):
+    return self.r,self.g,self.b
+
+  def mix(self,other:"ColorScheme"):
+    return ColorScheme((self.r+other.r)//2,(self.g+other.g)//2,(self.b+other.b)//2)
+  def getDark(self,amount:int):
+    return advanced_color.darken(self.r,self.g,self.b,amount)
+  def getLight(self,amount:int):
+    return advanced_color.lighten(self.r,self.g,self.b,amount)
+  def getComplementary(self):
+    return advanced_color.getComplementary(self.r,self.g,self.b)
+
+class CloseButtonColorScheme(ColorScheme):
+  def __init__(self,exit_color:ColorType,background_color:ColorType) -> None:
+    super().__init__(*exit_color)
+    self.bg_color = background_color
+    
+  def getActive(self):
+    return advanced_color.darken(*self.color,100)
+
+  def getInactive(self):
+    return self.bg_color
   
-  def get_all(self,list_of_things) -> list:
-    return [self.__dict__[item] for item in list_of_things]
+  def withBGColor(self,bg_color:ColorType):
+    return CloseButtonColorScheme(self.color,bg_color)
 
-class QuickWheel:
-  @classmethod
-  def accepts(cls):
-    return ('KDQueue','KUQueue','mpos','mb1down','mb1up')
-  def __init__(self,pos:tuple,options:tuple|list,key:str,radius:int,rot:float):
+class DrawBase:
+  order_in_layer = 0
+
+class ColorLayout:
+  def __init__(self,foreground:ColorType,background:ColorType,tertiary:ColorType|None = None):
+    self.foreground = foreground
+    self.background = background
+    self.tertiary = tertiary or background
+
+class Image: 
+  def __init__(self,pos:tuple[int,int],image:Surface):
     self.pos = pos
-    self.options = options
-    self.key = key
-    self.radius = radius
-    self.on = False
-    amount = len(options)
-    for num,option in enumerate(self.options):
-      option:Button
-      option.x = int(self.radius * cos(num*2*pi/amount+rot) + pos[0]-option.xlen/2)
-      option.y = int(self.radius * sin(num*2*pi/amount+rot) + pos[1]-option.ylen/2)
-
-  def update(self,things):
-    KDQueue,KUQueue,mpos,mb1down,mb1up = things
-    if self.key in KDQueue: self.on = True
-    if self.key in KUQueue: self.on = False
-    if self.on: 
-      for option in self.options:
-        option:Button
-        option.update((mpos,mb1down,0,(),mb1up))
-
-  def draw(self):
-    if not self.on: return
-    for option in self.options:
-      option:Button
-      option.draw()
-
-class TitleScreen:
-  def __init__(self,screen_time:int|None = None,fps = 60):
-    self._fps = fps
-    self._background_color = (0,0,0)
-    self._rect = Rect(0,0,WIDTH,HEIGHT)
-    self._screen_time = screen_time
-    self._defaults = {}
-    self._start_time = None
-    self._title_done = False
-    ###self._defaults setter should go last
-    self.clock = pg_time.Clock()
-    self._defaults = {name for name in self.__dict__}
-
-  def stop_early(self) -> None:
-    self._title_done = True
-
-  @property
-  def TitleDone(self):
-    return self._title_done
-  @property
-  def background_color(self):
-    self._background_color
-  @background_color.setter
-  def background_color(self,newColor):
-    if not isinstance(newColor,tuple): raise TypeError("Has to be a tuple!")
-    if len(newColor) != 3: raise TypeError("Color assignment is (R,G,B) (no A)!")
-    for color in newColor:
-        if not (0<= color <= 255): raise TypeError("Color range is not within bounds!")
-    self._background_color = newColor
-  
-  #__setattr__ is unecesary cause there is no offsetPos to set for each draw_obj
-  def start(self):
-    thread = threading.Thread(target=self._start)
-    thread.start()
-
-  def _start(self):
-    self._start_time = time.monotonic()
-    while 1:
-      if self._screen_time and time.monotonic() - self._start_time > self._screen_time or self._title_done: #time has run out
-        self._title_done = 1
-        break
-      else:
-        self.update(getAllInput())
-        self.draw()
-        display.flip()
-        self.clock.tick(self._fps)
-
-
-  def update(self,myInput:Input):
-    for object in self.__dict__:
-      if object not in self._defaults:
-        objInput = myInput.get_all(self.__dict__[object])
-        self.__dict__[object].update(objInput)
-
-  def draw(self):
-    draw.rect(screen,self._background_color,self._rect)
-    for drawThing in self.__dict__:
-      if drawThing not in self._defaults:
-        self.__dict__[drawThing].draw()
-
-
-class Image:
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ()
-  
-  def __init__(self,pos:tuple,image:Surface):
-    self._pos = tuple(pos)
     self.image = image
-    self.offSetPos = (0,0)
-    self.pos = tuple(pos)
+    self.pos = pos
+
+  def draw(self,surf:Surface):
+    surf.blit(self.image,self.pos)  
+
+class BackgroundColor:
+  order_in_layer = -1
+  def __init__(self,color:ColorType = (0,0,0)):
+    self.color = color
+
+  def draw(self,surf:Surface):
+    surf.fill(self.color)
+
+class ColorArea(DrawBase):
+  def __init__(self,pos:tuple[int,int],size:tuple[int,int],color:ColorType = (0,0,0)):
+    self.rect = Rect(pos,size)
+    self.color = color
+    self.fill_x = size[0]==0
+    self.fill_y = size[1]==0
+
+  def onResize(self,size:tuple[int,int]):
+    if self.fill_x:
+      self.rect.width = size[0]
+    if self.fill_y:
+      self.rect.height = size[1]
+
+  def draw(self,surf:Surface):
+    surf.fill(self.color,self.rect)
+
+class ButtonSwitch(DrawBase):
+  def __init__(self,pos:tuple[int,int],size:tuple[int,int],states:list[Surface],state:int = 0,onDown:EventHookInt|None = None):
+    self.rect = Rect(pos,size)
+    self.states = states
+    self.state = state
+    self.onDown = onDown
+    self.rect_color:Optional[ColorType] = None
+
+  def update(self,input:Input):
+    if input.mb1d and self.rect.collidepoint(input.mpos):
+      self.state = (self.state + 1) % len(self.states)
+      if self.onDown:
+        self.onDown(self.state)
+
+  def draw(self,surf:Surface):
+    s = self.states[self.state]
+    r = s.get_rect()
+    if self.rect_color is not None:
+      draw.rect(surf,self.rect_color,self.rect)
+    r.center = self.rect.center
+    surf.blit(s,r)
+
+class Switch(DrawBase):
+  def __init__(self,pos:tuple[int,int],size:tuple[int,int],color_scheme:ColorScheme,callback:Callable[[bool],None]):
+    self.rect = Rect(pos,size)
+    self.callback = callback
+    self.color_scheme = color_scheme
+    self.state = False
+    self.mhover = False
+    self.clicking = False
+
+  def setState(self,newState:bool):
+    self.state = newState
+    return self
+
+  def update(self,input:Input):
+    self.mhover = self.rect.collidepoint(input.mpos)
+    if input.mb1d and self.mhover:
+      self.clicking = True
+      self.state = not self.state
+      self.callback(self.state)
+    elif input.mb1u and self.clicking:
+      self.clicking = False
+
+  def draw(self,surf:Surface):
+    width = 0 if self.state else 2
+    if self.clicking:
+      color = self.color_scheme.getActive()
+    elif self.mhover:
+      color = self.color_scheme.getIdle()
+    else:
+      color = self.color_scheme.getInactive()
+    draw.rect(surf,color,self.rect,width,4)
+
+class Text(DrawBase):
+  def __init__(self,pos:tuple[int,int],text:str,color:ColorType,font:font.Font):
+    self.rect = Rect(pos,(0,0))
+    self.font = font
+    self.color = color
+    self.on_rect_change_event:Event[[]] = Event()
+    self.setText(text)
+    self.showing = True
+
+  def getText(self):
+    return self.__text
+
+  def setTextIfNeeded(self,newText:str):
+    if self.__text != newText:
+      self.setText(newText)
+
+  def setText(self,newText:str) -> None:
+    self.__text = newText
+    self.surf = self.font.render(self.__text,True,self.color)
+    self.rect.width = self.surf.get_width()
+    self.on_rect_change_event.fire()
+
+  def clear(self): self.setText('')
+
+  def show(self): 
+    self.showing = True
+    return self
+  
+  def hide(self): 
+    self.showing = False
+    return self
+
+  def draw(self,surf:Surface):
+    if self.showing:
+      surf.blit(self.surf,self.rect.topleft)
+
+class AddText(DrawBase):
+  __slots__ = 'color','f','obj','anchor_x','anchor_y','alignment_x','alignment_y','offset_x','offset_y','_final_offset_x','_final_offset_y','update','_s','onResize'
+  def __init__(self,obj:HasRect,text:str,color:ColorType,f:font.Font,anchor_x:float = 0.5,anchor_y:float = 0.5,
+                                                                     alignment_x:float = 0.5,alignment_y:float = 0.5,
+                                                                     offset_x:int = 0,offset_y:int = 0):
+    self.color = color
+    self.f = f
+    self.obj = obj
+    self.anchor_x = anchor_x
+    self.anchor_y = anchor_y
+    self.alignment_x = alignment_x
+    self.alignment_y = alignment_y
+    self.offset_x = offset_x
+    self.offset_y = offset_y
+    self.rect = obj.rect
+    self.setText(text)
+    self.txt = ''
+
+    if hasattr(obj,'update'):
+      self.update = obj.update #type: ignore
+    if hasattr(obj,'onResize'):
+      self.onResize = obj.onResize#type: ignore
+
+  def setText(self,text:str):
+    self.txt = text
+    self._s = self.f.render(text,True,self.color)
+  
+  def draw(self,surf:Surface):
+    self.obj.draw(surf)
+    surf.blit(self._s,
+              (self.obj.rect.left+self.obj.rect.width*self.anchor_x-self._s.get_width()*self.alignment_x + self.offset_x,
+               self.obj.rect.top+self.obj.rect.height*self.anchor_y-self._s.get_height()*self.alignment_y + self.offset_y)
+              )
+
+class AddImage(DrawBase):
+  def __init__(self,obj:HasRect,img:Surface,anchor_x:float = 0.5,anchor_y:float = 0.5,offset_x:int = 0,offset_y:int = 0):
+    self.obj = obj
+    self.img = img
+    self.anchor_x = anchor_x
+    self.anchor_y = anchor_y
+    self.offset_x = offset_x
+    self.offset_y = offset_y
+    if hasattr(obj,'update'):
+      self.update = obj.update#type: ignore
+    if hasattr(obj,'onResize'):
+      self.onResize = obj.onResize#type: ignore
 
   @property
-  def pos(self):
-    return self._pos
+  def rect(self):
+    return self.obj.rect
+  
+  def draw(self,surf:Surface):
+    self.obj.draw(surf)
+    surf.blit(self.img,
+              (self.obj.rect.left+self.obj.rect.width*self.anchor_x-self.img.get_width()*self.anchor_x+self.offset_x,
+               self.obj.rect.top+self.obj.rect.height*self.anchor_y-self.img.get_height()*self.anchor_y+self.offset_y)
+              )
 
-  @pos.setter
-  def pos(self,newVal):
-    self._pos = newVal
-    self._offSetPos = (0,0)
-    self.tpos = (self.offSetPos[0]+newVal[0],self.offSetPos[1]+newVal[1])
+class Aligner:
+  def __init__(self,obj:HasRect,anchor_x:float,anchor_y:float,alignment_x:float = 0.5,alignment_y:float = 0.5):
+    self.obj = obj
+    self.order_in_layer = obj.order_in_layer
+    self.anchor = anchor_x,anchor_y
+    self.alignment = alignment_x,alignment_y
+    self.offset = self.obj.rect.topleft
+    self.last_size:Optional[tuple[int,int]] = None
+    if hasattr(obj,'update'):
+      self.update = obj.update #type: ignore
+    if hasattr(obj,'on_rect_change_event'):
+      
+      obj.on_rect_change_event.register( #type: ignore
+        lambda : self.onResize(self.last_size) if self.last_size is not None else None
+      )
+
+  def onResize(self,size:tuple[int,int]):
+    self.last_size = size
+    if hasattr(self.obj,'onResize'): self.obj.onResize(size) #type: ignore
+    r = self.obj.rect
+    r.left = size[0] * self.anchor[0] - r.width * self.alignment[0] + self.offset[0]
+    r.top = size[1] * self.anchor[1] - r.height * self.alignment[1] + self.offset[1]
+
+  def draw(self,surf:Surface):
+    self.obj.draw(surf)
+
+class Resizer:
+  @staticmethod
+  def toPixels(s:str,l:int) -> int:
+    if not s: return 0
+    if '+' in s:
+      toSum = s.split('+')
+      return sum(Resizer.toPixels(s,l) for s in toSum)
+    if '-' in s:
+      s1,s2 = s.split('-')
+      return (Resizer.toPixels(s1,l) - Resizer.toPixels(s2,l)) % l
+    if s.isdigit():
+      return int(s)%l
+    elif s[-1] == '%':
+      return int(float(s[:-1])* 0.01 * l)
+    raise ValueError("Incorrect Format")
+  
+  def __init__(self,obj:HasRect,left:str,top:str,right:str,bottom:str):
+    self.obj = obj
+    self.left = left
+    self.top = top
+    self.right = right
+    self.bottom = bottom
+    self.order_in_layer = obj.order_in_layer
+    if hasattr(obj,'update'):
+      self.update = obj.update#type: ignore
+
 
   @property
-  def offSetPos(self):
-    return self._offSetPos
-  
-  @offSetPos.setter
-  def offSetPos(self,newVal):
-    self._offSetPos = newVal
-    self.tpos = (self.pos[0]+newVal[0],self.pos[1]+newVal[1])
-  def update(self,_):
-    pass
+  def rect(self):
+    return self.obj.rect
 
-  def draw(self):
-    screen.blit(self.image,self.tpos)
+  def onResize(self,size:tuple[int,int]):    
+    obj = self.obj
+    l = self.toPixels(self.left,size[0])
+    t = self.toPixels(self.top,size[1])
+    w = max(self.toPixels(self.right.replace('~',str(l)),size[0]) - l,0) 
+    h = max(self.toPixels(self.bottom.replace('~',str(t)),size[1]) - t,0)
+    if isinstance(self.obj,Space):
+      newSpace = Space(Rect(l,t,w,h))
+      self.update = newSpace.update #the update method that is cached must be redirected to point to the new object
+      self.obj.resized(newSpace)
+      self.obj = newSpace
+      return 
+    obj.rect.left = l
+    obj.rect.top = t
+    obj.rect.width = w
+    obj.rect.height = h
+    if hasattr(obj,'onResize'): obj.onResize(size) #type: ignore
+
+  def draw(self,surf:Surface):
+    self.obj.draw(surf)
+
+class InputBox(DrawBase):
+  def __init__(self,pos,size,color_layout:ColorLayout,caption = '',save_function:Callable|None =None,restrict_input = None):
+    self.pos = pos
+    self.font = font.SysFont('Courier New', 21)
+    self.active = False
+    self.caption = caption
+    self.box_color = color_layout.background
+    self.text_color = color_layout.foreground
+    self.max_chars = 500
+    self.text = ''
+    self.textsurface = self.font.render(self.text, True, (0, 0, 0))
+    self.rect = Rect(self.pos, size)
+    self.max_chars_per_line = size[0]//12
+    self.save_function = save_function if save_function else lambda x : x
+    self.restrict_input = restrict_input
+    self.timeactive = 0.0
+    self.cursor_rect = Rect(0,0,2,18)
+    self.surf = Surface(size,const.SRCALPHA)
+
+  def resize(self,newSize:tuple[int,int]):
+    self.rect.size = newSize
+    self.max_chars_per_line = newSize[0]//12
+    self.surf = Surface(newSize,const.SRCALPHA)
+    self.redrawSurf()
+
+  def setMaxChars(self,max:int):
+    self.max_chars = max
+    if len(self.text) > max: self.text = self.text[:max]
+    return self
+
+  def setText(self,new_text):
+    self.text = new_text
+    self.redrawSurf()
+
+  def _checkKey(self,key:str,input:Input):
+    if self.restrict_input and key not in self.restrict_input and key != u_const.BACK: return False
+    if key == u_const.BACK:
+      if len(self.text):    
+        if input.lctrl:
+          self.text = '' if ' ' not in self.text else ' '.join(self.text.split()[:-1])
+        else:
+          self.text = self.text[:-1]
+      else:
+        return False
+    elif len(self.text) < self.max_chars:
+      if key == '\r':
+        key = '\n'
+      self.text +=key
+    if self.save_function:
+      self.save_function(self.text)
+    return True
+
+  def update(self,input:Input):
+    'mpos,mb1down,keys'
+    mpos = input.mpos
+    mb1down = input.mb1d
+    if self.rect.collidepoint(mpos) and mb1down:
+      self.active = True
+      self.cursor_rect.topleft = (self.rect.left + (len(self.text)%self.max_chars_per_line)*12+2,self.rect.top+(len(self.text)//self.max_chars_per_line)*self.font.get_height()+2)
+      self.timeactive = time.monotonic()
+    elif mb1down:
+      self.active = False
+    if self.active:
+      t = self.text
+      input.KDQueue = list(filter(lambda x : not self._checkKey(x,input),input.KDQueue))
+      if t != self.text: #if text has been updated
+        self.timeactive = time.monotonic()-.5
+        self.cursor_rect.topleft = (self.rect.left + (len(self.text)%self.max_chars_per_line)*12+2,self.rect.top+(len(self.text)//self.max_chars_per_line)*self.font.get_height()+2)
+        self.redrawSurf()
+
+  def redrawSurf(self):
+    self.surf.fill((0,0,0,0))
+    letters = [letter for letter in self.text]
+    for char_num, letter in enumerate(letters):
+      txt = self.font.render(letter, True, self.text_color)
+      letterx = (char_num%self.max_chars_per_line)*12
+      self.surf.blit(txt,(letterx,(char_num//self.max_chars_per_line)*self.font.get_height()))
+
+  def draw(self,surf:Surface): 
+    if self.box_color:
+      draw.rect(surf,self.box_color,self.rect)
+    if not self.text:
+      self.textsurface = self.font.render(self.caption, True, self.text_color)
+      surf.blit(self.textsurface,self.pos)
+    else:
+      surf.blit(self.surf,self.rect)
+    if self.active and not int(time.monotonic()-self.timeactive) % 2:
+      draw.rect(surf,(0,0,0),self.cursor_rect)
+
+class InputBoxOneLine(DrawBase):
+  def __init__(self,pos:tuple[int,int],size:tuple[int,int],color_layout:ColorLayout,callback:Callable[[str],None]|None,font:font.Font):
+    self.rect = Rect(pos,size)
+    self.color_layout = color_layout
+    self.callback = callback
+    self.max_chars = 999
+    self.font = font
+    self.surf = Surface(self.rect.size,const.SRCALPHA)
+    self.surf.fill(self.color_layout.background)
+
+    self.text = ''
+    self.text_surf = Surface((0,0))
+    self.cursor_position = 0
+    self.cursor_height = self.font.get_height()
+    self.cursor_visible_x = 0
+    self.text_surf_left_shift = 0
+    self.valid_keys = u_const.REGULAR
+    self.text_y_alignment = 0.5
+    self.active = False
+    self.cursor_time = 0.0
+
+  def onResize(self,newSize:tuple[int,int]):
+    self.surf = Surface(self.rect.size,const.SRCALPHA)
+    self.redrawSurf()
+
+  def setRestrictInput(self,validKeys:set[str]|None):
+    self.valid_keys = validKeys
   
-class ScreenSurface:
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ()
-  def __init__(self,pos,size,color = (0,0,0)):
+  def setMaxChars(self,max:int):
+    self.max_chars = max
+    return self
+  
+  def setText(self,text:str):
+    self.text = text
+    if self.callback:
+      self.callback(text)
+    self.redrawSurf()
+    return self
+  
+  def getXPosOfCursorPosition(self,c_position:int):
+    return self.font.size(self.text[:c_position])[0] - self.text_surf_left_shift
+  
+  def resize(self,newSize:tuple[int,int]):
+    self.rect.size = newSize
+    self.onResize((0,0))
+
+  def update(self,input:Input):
+    mhover = self.rect.collidepoint(input.mpos)
+    if input.mb1d:
+      self.active = mhover
+      if mhover:
+        self.cursor_time = time.monotonic()
+        self.cursor_position = binaryApproximate(self.getXPosOfCursorPosition,input.mousex-self.rect.left,0,len(self.text))
+        self.cursor_visible_x = self.font.size(self.text[:self.cursor_position])[0]
+    if self.active:
+      if 'left_arrow' in input.KDQueue:
+        self.cursor_position = max(0,self.cursor_position-1)
+        self.redrawSurf()
+        self.cursor_time = time.monotonic() - 0.5
+      elif 'right_arrow' in input.KDQueue:
+        self.cursor_position = min(len(self.text),self.cursor_position+1)
+        self.redrawSurf()
+        self.cursor_time = time.monotonic() - 0.5
+      t = self.text
+      input.KDQueue = list(filter(lambda c: not self.typeKey(c,input.lctrl,False),input.KDQueue))
+      if t is not self.text:
+        self.cursor_time = time.monotonic() - 0.5
+        self.redrawSurf()
+        if self.callback:
+          self.callback(self.text)
+
+  def backspace(self):
+    if not self.text[:self.cursor_position]: return
+    self.text = self.text[:self.cursor_position-1] + self.text[self.cursor_position:]
+    self.cursor_position -= 1
+    if self.cursor_position < 0: self.cursor_position = 0
+  
+  def currChar(self):
+    if not self.cursor_position: return ''
+    return self.text[self.cursor_position-1]
+
+  def typeKey(self,key:str,lctrl:bool = False,use_callback:bool = True):
+    if not key: return True
+    if key == u_const.BACK:
+      if lctrl:
+        if self.currChar() == ' ': self.backspace()
+        while self.currChar() not in {'',' '}:
+          self.backspace()
+      else:
+        self.backspace()
+      return True
+    elif key == u_const.DELETE:
+      if lctrl:
+        pos_to_delete_to = self.text.find(' ',self.cursor_position)
+        self.text = self.text[:self.cursor_position] + (self.text[pos_to_delete_to:] if pos_to_delete_to != -1 else '')
+      else:
+        self.text = self.text[:self.cursor_position] + self.text[self.cursor_position+1:]
+          
+    if self.valid_keys is not None and key not in self.valid_keys: return False
+    if len(self.text) < self.max_chars:
+      if key == u_const.ENTER:
+        key = '\n'
+      self.text = self.text[:self.cursor_position] + key + self.text[self.cursor_position:] 
+      self.cursor_position += 1
+    if self.callback and use_callback:
+      self.callback(self.text)
+    return True
+
+  def redrawSurf(self):
+    self.surf.fill(self.color_layout.background)
+    self.text_surf = self.font.render(self.text,True,self.color_layout.foreground)
+    if self.font.size(self.text)[0] < self.rect.width:
+      self.text_surf_left_shift = 0
+    self.cursor_visible_x = self.font.size(self.text[:self.cursor_position])[0]
+    cursor_x_pos = self.cursor_visible_x - self.text_surf_left_shift
+    if cursor_x_pos > self.rect.width-3:
+      self.text_surf_left_shift += cursor_x_pos - self.rect.width + 3
+    elif cursor_x_pos < 0:
+      self.text_surf_left_shift += cursor_x_pos  
+    self.surf.blit(self.text_surf,(-self.text_surf_left_shift,(self.rect.height - self.font.get_height())*self.text_y_alignment))
+
+  def draw(self,surf:Surface):
+    surf.blit(self.surf,self.rect)
+    if not self.active: return
+    t = int(time.monotonic() - self.cursor_time)
+    if not t%2:
+      draw.rect(surf,self.color_layout.foreground,(self.cursor_visible_x - self.text_surf_left_shift+self.rect.left,self.rect.top +(self.rect.height - self.font.get_height())*self.text_y_alignment,2,self.font.get_height()))
+
+class Slider(DrawBase):
+  def __init__(self,pos:tuple[int,int],size:tuple[int,int],color_layout:ColorLayout,save_function:Callable[[float],None]):
     self.pos = pos
     self.size = size
-    self.color = color
-    self.surf = Rect(pos[0],pos[1],size[0],size[1])
-  @property
-  def offSetPos(self):
-    return self._offSetPos
-
-  @offSetPos.setter
-  def offSetPos(self,newVal):
-    self._offSetPos = newVal
-    self.surf = Rect(self.pos[0]+newVal[0],self.pos[1]+newVal[1],self.size[0],self.size[1])
-
-  def update(self,*_):
-    pass
-  def draw(self):
-    draw.rect(screen,self.color,self.surf)
-
-class Debug:
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ()
-  def __init__(self,measureFunc = time.perf_counter,performanceImpact = 30):
-    self.frameCount = 0
-    self.frameTimes = [measureFunc(),]
-    self.measureFunc = measureFunc
-    self.drawEvery = performanceImpact
-
-  def update(self):
-    self.frameCount += 1
-    if self.frameCount % self.drawEvery == 0:
-      self.frameTimes.append(self.measureFunc())
-      print(int(self.drawEvery/(self.frameTimes[-1]-self.frameTimes[-2])))
-
-  def draw(self):
-    return
-    if self.frameCount % self.drawEvery == 0:
-      print(int(self.drawEvery/(self.frameTimes[-1]-self.frameTimes[-2])))
-
-  def onQuit(self):
-    FPSlist = [self.drawEvery/(self.frameTimes[x+1]-self.frameTimes[x]) for x in range(len(self.frameTimes)-1)]
-    FPSlist.sort()
-    sum = 0
-    for fps in FPSlist:
-      sum += fps
-    sum /= len(FPSlist)
-    print(f'Avg FPS: {round(sum,2)}')
-    print(f'Min FPS: {round(FPSlist[0],2)}')
-    print(f'Max FPS: {round(FPSlist[-1],2)}')
-    print(f'Total Frames Updated: {self.frameCount}')
-
-class TextBox:
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ()
-  def __init__(self,pos,font,text,words_color,showing:bool = True):
-    self.pos = pos
-    self.font = font
-    self.text = text
-    self.words_color = words_color
-    self.textsurface = self.font.render(self.text, True, self.words_color)
-    self.offSetPos = (0,0)
-    self.showing = showing
-
-  def update_text(self) -> None:
-    '''
-    Update the rendered text to match self.text
-    '''
-    self.textsurface = self.font.render(self.text,True,self.words_color)
-  
-  def setText(self,newText) -> None:
-    self.text = newText
-    self.textsurface = self.font.render(self.text,True,self.words_color)
-  set_text = setText
-
-  def clear(self):
-    self.setText('')
-
-  def update(self,_) -> None:
-    pass
-
-  def set_showing(self,__value) -> None:
-    self.showing = __value
-
-  def show(self) -> None: 
-    self.showing = True
-  
-  def hide(self) -> None: 
-    self.showing = False
-
-  def draw(self):
-    if self.showing:
-      screen.blit(self.textsurface,(self.pos[0] + self.offSetPos[0],self.pos[1] + self.offSetPos[1]))
-
-class Options: #In Development
-  def __init__(self,pos):
-    self.options = dict()
-    self.pos = pos
-    self.font = font.SysFont("Courier New",20)
-
-  def update(self):
-    for num,option in enumerate(self.options):
-      draw.rect(screen,(10,10,10),Rect(self.pos[0],self.pos[1]+num*30,70,30))
-      screen.blit(self.font.render(option,True,(255,255,255)),(self.pos[0],self.pos[1]+num*30))
-
-class Slider:
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ('mpos','mb1down','mb1up')
-  def __init__(self,x,y,xlen,ylen,min,max,save_function,slider_color,ball_color,acceptsInput:bool = True,type:int = 1,passed_color:tuple[int,int,int]|None = (0,0,0),starting_value:int|None = None):
-    self.x = x
-    self.y = y
-    self.xlen = xlen
-    self.ylen = ylen
-    self.min = min
-    self.max = max
-    self.value = min if starting_value is None else starting_value
-    if starting_value is not None:
-      save_function(starting_value)
+    self.rect = Rect(pos,size)
     self.save_function = save_function
-    self.countperpixel = (max-min)/xlen
-    self.sliderx = int((self.value-self.min)/self.countperpixel)
-    self.offSetPos = (0,0)
-    self._rect = Rect(self.x-1,self.y-1,self.xlen+2,self.ylen+2)
-    self.collider = Rect(self.x,self.y,self.xlen,self.ylen)
-    self.acceptsInput = acceptsInput
-    self.slider_color = slider_color
-    self.ball_color = ball_color
-    self.ball_pos = (self.sliderx+self.x+self._offSetPos[0],self.y+self.ylen/2+self._offSetPos[1])
-    self.active = 0
-    self.pactive = 0
-    self.type = type
-    self.passed_color = passed_color
-    self.passed_rect = Rect(0,0,0,0)
-    self.mouse_active = 0
-    self.own_background = True if not isinstance(slider_color,Surface) else False
-
-  def changeSliderLimits(self,newMin:int|None = None,newMax:int|None = None):
-    if newMin is not None and newMin != self.max:
-      self.min = newMin
-    if newMax is not None and newMax != self.min:
-      self.max = newMax
-    
-    self.countperpixel = (self.max-self.min)/self.xlen
-    self.set_value(self.value)# recalculate ball, and passed_rect
-  change_slider_limits = changeSliderLimits
-
-  def onActivate(self):
-    pass
-
-  def onDeactivate(self):
-    pass
+    self.color = color_layout
+    self.sliderx = 0
+    self.value = 0.0
+    # self.bar_rect = Rect(0,0,self.size[0],9)
+    # self.bar_rect.midleft = (self.pos[0],self.pos[1]+self.size[1]//2)
+    self.bar_width = 9
+    self.active = False
+    self.pactive = False
+    self.mouse_active = False
+ 
+  def onActivate(self): ...
+  def onDeactivate(self): ...
 
   @property
-  def offSetPos(self) -> tuple[int,int]:
-    return self._offSetPos
+  def passed_rect(self):
+    return Rect(self.rect.left,self.rect.top+(self.rect.height-self.bar_width)//2,self.sliderx,self.bar_width)
 
-  @offSetPos.setter
-  def offSetPos(self,newVal) -> None:
-    self._rect = Rect(self.x + newVal[0]-1,self.y+newVal[1]-1,self.xlen+2,self.ylen+2)
-    self.collider = Rect(self.x + newVal[0],self.y+newVal[1],self.xlen,self.ylen)
-    self._offSetPos = newVal
-    self.ball_pos = (self.sliderx+self.x+self._offSetPos[0],self.y+self.ylen/2+self._offSetPos[1])
+  def setValue(self,x:float):
+    if x < 0: x = 0
+    elif x > 1: x = 1
+    self.sliderx = self.rect.width*x
+    self.value = x
+    self.save_function(self.value)
 
-
-  def update(self,things):
-    'mpos,mb1down,mb1up'
-    if not self.acceptsInput: return 
-    mpos,mb1down,mb1up = things
-    if self.collider.collidepoint(mpos):
-      self.mouse_active = 1
+  def update(self,input:Input):
+    mpos,mb1down,mb1up = input.mpos,input.mb1d,input.mb1u
+    if self.rect.collidepoint(mpos):
+      self.mouse_active = True
       if mb1down:
-        self.active = 1
-      elif mb1up:
-        self.active = 0
-    elif mb1down or mb1up: # if not colliding and mb1down or mb1up dont update
-      self.mouse_active = 0
-      self.active = 0
+        self.active = True
+        self.onActivate()
     else:
-      self.mouse_active = 0
-    
-    if self.active and not self.pactive:
-      self.onActivate()
-    elif not self.active and self.pactive:
+      self.mouse_active = False
+    if self.active and mb1up:
+      self.active = False
       self.onDeactivate()
+
     if self.active:
-      self.sliderx = mpos[0] - self.x - self._offSetPos[0]
-      newVal = int(self.sliderx*self.countperpixel)+self.min
-      if newVal < self.min: newVal = self.min
-      elif newVal > self.max - 1: newVal = self.max - 1
+      self.sliderx = min(max(mpos[0] - self.rect.left,0),self.rect.width)
+      newVal = self.sliderx / self.rect.width
       if self.value != newVal:
         self.value = newVal
         self.save_function(self.value)
-      if self.sliderx > self.xlen: self.sliderx = self.xlen
-      elif self.sliderx < 0: self.sliderx = 0
-      self.ball_pos = (self.sliderx+self.x+self._offSetPos[0],self.y+self.ylen/2+self._offSetPos[1])
-      self.passed_rect = Rect(self.x+self._offSetPos[0],self.y+self._offSetPos[1],self.sliderx,self.ylen)
+
     self.pactive = self.active
 
-  def draw(self):
-    if self.own_background:
-      draw.rect(screen,self.slider_color,self._rect,0,2)
-    else:
-      screen.blit(self.slider_color,(self.x+self._offSetPos[0],self.y+self._offSetPos[1]))
-    if self.type == 1: #always show ball
-      draw.circle(screen,self.ball_color,self.ball_pos,self.ylen)
-    else: # show passed rect
-      if self.passed_color:
-        draw.rect(screen,self.passed_color,self.passed_rect,0,2) 
-      if self.mouse_active: #show ball when mouse hovering
-        draw.circle(screen,self.ball_color,self.ball_pos,self.ylen)
-      
-  def set_value(self,newValue):
-    '''set the value of slider, if slider is currently active(being controlled) then does not work''' 
-    if self.active: return
-    if newValue > self.max - 1: newValue = self.max - 1
-    elif newValue < self.min: newValue = self.min
-    self.save_function(newValue)
-    self.value = newValue
-    self.sliderx = int((newValue-self.min)/self.countperpixel)
-    self.ball_pos = (self.sliderx+self.x+self._offSetPos[0],self.y+self.ylen/2+self._offSetPos[1])
-    self.passed_rect = Rect(self.x+self._offSetPos[0],self.y+self._offSetPos[1],self.sliderx,self.ylen)
+  def draw(self,surf:Surface):
+      draw.rect(surf,self.color.background,(self.rect.left,self.rect.top+(self.rect.height-self.bar_width)//2,self.rect.width,self.bar_width),0,2)
+      # draw.rect(surf,self.passed_color,self.passed_rect,0,2)
+      draw.circle(surf,self.color.foreground,(self.sliderx+self.rect.left,self.rect.midleft[1]),7)
 
-class DesmosSlider:
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ('mpos','mb1down','mb1up','KDQueue')
-  def __init__(self,pos,size,lower_limit,upper_limit,save_function,slider_color,ball_color,starting_value,scale=3,fontsize=20):
-    self.lower_limit = lower_limit
-    self.upper_limit = upper_limit
-    end_box_sizex = scale * fontsize * 15/21 # ratio of width to height of font for numbers
-    slider_end_box_space = 6
-    sliderlen = size[0]-2*(end_box_sizex + slider_end_box_space)
-    slideroffsetx = end_box_sizex + slider_end_box_space
-    self.f = save_function
-    self.slider = Slider(pos[0]+slideroffsetx,pos[1]+size[1]/3,sliderlen,size[1]/3,lower_limit,upper_limit,self.save_function,slider_color,ball_color,True,1,None,starting_value)
-    self.min_box = InputBox(pos,(end_box_sizex,size[1]),'Lower',slider_color,scale,self.set_lower_limit,positive_integers,fontsize)
-    self.max_box = InputBox((pos[0]+size[0]-end_box_sizex,pos[1]),(end_box_sizex,size[1]),'Upper',slider_color,scale,self.set_upper_limit,positive_integers,size[1])
-    self.min_box.set_text(str(self.lower_limit))
-    self.max_box.set_text(str(self.upper_limit))
-  
-  @staticmethod
-  def str_to_int(string:str) -> int:
+class SquareSlider(Slider):
+  def __init__(self, pos: tuple[int, int], size: tuple[int, int], color_layout: ColorLayout,range:Iterable,save_function: Callable[[int], None],initial_value:int|None = None):
+    self.values = list(range)
+    super().__init__(pos,size,color_layout,self.save_wrapper)
+    self.bar_width = size[1]
+    self.save = save_function
+    self.last_value = None
+    self.slider_rect = Rect(0,pos[1],5,size[1])
+    if initial_value is not None:
+      assert initial_value in self.values, 'Initial Value must in set of valid values'
+      self.setValue(initial_value)
+
+  def save_wrapper(self,value:float) -> None:
+    value = self.sliderx / (self.rect.width + 1)
+    index = int(value * len(self.values))
+    v = self.values[index]
+    if v != self.last_value:
+      self.last_value = v
+      self.save(v)
+    
+  def draw(self,surf:Surface):
+    draw.rect(surf,self.color.background,self.rect,0,2)
+    self.slider_rect.left  = self.rect.left + (self.rect.width - self.slider_rect.width) * self.value
+    draw.rect(surf,self.color.foreground,self.slider_rect,0,2)
+
+  def setValue(self,value:int):
     try:
-      return int(string)
+      index = self.values.index(value)
+      super().setValue(index / (len(self.values)-1))
     except ValueError:
-      return 0
-
-  def save_function(self,value):
-    self.f(value)
-
-  def set_lower_limit(self,new_lower_limit):
-    new_lower_limit = self.str_to_int(new_lower_limit)
-    if new_lower_limit >= self.upper_limit:
-      new_lower_limit = self.upper_limit-1
-    self.lower_limit = new_lower_limit
-    self.slider.changeSliderLimits(new_lower_limit)
-
-  def set_upper_limit(self,new_upper_limit):
-    new_upper_limit = self.str_to_int(new_upper_limit)
-    if new_upper_limit < self.lower_limit:
-      new_upper_limit = self.lower_limit+1
-    self.upper_limit = new_upper_limit
-    self.slider.changeSliderLimits(None,new_upper_limit+1)
-  
-  def set_value(self,value):
-    if value < self.lower_limit:
-      self.set_lower_limit(value)
-    elif value > self.upper_limit:
-      self.set_upper_limit(value)
-    else: # in between preexisting limits
-      self.slider.set_value(value)
-
-
-  @property
-  def offSetPos(self) -> tuple:
-    return self._offSetPos
-
-  @offSetPos.setter
-  def offSetPos(self,newVal) -> None:
-    self._offSetPos = newVal
-    self.slider.offSetPos = newVal
-    self.min_box.offSetPos = newVal
-    self.max_box.offSetPos = newVal
-
-  def update(self,things):
-    '''mpos,mb1d,mb1u,KDQ'''
-    mpos,mb1down,mb1up,KDQueue = things
-    self.slider.update((mpos,mb1down,mb1up))
-    self.min_box.update((mpos,mb1down,KDQueue))
-    self.max_box.update((mpos,mb1down,KDQueue))
-
-  def draw(self):
-    self.slider.draw()
-    self.min_box.draw()
-    self.max_box.draw()
-  
-class Dropdown:
-  #TODO: make a slider go up and down next to dropdown
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ('mpos','mb1down','mb1up','wheel','mb3down')
-
-  def __init__(self,pos,size,up_color,down_color,text_color,captions,outPutCommand,maxy,rightClickCommand = None,tpos = (0,0),spacing:int = 1, myfont = None ):
-    self.pos = list(pos)
-    self.size = tuple(size)
-    self.up_color = up_color
-    self.down_color = down_color
-    self.text_color = text_color
-    self.captions_command = captions
-    self.empty_list = []
-    self.captions = list(captions())
-    self.mpos = [0,0]
-    self.new_captions = []
-    self.outPutCommand = outPutCommand
-    self.font = font.SysFont('Courier New', 20) if myfont is None else myfont
-    self.yscroll = 0
-    self.mhover = 0
-    self.pmhover = 0
-    self.maxy = maxy
-    self.tpos = tpos
-    self.spacing = spacing
-    self.rightClickCommand = rightClickCommand if rightClickCommand else None
-    if self.captions:
-      assert isinstance(self.captions[0],(str,Surface)), "weeer al gunna dai"
-      if isinstance(self.captions[0],str):
-        for caption in self.captions:
-          self.new_captions.append(self.font.render(caption, True, self.text_color))
-      elif isinstance(self.captions[0],Surface):
-        self.new_captions = self.captions
-    else: #empty list
-      self.new_captions = []
-    self.buttons = [Button((pos[0],pos[1]+count*size[1]*self.spacing),size[0],size[1],self.command,down_color,up_color,(min(up_color[0]+25,255),min(up_color[1]+25,255),min(up_color[2]+25,255)),caption,self.tpos[0],self.tpos[1],self.rightCommand,accepts_mb3=True if self.rightClickCommand else False) for count,caption in enumerate(self.new_captions)]
-    self.offSetPos = (0,0)
-    self.lenButtons = len(self.buttons)
-    self._rect = Rect(self.pos[0],self.pos[1],self.size[0],self.maxy)
-
-  @property
-  def offSetPos(self) -> tuple:
-    return self._offSetPos
-
-  def setAllToUp(self):
-    for button in self.buttons:
-      button.setToUp()
-
-  @offSetPos.setter
-  def offSetPos(self,newVal):
-    self._offSetPos = newVal
-    self._rect = Rect(self.pos[0]+newVal[0],self.pos[1]+newVal[1],self.size[0],self.maxy)
-    for button in self.buttons:
-      button.offSetPos = newVal
-
-  def command(self):
-    top = self.mpos[1]-(self.pos[1]+self._offSetPos[1])+self.yscroll
-    if self.spacing != 1: top +=1 
-    bottom = self.size[1]*self.spacing
-    self.outPutCommand(top//bottom)
-
-  def onMouseEnter(self):
-    pass
-  def onMouseExit(self):
-    pass
-
-  def rightCommand(self):
-    top = self.mpos[1]-(self.pos[1]+self._offSetPos[1])+self.yscroll
-    if self.spacing != 1: top +=1 
-    bottom = self.size[1]*self.spacing
-    if self.rightClickCommand:
-      self.rightClickCommand(top//bottom)
-
-  def recalculate_options(self):
-    self.captions = list(self.captions_command())
-    self.new_captions = []
-    if not self.captions: return
-    assert isinstance(self.captions[0],(str,Surface)), "weeer al gunna dai"
-    if isinstance(self.captions[0],str):
-      for caption in self.captions:
-        self.new_captions.append(self.font.render(caption, True, self.text_color))
-    elif isinstance(self.captions[0],Surface):
-      self.new_captions = self.captions
-    self.buttons = [Button((self.pos[0],self.pos[1]+count*self.size[1]*self.spacing),self.size[0],self.size[1],self.command,self.down_color,self.up_color,(min(self.up_color[0]+25,255),min(self.up_color[1]+25,255),min(self.up_color[2]+25,255)),caption,self.tpos[0],self.tpos[1],self.rightCommand,None, not not self.rightClickCommand,) for count,caption in enumerate(self.new_captions)]
-    self.lenButtons = len(self.buttons)
-    if self.yscroll > self.size[1]*self.lenButtons-self.maxy:
-      self.yscroll = self.size[1]*self.lenButtons-self.maxy
-    if self.size[1]*self.lenButtons < self.maxy:
-      self.yscroll = 0 
-    for button in self.buttons:
-      button.offSetPos = self._offSetPos
-      button.offsetY = self.yscroll
-
-
-  def update(self,things):
-    '''mpos,mb1down,mb1up,wheelState,mb3down'''
-    mpos,mb1down,mb1up,wheelState,mb3down = things
-    if self._rect.collidepoint(mpos):  
-      if not self.pmhover:
-        self.onMouseEnter()
-      self.mhover = 1
-      self.mpos = tuple(mpos)
-      if self.size[1]*self.lenButtons >= self.maxy + self.yscroll and wheelState: #TODO: everything in this if statement can probably be optimized
-        self.yscroll += wheelState * WHEEL_SENSITIVITY
-        if self.yscroll + wheelState * WHEEL_SENSITIVITY > self.size[1]*self.lenButtons-self.maxy:
-          self.yscroll = self.size[1]*self.lenButtons-self.maxy
-        if self.yscroll < 0:
-          self.yscroll = 0
-        for button in self.buttons:
-          button.offsetY = self.yscroll
-          button.update((mpos,mb1down,mb3down,self.empty_list,mb1up))
-      else:
-        for button in self.buttons:
-          button.update((mpos,mb1down,mb3down,self.empty_list,mb1up))
-    else:
-      self.mhover = 0
-      if self.pmhover:
-        self.onMouseExit()
-        for button in self.buttons:
-          button.setToUp()
-    self.pmhover = self.mhover
-
-  def draw(self):
-    for button in self.buttons:
-      #check if needs to be drawn
-      if self.pos[1] + self._offSetPos[1] +button.offsetY> button.y+button._offSetPos[1]+button.ylen:
-        continue
-      if self.pos[1] + self._offSetPos[1]+self.maxy +button.offsetY< button.y+button._offSetPos[1]:
-        continue
-      button.draw()
-
-  def __str__(self) -> str:
-    return self.captions_command()
-    
-class LoadingBar:
-  @classmethod
-  def accepts(cls):
-    return ()
-  def __init__(self,pos,size,background_color,bar_color,border_color):
-    self.pos = pos
-    self.size = size
-    self.background_color = background_color
-    self.bar_color = bar_color
-    self.border_color = border_color
-    self.fullRect = Rect(pos[0]-2,pos[1]-1,size[0]+4,size[1]+2)
-    self.max = 100
-    self.position = 0
-    self.loadedRect = Rect(pos[0],pos[1],self.position*self.size[0]/self.max,self.size[1])
-    self.offSetPos = (0,0)
-
-
-  @property
-  def offSetPos(self):
-    return self._offSetPos
-
-  @offSetPos.setter
-  def offSetPos(self,newVal):
-    self._offSetPos = newVal
-    self.fullRect = Rect(self.pos[0]+newVal[0]-2,self.pos[1]+newVal[1]-1,self.size[0]+4,self.size[1]+2)
-    self.loadedRect = Rect(self.pos[0],self.pos[1],self.position*self.size[0]/self.max,self.size[1])
-
-
-  def update(self,*_):
-    pass
-
-  def setPosition(self,newVal):
-    if not isinstance(newVal,int):
-      raise TypeError("Must be 'int' type")
-    if newVal > 100:
-      raise TypeError("Must not be greater than 100")
-    if newVal < 0:
-      raise TypeError("Must not be less than 0")
-    self.position = newVal
-    self.loadedRect = Rect(self.pos[0]+self._offSetPos[0],self.pos[1]+self._offSetPos[1],self.position*self.size[0]/self.max,self.size[1])
-
-  def draw(self):
-    draw.rect(screen,self.background_color,self.fullRect,0,2)
-    draw.rect(screen,self.bar_color,self.loadedRect,0,2)
-class InputBox:
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ('mpos','mb1down','KDQueue')
-  def __init__(self,pos,size,caption = '',box_color = (100,100,100),max_chars=500,save_function = lambda x:x,restrict_input = None,fontSize = 21):
-    self.pos = pos
-    self.size = size
-    self.font = font.SysFont('Courier New',fontSize)
-    character = self.font.render('H',True,(0,0,0))
-    self.character_x,self.character_y = character.get_size()
-    del character
-    self.active = False
-    self.caption = caption
-    self.box_color = box_color
-    self.max_chars = max_chars
-    self.chars = 0
-    self.text = ''
-    self.textsurface = self.font.render(self.text, True, (0, 0, 0))
-    self.textRect = Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
-    self.max_chars_per_line = self.size[0]//self.character_x
-    self.save_function = save_function
-    self.restrict_input = restrict_input
-    self.offSetPos = (0,0)
-    self.timeactive = 0
-    self.cursor_rect = Rect(0,0,50,10)
-  @property
-  def offSetPos(self):
-    return self._offSetPos
-
-  @offSetPos.setter
-  def offSetPos(self,newPos):
-    self._offSetPos = newPos
-    self.textRect = Rect(self.pos[0]+self.offSetPos[0],self.pos[1]+self.offSetPos[1],self.size[0],self.size[1])
-
-  def set_text(self,new_text:str):
-    assert isinstance(new_text,str), "arg <new_text> must be of type 'str'"
-    '''Sets text and also calls save function on it'''
-    self.chars = len(new_text)
-    self.text = new_text
-    self.save_function(self.text)
-    
-  def set_text_no_save(self,new_text:str) -> None:
-    assert isinstance(new_text,str), "argument <new_text> must be of type <str>"
-    '''Sets Texts witout calling save function on it'''
-    self.chars = len(new_text)
-    self.text = new_text
-  
-  def check_keys(self,key):
-    if self.active and self.restrict_input and key in self.restrict_input:
-      if key == back_unicode:
-        if self.text:  #if self.text has any thing in it  
-          self.text = self.text[:-1]
-          self.chars -= 1
-          self.save_function(self.text)
-          return
-      elif self.chars < self.max_chars: #has not reached max characters yet
-        if key == '\r':
-          self.text += '\n'
-        else:
-          self.text += key
-        self.chars += 1 #previously, self.chars = len(self.text)
-        self.save_function(self.text)
-
-  def update(self,things):
-    '''mpos,mb1down,keys'''
-    mpos,mb1down,keys = things
-    if self.textRect.collidepoint(mpos):
-      if mb1down:
-        self.active = True
-        self.timeactive = time.monotonic()
-    else:
-      if mb1down:
-        self.active = False
-    global inputBoxSelected
-    if self.active:
-      thingy = self.text
-      inputBoxSelected = True
-      for key in keys:
-        self.check_keys(key)
-      if thingy != self.text: #if text has been updated
-        self.timeactive = time.monotonic()
-        self.cursor_rect = Rect(self.pos[0]+ (len(self.text)%self.max_chars_per_line)*self.character_x + self._offSetPos[0]+2,self.pos[1]+(len(self.text)//self.max_chars_per_line)*self.character_y + self._offSetPos[1]+2,3,self.character_y-3)
-    else:
-      inputBoxSelected = False
-      
-  def draw(self): 
-    if not self.text:
-      if self.box_color:
-        draw.rect(screen,self.box_color,self.textRect)
-      self.textsurface = self.font.render(self.caption, True, (100, 100, 100))
-      screen.blit(self.textsurface,(self._offSetPos[0]+self.pos[0],self.pos[1]+self._offSetPos[1]))
-      if self.active and not int(time.monotonic()-self.timeactive) % 2:
-        draw.rect(screen,(0,0,0),self.cursor_rect)
-    else:
-      letters = [letter for letter in self.text]
-      if self.box_color:
-        draw.rect(screen,self.box_color,self.textRect)
-      for char_num, letter in enumerate(letters):
-        self.textsurface = self.font.render(letter, True, (0, 0, 0))
-        letterx = self.pos[0]+(char_num%self.max_chars_per_line)*self.character_x
-        screen.blit(self.textsurface,(letterx+self._offSetPos[0],self.pos[1]+((char_num//self.max_chars_per_line)*self.character_y)+self._offSetPos[1]))
-      if self.active and not int(time.monotonic()-self.timeactive) % 2:
-        draw.rect(screen,(0,0,0),self.cursor_rect)
-
-class RoundButton:
-    @classmethod
-    def accepts(cls) -> tuple:
-      return ('mpos','mb1','mb3down','KDQueue')
-    def __init__(self,pos,radius,OnDownCommand,down_color,up_color,idle_color,surface = Surface((0,0)),textx = 0,texty = 0,rightClickCommand = None,key = None,accepts_mb3:bool = False, downCommand = None, OnUpCommand = None,keyCommand = 'OnDownCommand'):
-      self.pos = pos
-      self.radius = radius
-      self.OnDownCommand = OnDownCommand
-      self.downCommand = downCommand if downCommand else lambda:0
-      self.OnUpCommand = OnUpCommand if OnUpCommand else lambda:0
-      self.down_color = down_color
-      self.up_color = up_color
-      self.down = False
-      self.previous_state = False
-      self.idle_color = idle_color
-      self.text = surface
-      self.textx = textx
-      self.texty = texty
-      self.idle = False
-      self.state = False
-      self.offsetY = 0
-      self.key = key
-      self.accepts_mb3 = accepts_mb3
-      self.rightClickCommand = self.exampleRightClick if rightClickCommand == None else rightClickCommand
-      self.keyCommand = keyCommand
-      self.offSetPos = (0,0)
-
-    def exampleRightClick(self):
-      print("you right clicked a button!!! :)")
-
-    def SetDown(self):
-      if self.down:
-        self.downCommand()
-        return
-      self.down = True
-      self.OnDownCommand()  
-
-    def SetUp(self):
-      if not self.down:
-        return    
-      self.down = False
-      self.OnUpCommand()
-
-    def draw(self):
-        if self.down:
-            gfxdraw.aacircle(screen, self.pos[0]+self.offSetPos[0], self.pos[1]+self.offSetPos[1], self.radius, self.down_color)
-            gfxdraw.filled_circle(screen, self.pos[0]+self.offSetPos[0], self.pos[1]+self.offSetPos[1], self.radius, self.down_color)
-        elif self.idle:
-            gfxdraw.aacircle(screen, self.pos[0]+self.offSetPos[0], self.pos[1]+self.offSetPos[1], self.radius+1, self.idle_color)
-            gfxdraw.filled_circle(screen, self.pos[0]+self.offSetPos[0], self.pos[1]+self.offSetPos[1], self.radius+1, self.idle_color)
-        else:
-            gfxdraw.aacircle(screen, self.pos[0]+self.offSetPos[0], self.pos[1]+self.offSetPos[1], self.radius, self.up_color)
-            gfxdraw.filled_circle(screen, self.pos[0]+self.offSetPos[0], self.pos[1]+self.offSetPos[1], self.radius, self.up_color)
-        if self.text:
-            screen.blit(self.text,(self.pos[0]+self.textx+self.offSetPos[0],self.pos[1]+self.texty+self.offSetPos[1]))
-
-    def update(self,things):
-      mpos,mb1,mb3,keyQueue = things
-      if self.key in keyQueue and ((not inputBoxSelected) or self.key in keysThatIgnoreBoxSelected):
-        self.__dict__[self.keyCommand]()
-      if sqrt((mpos[0]-self.pos[0]-self.offSetPos[0])**2+(mpos[1]-self.pos[1]-self.offSetPos[1])**2) > self.radius:
-        self.idle = False
-      else:
-        self.idle = True
-        if mb1:
-          self.SetDown()
-        else:
-          self.SetUp()
-        if self.accepts_mb3:
-          if mb3:
-            self.rightClickCommand()  
-
-class ButtonSwitch:
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ('mpos','mb1down')
-
-  def __init__(self,pos,size,start_state,state_pics,big_hitbox:bool = False):
-    self.pos = pos
-    self.size = size
-    self.state = start_state
-    self.state_pics = state_pics
-
-  def update(self,things):
-    mpos,mb1 = things
-    if mpos[0] > self.pos[0] and mpos[0] < self.pos[0] + self.size[0]:
-      if mpos[1] > self.pos[1] and mpos[1] < self.pos[1] + self.size[1]:  
-        if mb1:
-          self.state = (self.state + 1) % len(self.state_pics)
-
-  def draw(self):
-    screen.blit(self.state_pics[self.state],self.pos)
-  
-class CheckBox:
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ('mpos','mb1down')
-  __slots__ = ('pos','size','func','_rect','_offSetPos','box_color','font','txt','tpos','_selected','onlyOn')
-  def __init__(self,pos:tuple,size:number,func:Callable,box_color:tuple = (110,110,110),txt:str = '',font = None,tpos = (20,0),onlyOn:bool = False) -> None:
-    self.onlyOn = onlyOn
-    self.pos = pos
-    self.size = (size,size)
-    self.func = func
-    self._rect = Rect(pos,self.size)
-    self._offSetPos = (0,0)
-    self.selected = False
-    self.box_color = box_color
-    if txt:
-      self.font = font
-      if self.font is None:
-        self.font = makeFont('Arial',size)
-      self.txt = self.font.render(txt,True,(0,0,0))
-    else:
-      self.txt = None
-    self.tpos = tpos
-    
-
-  @property
-  def selected(self) -> bool:
-    raise Warning('Should use instead <CheckBox>._selected')
-    return self._selected
-  
-  @selected.setter
-  def selected(self,newVal:bool) -> None:
-    self._selected = newVal
-    if self.onlyOn:
-      if newVal:
-        self.func(newVal)
-    else:
-      self.func(newVal)
-  @property
-  def offSetPos(self) -> tuple:
-    raise Warning('Should use instead <CheckBox>._offSetPos')
-    return self._offSetPos
-  
-  @offSetPos.setter
-  def offSetPos(self,newVal) -> None:
-    self._offSetPos = newVal
-    self._rect = Rect(self.pos[0]+self._offSetPos[0],self.pos[1]+self._offSetPos[1],self.size[0],self.size[1])
-
-
-  def update(self,things) -> None:
-    'mpos,mb1down'
-    mpos, mb1d = things
-    if mb1d and self._rect.collidepoint(mpos):
-      if self.onlyOn:
-        if not self._selected:
-          self.selected = not self._selected
-      else:
-        self.selected = not self._selected
-      
-
-  def draw(self) -> None:
-    draw.rect(screen,self.box_color,self._rect,(not self._selected)*3,3)
-    if self.txt is not None:
-      screen.blit(self.txt,(self.pos[0]+self._offSetPos[0]+self.tpos[0],self.pos[1]+self._offSetPos[1]+self.tpos[1]))
-    
+      raise ValueError("Value not found in valid values")
 
 class KeyBoundFunction:
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ('KDQueue',)
-  
-  __slots__ = ('func','keys','offSetPos')
-  def __init__(self,func:Callable,*keys):
+  __slots__ = 'func','keys','offSetPos'
+  def __init__(self,func:EventHook|Callable[[],Any],*keys:str):
     self.func = func
     self.keys = set(keys)
 
-  def update(self,things) -> None:
-    '''KDQueue'''
-    KDQueue = set(things[0])
+  def update(self,input:Input) -> None:
     #find all keys that we accept, if list is empty return
-    #else if inputboxselected then check if keys that ignore 
-    KDQueue.intersection_update(self.keys)
-    if inputBoxSelected:
-      KDQueue.intersection_update(keysThatIgnoreBoxSelected)
-    if KDQueue:
+    if in_both := self.keys.intersection(input.KDQueue):
+      for key in in_both:
+        input.KDQueue.remove(key)
       self.func()
 
-  def draw(self) -> None:
-    pass
+class Button(DrawBase):
+  rect:Rect
+  def __init__(self,pos:tuple[int,int],size:tuple[int,int],color_scheme:ColorScheme,onDownFunction:EventHook|None=None,onUpFunction:EventHook|None=None):
+    self.rect = Rect(pos,size)
+    self.color_scheme = color_scheme
+    self.onDown = onDownFunction
+    self.onUp = onUpFunction
+    self.state = 0 #0 -> up, 1 -> hover, 2 -> down
 
-class FPS(TextBox):
-  '''Type of <TextBox> which will always display the current fps'''
-  def __init__(self,pos):
-    super().__init__(pos,makeFont('Arial',20,True),'',(255,255,255))
-    self.last_time = time.perf_counter()
-  def update(self,things):
-    this_time = time.perf_counter()
-    self.setText(f'{(1/(this_time-self.last_time)).__trunc__()}')
-    self.last_time = this_time
+  def setToUp(self):
+    if self.state == 2 and self.onUp is not None:
+      self.onUp()
+    self.state = 0
 
-class OnScroll:
-  @classmethod
-  def accepts(cls) -> tuple:
-    return 'wheel',
-
-  def __init__(self,command):
-    self.cmd = command
-
-  def update(self,things):
-    #we know that things[0] is the wheel 
-    if things[0]:
-      self.cmd(things[0])
-    
-  def draw(self):
-    pass
-
-class Button:
-  font.init()
-  default_font = font.SysFont("Arial",20)
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ('mpos','mb1down','mb3down','KDQueue','mb1up')
-  #__slots__ = ('x','y','xlen','ylen','OnDownCommand','OnUpCommand','down_color','up_color','down','previous_state','idle_color','text','textx','texty','idle','state','key','text_color','accepts_mb3','rightClickCommand','keyCommand','_offSetPos','_offsetY','_rect','pidle')
-  def __init__(self,pos,xlen,ylen,OnDownCommand,down_color,up_color,idle_color,text:Surface|str = Surface((0,0)),textx:int = 0,texty:int = 0,rightClickCommand:Callable|None = None,key:str|None = None,accepts_mb3:bool = False, OnUpCommand:Callable|None = None,keyCommand:str = 'OnDownCommand',text_color:tuple = (0,0,0)):
-    self.x = pos[0]
-    self.y = pos[1]
-    self.xlen = xlen
-    self.ylen = ylen
-    self.OnDownCommand = OnDownCommand
-    self.OnUpCommand = OnUpCommand if OnUpCommand else lambda:0
-    self.down_color = down_color
-    self.up_color = up_color
-    self.down = False
-    self.previous_state = False
-    self.idle_color = idle_color
-    self.text_color = text_color
-    if isinstance(text,str):
-      self.text = self.default_font.render(text,True,self.text_color)
+  def update(self,input:Input):
+    if self.rect.collidepoint(input.mpos):
+      if self.state == 0:
+        self.state = 1
+      if input.mb1d == 1:
+        self.state = 2
+        if input.mb1d and self.onDown is not None:
+          self.onDown()
     else:
-      self.text = text
-    self.textx = textx
-    self.texty = texty
-    self.idle = False
-    self.state = False
-    self.key = key
-    self.accepts_mb3 = accepts_mb3
-    self.rightClickCommand = rightClickCommand if rightClickCommand is not None else lambda:None
-    self.keyCommand = keyCommand
-    self._offSetPos = (0,0)
-    self._offsetY = 0
-    self.offSetPos = (0,0)
-    self.offsetY = 0
-    self.pidle = 0
-    self._rect = Rect(self.x,self.y,self.xlen,self.ylen)
-   
+      if self.state == 1:
+        self.state = 0
+  
+    if self.state == 2:
+      if input.mb1u:
+        self.state = 1
+        if self.onUp is not None:
+          self.onUp() 
+
+  def draw(self,surf:Surface):
+    cs = self.color_scheme
+    color = [cs.getInactive,cs.getIdle,cs.getActive][self.state]() #TODO find out if its worth it to cache the results instead of calling them everytime
+    draw.rect(surf,color,self.rect)
+
+class SelectionBase(Button):
+  def __init__(self,pos:tuple[int,int],size:tuple[int,int],color_scheme:ColorScheme,onDown:EventHook|None = None,onUp:EventHook|None = None) -> None:
+    self.pos = pos
+    super().__init__(pos,size,color_scheme,onDown,onUp)
+    self.setYOffset(0)  
+
+  def onYOffsetChangeHook(self,offsetY:int): ...
+  def getYOffSet(self) -> int: return self.yoffset
+
+  def setYOffset(self,y:int): 
+    self.yoffset = y
+    self.rect.top = self.pos[1] - y
+    self.onYOffsetChangeHook(y)
+
+class Selection(DrawBase):
+  def __init__(self,pos:tuple[int,int],selectionSize:tuple[int,int],max_y:int,color_scheme:ColorScheme,dataGetter:Callable[[],Iterable[T]],buttonFactory:Callable[[tuple[int,int],tuple[int,int],ColorScheme,T],SelectionProtocol]=SelectionBase,spacing:float = 1):
+    self.rect = Rect(pos,(selectionSize[0],max_y))
+    self.selectionSize = selectionSize
+    self.max_y = max_y
+    self.buttonFactory = buttonFactory
+    self.dataGetter = dataGetter
+    self.selection:list[SelectionProtocol] = []
+    self.y_scroll_real:int = 0
+    self.y_scroll_target:int = 0 
+    self.aligned_y = True
+    self.mhover = False
+    self.color_scheme = color_scheme
+    self.spacing = spacing
+    self.size_change_event:Event[[]] = Event()
+    self.surf = Surface(self.rect.size,const.SRCALPHA)
+    self.pwheel = 0
+    self.recalculateSelection()
+    
+  def recalculateSelection(self):
+    self.selection = [self.buttonFactory((0,(self.selectionSize[1]*i*self.spacing).__trunc__()),self.selectionSize,self.color_scheme,d) for i,d in enumerate(self.dataGetter())]
+    self.size_change_event.fire()
+    
+    if self.fullHeight < self.max_y:
+      self.setYScroll(0)
+    elif self.fullHeight + self.y_scroll_real < self.max_y:
+      self.setYScroll(self.fullHeight-self.max_y)
+    else:
+      for s in self.selection:
+        s.setYOffset(self.y_scroll_real)
+  def resize(self,newPos:tuple[int,int],newSelectionSize:tuple[int,int],new_max_y:int):
+    self.rect.topleft = newPos
+    self.rect.width = newSelectionSize[0]
+    self.rect.height = new_max_y
+    self.selectionSize = newSelectionSize
+    self.max_y = new_max_y
+    self.recalculateSelection()
+    self.setYScroll(self.y_scroll_real)
+
+  def onResize(self,size:tuple[int,int]):
+    self.max_y = self.rect.height
+    self.selectionSize = (self.rect.width,self.selectionSize[1])
+    self.recalculateSelection()
+    if self.fullHeight < self.max_y:
+      self.y_scroll_real = 0
+    elif self.y_scroll_real > self.fullHeight - self.max_y:
+     self.y_scroll_real = self.fullHeight - self.max_y  
+    self.setYScroll(self.y_scroll_real)
+    # print('new Size!',self.rect.size)
+    if self.rect.size != self.surf.get_size():
+      self.surf = Surface(self.rect.size,const.SRCALPHA)
+
   @property
-  def offSetPos(self):
-    return self._offSetPos
-  
-  @property
-  def offsetY(self):
-    return self._offsetY
-  
-  @offsetY.setter
-  def offsetY(self,newVal):
-    self._offsetY = newVal
-    self._rect = Rect(self.x+self.offSetPos[0],self.y+self.offSetPos[1]-self.offsetY,self.xlen,self.ylen)
-    self.textpos = (self.x+self.textx + self.offSetPos[0],self.y + self.texty + self.offSetPos[1] - newVal)
+  def fullHeight(self):
+    return (len(self.selection) * self.selectionSize[1] * self.spacing).__trunc__()
 
-  @offSetPos.setter
-  def offSetPos(self,newVal):
-    self._offSetPos = newVal
-    self._rect = Rect(self.x+newVal[0],self.y+newVal[1]-self.offsetY,self.xlen,self.ylen)
-    self.textpos = (self.x+self.textx + self._offSetPos[0],self.y + self.texty + self._offSetPos[1] - self._offsetY)
-  def onMouseEnter(self):
-    #function to be overwritten for extra functionality
-    pass
-  def onMouseExit(self):
-    #function to be overwritten for extra functionality
-    pass
+  def getScrollPercent(self):
+    fullHeight = self.fullHeight
+    usableHieght = self.max_y
+    if usableHieght > fullHeight:
+      return 1.0
+    return self.y_scroll_real / (fullHeight - usableHieght)
 
-  def draw(self) -> None:
-    global screen
-    if self.down:
-      draw.rect(screen, self.down_color, self._rect)
-    elif self.idle:
-      draw.rect(screen, self.idle_color, self._rect)
+  def setScrollPercent(self,percent:float):
+    fullHeight = self.fullHeight
+    usableHieght = self.max_y
+    if usableHieght <= fullHeight:
+      self.setYScroll((percent *(fullHeight - usableHieght)).__round__())
+
+  def setYScroll(self,y:int):
+    self.aligned_y = False
+    self.y_scroll_real = self.y_scroll_target = y
+    for s in self.selection:
+      s.setYOffset(self.y_scroll_real)
+
+  def update(self,input:Input):
+    mpos,wheel = input.mpos,input.wheel
+    if self.rect.collidepoint(mpos):  
+      self.mhover = True      
+      if wheel and self.fullHeight > self.max_y:
+        w = (wheel + self.pwheel.__trunc__()) * WHEEL_SENSITIVITY
+        self.y_scroll_target += w
+        if self.y_scroll_target > self.fullHeight - self.max_y:
+          self.y_scroll_target = self.fullHeight - self.max_y
+        elif self.y_scroll_target < 0: self.y_scroll_target = 0
+        self.aligned_y = False
+      input.mousex -= self.rect.left
+      input.mousey -= self.rect.top
+      for i,button in enumerate(self.selection):
+        top = (i*self.selectionSize[1]*self.spacing).__trunc__() - self.y_scroll_real
+        bottom = top + self.selectionSize[1]
+        if bottom < 0 or top > self.max_y: continue
+        button.update(input)
+      input.mousex += self.rect.left
+      input.mousey += self.rect.top
     else:
-      draw.rect(screen, self.up_color, self._rect)
-    screen.blit(self.text,self.textpos)  
-  def setToUp(self) -> None:
-    self.idle = False
-    self.down = False
-
-  def update(self,things) -> None:
-    '''mpos,mb1down,mb3down,KDQueue,mb1up'''
-    mpos,mb1down, mb3,keyQueue,mb1up = things
-
-    if keyQueue and self.key:
-      if self.key in keyQueue and ((not inputBoxSelected) or self.key in keysThatIgnoreBoxSelected):
-        self.__dict__[self.keyCommand]()
-    if self._rect.collidepoint(mpos):
-      if not self.pidle:
-        self.onMouseEnter()
-      self.idle = True
-      if mb1down:
-        self.OnDownCommand()
-        self.down = True
-      elif self.down and mb1up: #if we are down and just released mouse
-        self.OnUpCommand()
-        self.down = False
-
-      if self.accepts_mb3 and mb3:
-        self.rightClickCommand()
-    elif self.pidle:
-      self.idle = False
-      self.down = False
-      self.onMouseExit()
-    self.pidle = self.idle
-
-class MiniWindow:
-  def __init__(self,name,pos,size,color =(70,70,70),exit_command:Callable = lambda:1,force_focus:bool = True):
-    self._offset = tuple(pos)
-    self._size = tuple(size)
-    if self._size[1] < 100: raise TypeError("Cannot Make A MiniWindow that small")
-    self._background_color = color
-    self._rect = Rect(self._offset[0],self._offset[1],self._size[0],self._size[1])
-    self._top_rect = Rect(self._offset[0],self._offset[1],self._size[0],25) 
-    self._force_focus = force_focus
-    self._mpos = (0,0)
-    self._pmpos = (0,0)
-    self.window_caption = TextBox((5,5),font.SysFont('Arial',15),name,(0,0,0))
-    self.onStart = lambda:None
-    self.exit_button = Button((size[0]-30,0),30,25,lambda:1,(255,100,100),(210,210,210),(255,10,10),'',7,4,OnUpCommand=exit_command)
-
-  def __setattr__(self, __name: str, __value) -> None:
-    if __name not in {'_offset','_background_color','_size','_rect','_top_rect','_force_focus','_pmpos','_mpos','onStart'}:
-      self.__dict__[__name] = __value
-      self.__dict__[__name].offSetPos = self._offset
-    else:
-      self.__dict__[__name] = __value
-
-
-  def ChangeObjsOffset(self,newOffset,newSize) -> None:
-    self._offset = tuple(newOffset)
-    self._size = tuple(newSize)
-    for obj in self.__dict__:
-      if obj not in {'_offset','_background_color','_size','_rect','_top_rect','_force_focus','_pmpos','_mpos','onStart'}:
-        self.__dict__[obj].offSetPos = tuple(newOffset)
-    self._rect = Rect(self._offset[0],self._offset[1],self._size[0],self._size[1])
-
-  def move(self,newOffset):
-    self._offset = (self._offset[0]+ newOffset[0],self._offset[1]+newOffset[1])
-    for obj in self.__dict__:
-      if obj not in {'_offset','_background_color','_size','_rect','_top_rect','_force_focus','_pmpos','_mpos','onStart'}:
-        self.__dict__[obj].offSetPos = self._offset
-    self._rect.move_ip(newOffset)
-    self._top_rect.move_ip(newOffset)
-
-  def update(self,myInput:Input):
-    if not self._force_focus:
-      self._mpos = myInput.mpos
-      if self._top_rect.collidepoint(self._mpos) or self._top_rect.collidepoint(self._pmpos):
-        if myInput.mb1:
-          self.move((self._mpos[0]-self._pmpos[0],self._mpos[1]-self._pmpos[1]))
-      self._pmpos = self._mpos
-
-    for object in self.__dict__:
-      if object not in {'_offset','_background_color','_size','_rect','_top_rect','_force_focus','_pmpos','_mpos','onStart'}:
-        #objInput = [myInput.__getattr__(acceptableInput) for acceptableInput in self.__dict__[object].accepts()]
-        self.__dict__[object].update(myInput.get_all(self.__dict__[object].accepts()))
-
-  def draw(self):
-    draw.rect(screen,self._background_color,self._rect)
-    draw.rect(screen,(210,210,210),self._top_rect)
-    top_x = (self._offset[0]+self._size[0]-23)
-    top_y = (self._offset[1]+5)
-    bottom_x = (self._offset[0]+self._size[0]-8)
-    bottom_y = (self._offset[1]+20)
-    for drawThing in self.__dict__:
-      if drawThing not in ('_offset','_background_color','_size','_rect','_top_rect','_force_focus','_pmpos','_mpos','onStart'):
-        self.__dict__[drawThing].draw()
-    draw.line(screen,(0,0,0),(top_x,top_y),(bottom_x,bottom_y),2)
-    draw.line(screen,(0,0,0),(top_x,bottom_y),(bottom_x,top_y),2)
-    
-
-class Empty:
-  @classmethod
-  def accepts(cls) -> tuple:
-    return ()
-  def __init__(self):
-    pass
-
-  def update(self,_):
-    pass
-
-  def draw(self,_):
-    pass
-
-class Stopwatch:
-  def __init__(self,function = time.time):
-    self.startTime = None
-    self.extraTime = 0
-    self.paused = False
-    self.measurement = function
-
-  def running(self):
-    if self.startTime:
-      return True
-    else:
-      return False
-    
-  def start(self):
-    self.startTime = self.measurement()
-
-  def stop(self):
-    time = self.timeElapsed()
-    self.paused = 0
-    self.startTime = None
-    self.extraTime = 0
-    return time
-
-  def timeElapsed(self):
-    if not self.paused:
-      return self.measurement() - self.startTime + self.extraTime
-    elif self.paused:
-      return self.extraTime
-    
-  def setTime(self,newVal):
-    if not self.paused:
-      self.startTime = self.measurement() - newVal
-      self.extraTime = 0
-    elif self.paused:
-      self.extraTime = newVal
-
-  def pause(self):
-    if not self.paused:
-      self.extraTime += self.measurement() - self.startTime
-      self.paused = True
-
-  def unpause(self):
-    if self.paused:
-      self.startTime = self.measurement()
-      self.paused = False
-  
-  def reset(self):
-    self.startTime, self.extraTime = self.measurement(), 0
-  time = timeElapsed
-
-
-
-##########################
-class Main_Space:
-    @classmethod
-    def accepts(cls) -> tuple:
-      return ()
-    def __init__(self):
-        pass
-
-    def update(self,*_):
-        pass
-
-    def draw(self,*_):
-        pass
-    
-    def onQuit(self):
-        pass
-
-class Border:
-    _draw_need:int
-    _rect:Rect
-    def __init__(self):
-        pass
-
-    def update(self):
-        pass
-
-    def draw(self):
-        pass
-
-class Window_Space:
-    #TODO optimize the draw method for MS and borders so that in the first_update they get a list of what everything they need to do and then they store it to not call <obj>.accepts() each frame
-    '''def __new__(cls): 
-      if not hasattr(cls, 'instance'):
-        cls.instance = super(Window_Space, cls).__new__(cls)
-      return cls.instance'''
-    def __init__(self):
-      self._background_color = (0,0,0)
-      self._mainSpaces = []
-      self._mainSpace = None
-      self._activeMainSpace = 0
-      self._mainSpacePos = [0,0]
-      self._mainSpaceSize = [WIDTH,HEIGHT]
-      self._borders:dict[str,None|Border] = {"top":None,"bottom":None,"left":None,"right":None}  
-      self._miniWindows = {}     
-      self._debug = Main_Space()
-      self._miniwindowactive = False
-      self._drawRects = []
-      self._rect = Rect(0,0,WIDTH,HEIGHT)
-      self._msRect = self._rect
-      self._mpos = (0,0)
-      self._pmpos = (0,0)
-      self._activeMiniWindow:MiniWindow
+      if self.mhover:
+        for s in self.selection:
+          s.setToUp()
+        self.mhover = False
+      if input.mb1d or input.mb1u or input.mb3u or input.mb3d:
+        mx,my = input.mpos
+        input.mousex = -999
+        input.mousey = -999
+        for button in self.selection:
+          button.update(input)
+        input.mousey = my
+        input.mousex = mx
       
+    if not self.aligned_y:
+      self.y_scroll_real = (self.y_scroll_real + (self.y_scroll_target - self.y_scroll_real) * min(1/6,1)).__round__()        
+      if (self.y_scroll_real - self.y_scroll_target).__abs__() < 2:
+        self.y_scroll_real = self.y_scroll_target
+        self.aligned_y = True
+      for s in self.selection:
+        s.setYOffset(self.y_scroll_real)
+    self.pwheel = self.pwheel + wheel * 0.5 if wheel else 0
+
+  def draw(self,surf:Surface):
+    surf2 = surf.subsurface(self.rect)
+    for i,s in enumerate(self.selection):
+      top = (i*self.selectionSize[1]*self.spacing).__trunc__() - self.y_scroll_real
+      bottom = top + self.selectionSize[1]
+      if bottom < 0 or top > self.max_y: continue
+      s.draw(surf2)
+    # surf.blit(self.surf,self.rect)
+
+class Scrollbar(DrawBase):
+  def __init__(self,pos:tuple[int,int],size:tuple[int,int],scrollbar_size:int,color_layout:ColorLayout) -> None:
+    self.pos = pos
+    self.scroll_size = scrollbar_size
+    self.usable_size = size[1]-scrollbar_size
+    self.rect = Rect(pos,size)
+    self.color_layout = color_layout
+
+    self.mouse_down_offset = 0
+    self.x = 0
+    self._drag_rect = Rect(self.pos[0],self.pos[1],size[0],scrollbar_size)
+
+    self.state:Literal["Dragging",'Hover Scroll','Hover','Off'] = 'Off'
+    self.linked_dropdown:Optional[SelectionLike] = None
+    self.hiding = False
+
+  def onResize(self,size:tuple[int,int]):
+    if self.linked_dropdown:
+      self.adjustSize()
+
+  def linkToDropdown(self,dropdown:SelectionLike, auto_adjust = True):
+    self.linked_dropdown = dropdown
+    if auto_adjust:
+      dropdown.size_change_event.register(self.adjustSize)
+      self.adjustSize()
+    return self
   
-
-    def addMiniWindow(self,name:str,pos:tuple,size:tuple,bg_color=None,exit_command:Callable|None=None,force_focus:bool = True) -> None:
-      if bg_color == None:
-        bg_color = (70,70,70)
-      if exit_command == None:
-        exit_command = self.deactivateMiniWindow
-      self._miniWindows[name] = MiniWindow(name,pos,size,bg_color,exit_command,force_focus)
-    def activateMiniWindow(self,name,passFunc:bool = False) -> None|Callable:
-      if passFunc: return lambda :self.activateMiniWindow(name)
-      assert name in self._miniWindows.keys(), "That miniwindow does not exist"
-      #if not name in self._miniWindows.keys(): raise TypeError('That miniwindow does not exist')
-      if self._activeMiniWindow is not self._miniWindows[name]:
-        assert not self._miniwindowactive, 'Only one MiniWindow can be active at a time'
-      #if self._miniwindowactive: raise TypeError('Only one MiniWindow can be active at a time')
-      self.miniWindow(name).onStart()
-      self._miniwindowactive = True
-      self._activeMiniWindow = self._miniWindows[name]
-    def deactivateMiniWindow(self) -> None:
-      self._miniwindowactive = False
-      self._activeMiniWindow = None #type: ignore
-      self._currentMS = self.mainSpace
-      self.first_draw()
-    def miniWindow(self,name) -> MiniWindow:
-      return self._miniWindows[name]
-    @property
-    def top(self) -> Border|None: return self._borders['top']
-    @property
-    def left(self) -> Border|None: return self._borders['left']
-    @property
-    def right(self) -> Border|None: return self._borders['right']
-    @property 
-    def bottom(self) -> Border|None: return self._borders['bottom']
-    @property
-    def mainSpace(self):
-      t = self._mainSpaces[self._activeMainSpace]
-      assert isinstance(t,ScrollingMS)
-      return t
-    @property
-    def MSSize(self) -> tuple:
-      return self._mainSpaceSize
-    @property
-    def MSPos(self) -> tuple:
-      return self._mainSpacePos
-    def drawBorder(self,borderName):
-      assert borderName in self._borders.keys(), f'Border named :{borderName} does not exist'
-      border = self._borders[borderName]
-      border.draw()
-
-    @property
-    def activeMainSpace(self) -> int:
-      return self._activeMainSpace
-    
-    def getMainSpace(self,num:int) -> Main_Space:
-      return self._mainSpaces[num]
-    
-    def drawMS(self) -> None:
-      '''Draw Active Main Space'''
-      self._mainSpaces[self._activeMainSpace].draw()
-    
-    def deleteMainSpace(self,num:int) -> None:
-      del self._mainSpaces[num]
-      if self._activeMainSpace == len(self._mainSpaces):
-        self._activeMainSpace -= 1
-        self._currentMS = self._mainSpaces[self._activeMainSpace]
-        self._currentMS.draw()
-        
-    @property
-    def leftSize(self) -> int:
-      try:
-        return self._borders['left']._size[0]
-      except AttributeError:
-        return 0
-    @property
-    def topSize(self) -> int:
-      try:
-        return self._borders['top']._size[1]
-      except AttributeError:
-        return 0
-    @property
-    def rightSize(self) -> int:
-      try:
-        return self._borders['right']._size[0]
-      except AttributeError:
-        return 0
-    @property
-    def bottomSize(self) -> int:
-      try:
-        return self._borders['bottom']._size[1]
-      except AttributeError:
-        return 0 
-    @mainSpace.setter
-    def mainSpace(self, newVal:int | Main_Space) -> None:
-      if isinstance(newVal,int):
-        self._activeMainSpace = newVal
-        self._currentMS = self._mainSpaces[newVal]
-      elif isinstance(newVal,ScrollingMS):
-        self._mainSpaces.append(newVal)
-        self._activeMainSpace = len(self._mainSpaces)-1
-        self._currentMS = self._mainSpaces[-1]
-      else:
-        return
-      self._update_mainspace()
-      #self._currentMS.draw()
-      #display.update(self._msRect)
-
-    def addMainSpace(self,newMS:Main_Space) -> None:
-      self._mainSpaces.append(newMS)
-      self._update_mainspace()
-
-    def addDebugInfo(self,impact:int = 30) -> None:
-      '''impact is how much you want the debug impact the current performance.
-      the lower 'impact' is the higher the actual impact, impact > 0'''
-      self._debug = Debug(performanceImpact=impact)
-    
-    def setActiveMainSpace(self,newVal:int) -> None:
-      self._activeMainSpace = newVal
-      self._currentMS = self._mainSpaces[newVal]
-      self._currentMS.draw()
-    
-    def emptyMainSpace(self,num:int) -> None:
-      for var in self._mainSpaces[num].__dict__:
-        if var not in self._mainSpaces[num]._defaults:
-          del self._mainSpaces[num].__dict__[var]
-
-    @property
-    def background_color(self) -> tuple:
-      return self._background_color
-
-    @background_color.setter
-    def background_color(self,newColor) -> None:
-      if not isinstance(newColor,tuple):
-        raise TypeError("Has to be a tuple!")
-      if len(newColor) != 3:
-        raise TypeError("Color assignment is (R,G,B) (no A)!")
-      for color in newColor:
-        if not (0<= color <= 255):
-          raise TypeError("Color range is not within bounds!")
-      self._background_color = newColor
-
-    def addBorder(self,direction:str,sizeintoMid,color,draw_need = 1,border_border_color:tuple = (0,0,0),border_border_width:int = 0) -> None:
-      if direction == 'top':
-        self._borders['top'] = Top_Border(color,draw_need,border_border_color,border_border_width)
-        self._borders['top'].setSizeAndPos(self._borders,sizeintoMid)
-        self._mainSpacePos[1] = sizeintoMid
-        self._mainSpaceSize[1] -= sizeintoMid
-        self._update_mainspace()
-      elif direction == 'bottom':
-        self._borders['bottom'] = Bottom_Border(color,draw_need,border_border_color,border_border_width)
-        self._borders['bottom'].setSizeAndPos(self._borders,sizeintoMid)
-        self._mainSpaceSize[1] -= sizeintoMid
-        self._update_mainspace()
-      elif direction == 'left':
-        self._borders['left'] = Left_Border(color,draw_need,border_border_color,border_border_width)
-        self._borders['left'].setSizeAndPos(self._borders,sizeintoMid)
-        self._mainSpacePos[0] = sizeintoMid
-        self._mainSpaceSize[0] -= sizeintoMid
-        self._update_mainspace()
-      elif direction == 'right':
-        self._borders['right'] = Right_Border(color,draw_need,border_border_color,border_border_width)
-        self._borders['right'].setSizeAndPos(self._borders,sizeintoMid)
-        self._mainSpaceSize[0] -= sizeintoMid
-        self._update_mainspace()
-
-    def update_mainspace(self,num) -> None:
-      '''draw specific mainspace'''
-      self._mainSpaces[num].draw()
-
-    def _update_mainspace(self) -> None:
-      self._msRect = Rect(self._mainSpacePos[0],self._mainSpacePos[1],self._mainSpaceSize[0],self._mainSpaceSize[1])
-      for mainSpace in self._mainSpaces:
-        mainSpace.ChangeObjsOffset(self._mainSpacePos,self._mainSpaceSize)
-        
-    def initiate(self):
-      self.first_update()
-      self.first_draw()
-
-    def first_update(self) -> None:
-      self._live_borders = tuple([x for x in self._borders.values() if x != None])
-
-    def update(self,input:Input) -> None:
-      self._mpos = input.mpos
-      if not self._miniwindowactive:
-        self.mainSpace.update(input)
-        for border in self._live_borders: #type: ignore
-          border:Top_Border #just an example to help autocorrect
-          border.update(input)
-
-      elif not self._activeMiniWindow._force_focus:  #miniwindow active, but not forced focus 
-        if self._activeMiniWindow._rect.collidepoint(self._mpos) or self._activeMiniWindow._rect.collidepoint(self._pmpos):
-          self._activeMiniWindow.update(input)
-        else:
-          self.mainSpace.update(input)
-          for border in self._live_borders: #type: ignore
-            border:Top_Border #just an example to help autocorrect
-            border.update(input)
-      else:
-        self._activeMiniWindow.update(input)
-      self._pmpos = self._mpos
-      self._debug.update()
-
-
-    def first_draw(self) -> None:
-      self.mainSpace.draw()
-      for border in self._borders.values():
-        if border != None:
-          border.draw()
-      
-      #arrange borders by draw_need so that self.draw() can draw them
-      self._draw_when_needed_borders = tuple([border for border in self._borders.values() if border != None and border._draw_need == 1])
-      self._need_to_draw_borders =  tuple([border for border in self._borders.values() if border != None and border._draw_need == 2])
-
-    def draw(self) -> None:
-      if not self._miniwindowactive:   
-        screen.fill(self.background_color)
-        self._currentMS:ScrollingMS
-        if self._currentMS._draw_need == 1 and self._msRect.collidepoint(self._mpos):
-          self._currentMS.draw()
-        else:
-          for border in self._draw_when_needed_borders:
-            if border._rect.collidepoint(self._mpos):
-              border.draw()
-              break #break cause further checking is useless cause we know that mpos can only collide with one rect
-        if self._currentMS._draw_need == 2:
-          self._currentMS.draw()
-        for border in self._need_to_draw_borders:
-          border.draw()
-
-      elif not self._activeMiniWindow._force_focus:
-        screen.fill(self.background_color)
-        self._currentMS.draw()
-        for border in self._live_borders:
-          border.draw()
-        self._activeMiniWindow.draw()
-
-      else: 
-        self._activeMiniWindow.draw()
-      self._debug.draw()      
-
-    def onQuit(self) -> None:
-      self._debug.onQuit()
-
-class Top_Border(Border):
-    def __init__(self,color,draw_need,border_color:tuple = (0,0,0),border_width:int = 0):
-      self._color = color
-      self._pos:tuple
-      self._size:tuple
-      self._rect:Rect
-      self._draw_need = draw_need
-      self._active = 0
-      self._pactive = 0
-      self._border_color = border_color
-      self._border_width = border_width
-      self._border_exists = 1 if border_width else 0
-
-    def __setattr__(self, __name: str, __value) -> None:
-      if __name[0] == '_':
-        self.__dict__[__name] = __value
-      else:
-        self.__dict__[__name] = __value
-        self.__dict__[__name].offSetPos = self._pos
-
-    def setSizeAndPos(self, existingBorders:dict,ylen):
-      if existingBorders['left'] == None:
-        self._pos = (0,0) 
-      else:
-        self._pos = (existingBorders['left']._size[0],0)
-      if existingBorders['right'] == None:
-        self._size = (WIDTH-self._pos[0],ylen)
-      else:
-        self._size = (WIDTH-self._pos[0]-existingBorders['right']._size[0],ylen)
-      self._rect = Rect(self._pos[0],self._pos[1],self._size[0],self._size[1])
-
-    def onMouseEnter(self):
-      pass
-    def onMouseExit(self):
-      pass
-
-    def update(self,myInput:Input):
-      if self._rect.collidepoint(myInput.mpos):
-        self._active = 1
-      else:
-        self._active = 0
-      if self._active and not self._pactive:
-        self.onMouseEnter()
-      elif not self._active and self._pactive:
-        draw.rect(screen,self._color,self._rect)
-        self.onMouseExit()
-        if not self._draw_need: return
-        for object in self.__dict__:
-          if object[0] != '_':
-            obj = self.__dict__[object]
-            if isinstance(obj,Button):
-              obj.setToUp()
-            obj.draw()
-        if self._border_exists:
-          draw.rect(screen,self._border_color,self._rect,self._border_width)
-      for object in self.__dict__:
-        if object[0] != '_':
-          #objInput = [myInput.__getattr__(acceptableInput) for acceptableInput in self.__dict__[object].accepts()]
-          self.__dict__[object].update(myInput.get_all(self.__dict__[object].accepts()))
-      self._pactive = self._active
-
-    def draw(self):
-      draw.rect(screen,self._color,self._rect)
-      for object in self.__dict__:
-        if object[0] != '_':
-          self.__dict__[object].draw()
-      if self._border_exists:
-        draw.rect(screen,self._border_color,self._rect,self._border_width)
-
-class Left_Border(Border):
-    def __init__(self,color,draw_need,border_color:tuple = (0,0,0),border_width:int = 0):
-      self._pos = (0,0)
-      self._color = color
-      self._draw_need = draw_need
-      self._active = 0
-      self._pactive = 0
-      self._border_color = border_color
-      self._border_width = border_width
-      self._border_exists = 1 if border_width else 0
-
-    def __setattr__(self, __name: str, __value) -> None:
-      if __name[0] != '_':
-        self.__dict__[__name] = __value
-        self.__dict__[__name].offSetPos = self._pos
-      else:
-        self.__dict__[__name] = __value
-
-    def onMouseEnter(self):
-      pass
-    def onMouseExit(self):
-      pass
-    def setSizeAndPos(self, existingBorders:dict,xlen):
-      if existingBorders['top'] == None:
-        self._pos = (0,0)
-      else:
-        self._pos = (0,existingBorders['top']._size[1])
-      if existingBorders['bottom'] == None:
-        self._size = (xlen,HEIGHT-self._pos[1])
-      else:
-        self._size = (xlen,HEIGHT-self._pos[1]-existingBorders['bottom']._size[1])
-      self._rect = Rect(self._pos[0],self._pos[1],self._size[0],self._size[1])
-
-    def update(self,myInput:Input):
-      if self._rect.collidepoint(myInput.mpos):
-        self._active = 1
-      else:
-        self._active = 0
-      if self._active and not self._pactive:
-        self.onMouseEnter()
-      elif not self._active and self._pactive:
-        self.onMouseExit()
-        if not self._draw_need: return
-        draw.rect(screen,self._color,self._rect)
-        for object in self.__dict__:
-          if object[0] != '_':
-            obj = self.__dict__[object]
-            if isinstance(obj,Button):
-              obj.setToUp()
-              obj.draw()
-            elif isinstance(obj,Dropdown):
-              obj.setAllToUp()
-              obj.draw()
-            else:
-              obj.draw()
-        if self._border_exists:
-          draw.rect(screen,self._border_color,self._rect,self._border_width)
-      for object in self.__dict__:
-        if object[0] != '_':
-          #objInput = [myInput.__getattr__(acceptableInput) for acceptableInput in self.__dict__[object].accepts()]
-          self.__dict__[object].update(myInput.get_all(self.__dict__[object].accepts()))
-      self._pactive = self._active
-
-    def draw(self):
-      draw.rect(screen,self._color,self._rect)
-      for obj in self.__dict__:
-        if obj[0] != '_':
-          self.__dict__[obj].draw()
-      if self._border_exists:
-        draw.rect(screen,self._border_color,self._rect,self._border_width)
-
-class Right_Border(Border):
-    def __init__(self,color,draw_need,border_color:tuple = (0,0,0),border_width:int = 0):
-      self._color = color
-      self._pos: tuple
-      self._size: tuple
-      self._rect: Rect
-      self._draw_need = draw_need
-      self._active = 0
-      self._pactive = 0
-      self._border_color = border_color
-      self._border_width = border_width
-      self._border_exists = 1 if border_width else 0
-
-    def __setattr__(self, __name: str, __value) -> None:
-      if __name[0] == '_':
-        self.__dict__[__name] = __value
-      else:
-        self.__dict__[__name] = __value
-        self.__dict__[__name].offSetPos = self._pos
-
-    def setSizeAndPos(self, existingBorders:dict,xlen):
-      if existingBorders['top'] == None:
-        self._pos = (WIDTH-xlen,0) 
-      else:
-        self._pos = (WIDTH-xlen,existingBorders['top']._size[1])
-      if existingBorders['bottom'] == None:
-        self._size = (WIDTH-self._pos[0],HEIGHT-self._pos[1])
-      else:
-        self._size = (WIDTH-self._pos[0],HEIGHT-self._pos[1]-existingBorders['bottom']._size[1])
-      self._rect = Rect(self._pos[0],self._pos[1],self._size[0],self._size[1])
-
-    def onMouseEnter(self):
-      pass
-    def onMouseExit(self):
-      pass
-
-    def update(self,myInput:Input):
-      if self._rect.collidepoint(myInput.mpos):
-        self._active = 1
-      else:
-        self._active = 0
-      if self._active and not self._pactive:
-        self.onMouseEnter()
-      elif not self._active and self._pactive:
-        draw.rect(screen,self._color,self._rect)
-        self.onMouseExit()
-        if not self._draw_need: return
-        for object in self.__dict__:
-          if object[0] != '_':
-            obj = self.__dict__[object]
-            if isinstance(obj,Button):
-              obj.setToUp()
-            obj.draw()
-        if self._border_exists:
-          draw.rect(screen,self._border_color,self._rect,self._border_width)
-      for object in self.__dict__:
-        if object[0] != '_':
-          #objInput = [myInput.__getattr__(acceptableInput) for acceptableInput in self.__dict__[object].accepts()]
-          self.__dict__[object].update(myInput.get_all(self.__dict__[object].accepts()))
-      self._pactive = self._active
-
-    def draw(self):
-      draw.rect(screen,self._color,self._rect)
-      for object in self.__dict__:
-        if object[0] != '_':
-          self.__dict__[object].draw()
-      if self._border_exists:
-        draw.rect(screen,self._border_color,self._rect,self._border_width)
-
-class Bottom_Border(Border):
-    def __init__(self,color,draw_need,border_color:tuple = (0,0,0),border_width:int = 0):
-      self._pos = (0,0)
-      self._size = (0,0)
-      self._color = color
-      self._draw_need = draw_need
-      self._active = 0
-      self._pactive = 0
-      self._border_color = border_color
-      self._border_width = border_width
-      self._border_exists = 1 if border_width else 0
-
-    def __setattr__(self, __name: str, __value) -> None:
-      if __name[0] == '_':
-        self.__dict__[__name] = __value
-      else:
-        self.__dict__[__name] = __value
-        self.__dict__[__name].offSetPos = self._pos
-
-    def setSizeAndPos(self, existingBorders:dict,ylen):
-      if existingBorders['left'] == None:
-        self._pos = (0,HEIGHT-ylen) 
-      else:
-        self._pos = (existingBorders['left']._size[0],HEIGHT-ylen)
-      if existingBorders['right'] == None:
-        self._size = (WIDTH-self._pos[0],ylen)
-      else:
-        self._size = (WIDTH-self._pos[0]-existingBorders['right']._size[0],ylen)
-      self._rect = Rect(self._pos[0],self._pos[1],self._size[0],self._size[1])
-    
-    def onMouseEnter(self):
-      pass
-    def onMouseExit(self):
-      pass
-
-    def update(self,myInput:Input):
-      if self._rect.collidepoint(myInput.mpos):
-        self._active = 1
-      else:
-        self._active = 0
-      if self._active and not self._pactive:
-        self.onMouseEnter()
-      elif not self._active and self._pactive:
-        self.onMouseExit()
-        if not self._draw_need: return
-        for object in self.__dict__:
-          if object[0] != '_':
-            obj = self.__dict__[object]
-            if isinstance(obj,Button):
-              obj.setToUp()
-              obj.draw()
-        if self._border_exists:
-          draw.rect(screen,self._border_color,self._rect,self._border_width)
-      for object in self.__dict__:
-        if object[0] != '_':
-          #objInput = [myInput.__getattr__(acceptableInput) for acceptableInput in self.__dict__[object].accepts()]
-          self.__dict__[object].update(myInput.get_all(self.__dict__[object].accepts()))
-      self._pactive = self._active
-    def draw(self):
-      draw.rect(screen,self._color,self._rect)
-      for object in self.__dict__:
-        if object[0] != '_':
-          self.__dict__[object].draw()
-      if self._border_exists:
-        draw.rect(screen,self._border_color,self._rect,self._border_width)
-
-class ScrollingMS(Main_Space):
-    def __init__(self,draw_need = 2,update_need = 1):
-      #update need explained: 0 = only update when mpos on self, 1 = always update when update method called
-      #draw need explained: 0 -> dont draw, 1 => only draw when touching mouse, 2 => always draw 
-      super().__init__()
-      self._scrollVal = 0
-      self._offset = (0,0)
-      self._size = (WIDTH,HEIGHT)
-      self._background_color = (0,0,0)
-      self._rect = Rect(self._offset[0],self._offset[1],self._size[0],self._size[1])
-      self._draw_need = draw_need
-      self._defaults = {}
-      self._active = 0
-      self._pactive = 0
-      self._update_need = update_need
-      self._Screen_Objects = []
-      self._Screen_Objects_accepts = []
-      ###self._defaults setter should go last###
-      self._defaults = {name for name in self.__dict__}
-
-    @property
-    def size(self):
-      return self._size
-
-    @property
-    def background_color(self):
-      self._background_color
-    
-    @background_color.setter
-    def background_color(self,newVal) -> None:
-      self.set_background_color(newVal)
-
-    def set_background_color(self,newColor):
-      if not isinstance(newColor,tuple):
-        raise TypeError("Has to be a tuple!")
-      if len(newColor) != 3:
-        raise TypeError("Color assignment is (R,G,B) (no A)!")
-      for color in newColor:
-        if not (0<= color <= 255):
-          raise TypeError("Color range is not within bounds!")
-      self._background_color = newColor
-
-    def __setattr__(self, __name: str, __value) -> None:
-      if __name[0] != '_' :
-        self.__dict__[__name] = __value
-        __value.offSetPos = self._offset
-        self._Screen_Objects.append(__value)
-        self._Screen_Objects_accepts.append(__value.accepts())
-      else:
-        self.__dict__[__name] = __value
-
-    def onMouseEnter(self):
-      pass
-    def onMouseExit(self):
-      pass
-    def ChangeObjsOffset(self,newOffset,newSize) -> None:
-      self._offset = tuple(newOffset)
-      self._size = tuple(newSize)
-      for obj in self.__dict__:
-        if obj not in self._defaults:
-          self.__dict__[obj].offSetPos = tuple(newOffset)
-      self._rect = Rect(self._offset[0],self._offset[1],self._size[0],self._size[1])
-
-    def update(self,myInput:Input):
-      if self._rect.collidepoint(myInput.mpos):
-        self._active = 1
-      else:
-        self._active = 0
-      if self._active and not self._pactive:
-        self.onMouseEnter()
-      elif not self._active and self._pactive:
-        self.onMouseExit()
-        for obj in self.__dict__.values():
-          if isinstance(obj,Button):
-            obj.setToUp()
-          elif isinstance(obj,Dropdown):
-            obj.setAllToUp()
-        if self._draw_need == 1:
-          self.draw()
-      if not self._active and not self._update_need: return
-      #for object in self.__dict__:
-      #  if object not in self._defaults:
-      #    objInput = [myInput.__getattr__(acceptableInput) for acceptableInput in self.__dict__[object].accepts()]
-      #    self.__dict__[object].update(objInput)
-      for object,accepts in zip(self._Screen_Objects,self._Screen_Objects_accepts):
-        accepts:list
-        object:Empty #can be any Screen Object.
-        object.update(myInput.get_all(accepts))
-      self._pactive = self._active
-
-    def draw(self):
-      draw.rect(screen,self._background_color,self._rect)
-      for obj in self._Screen_Objects:
-          obj.draw()
-#print("BIG SAVINGS ON BEING ABLE TO PASS IN .accepts RETURN VALUE DIRECTLY INTO <Input> CLASS TO LOWER FUNC CALLS!!")
-class SpaceMS(Main_Space):
-    def __init__(self):
-        super().__init__()
-        self.spacePos = [0,0]
-   
-def log(_log:str):
-  if not isinstance(_log,str):
+  def adjustSize(self):
+    assert self.linked_dropdown
     try:
-      _log = str(_log)
-    except:
-      raise Exception(f'{_log}: type <{type(_log)}> could not be converted to string')
-  with open(PATH+"/"+log_path,'a+') as file:
-    file.write(_log+'\n')
+     x = self.linked_dropdown.max_y/self.linked_dropdown.fullHeight 
+    except ZeroDivisionError:
+      x = float('inf')
+
+    if x >=1:
+      self.hiding = True
+    else:
+      self.hiding = False
+
+      self.rect.left = self.linked_dropdown.rect.right
+      self.rect.height = self.linked_dropdown.max_y
+      self.scroll_size =(x * self.rect.height).__trunc__()
+      self.usable_size = self.rect.height-self.scroll_size
+      self._drag_rect.left = self.rect.left
+      self._drag_rect.height = self.scroll_size 
+
+  def update(self,input:Input):
+    if self.hiding: return
+    mpos,mb1d,mb1u = input.mpos,input.mb1d,input.mb1u
+    if self.rect.collidepoint(mpos) and self.state != 'Dragging':
+      self.state = 'Hover Scroll' if self._drag_rect.collidepoint(mpos) else 'Hover'
+      if mb1d and self.state =='Hover Scroll':
+        self.mouse_down_offset = mpos[1] - self._drag_rect.top
+        self.state = 'Dragging'
+    if mb1u and self.state == 'Dragging':
+      self.state = 'Off'
+
+    if self.state == 'Dragging':
+      self._drag_rect.top = mpos[1] - self.mouse_down_offset
+      if self._drag_rect.top < self.rect.top: self._drag_rect.top = self.rect.top
+      if self._drag_rect.bottom > self.rect.bottom: self._drag_rect.bottom = self.rect.bottom
+      self.x = self._drag_rect.top - self.rect.top 
+      if self.linked_dropdown:
+        self.linked_dropdown.setScrollPercent(self.getValue())
+    else:
+      if self.linked_dropdown:
+        self.setValue(self.linked_dropdown.getScrollPercent())
+
+  def getValue(self):
+    return min(self.x / self.usable_size,1)
+
+  def setValue(self,value:float):
+    self.x = value * self.usable_size
+    self._drag_rect.top = self.rect.top + self.x
+        
+  def draw(self,surf:Surface):
+    if self.hiding: return
+    draw.rect(surf,self.color_layout.background,self.rect)
+    draw.rect(surf,self.color_layout.foreground,self._drag_rect)
+
+class ScrollbarConsuming(Scrollbar):
+  def update(self,input:Input):
+    super().update(input)
+    if self.state == 'Hover Scroll' or self.state == 'Dragging':
+      input.mousex = -999
+      input.mousey = -999
+
+class ClearInput:
+  def update(self,input:Input):
+    input.clearALL()
+    
+
+class Layer(DrawBase):
+  def __init__(self,size:tuple[int,int]):
+    self.rect = Rect(0,0,size[0],size[1])
+    self.next_layer: Layer|None = None
+    self.space = Space(self.rect.copy())
+
+  def onResize(self,size:tuple[int,int]):
+    new = Space(self.rect.copy())
+    self.space.resized(new)
+    self.space = new
+    if self.next_layer:
+      self.next_layer.resize(size)
+
+  def resize(self,newSize:tuple[int,int]):
+    self.rect.size = newSize
+    new = Space(self.rect.copy())
+    self.space.resized(new)
+    self.space = new
+    if self.next_layer:
+      self.next_layer.resize(newSize)
+
+  def resetEverything(self,newSize:tuple[int,int]|None=None):
+    if newSize is not None:
+      self.rect.size = newSize
+    if self.next_layer:
+      self.removeLayer(self.next_layer,True)
+    self.space = Space(self.rect.copy())
+
+  def update(self,input:Input):
+    if self.next_layer:
+      self.next_layer.update(input)
+    self.space.update(input)
+  
+  def draw(self,surf:Surface):
+    self.space.draw(surf)
+    if self.next_layer:
+      self.next_layer.draw(surf)
+
+  def addLayer(self,layer:Optional["Layer"] = None) -> "Layer":
+    if self.next_layer:
+      return self.next_layer.addLayer(layer)
+    if layer is not None:
+      layer.resize(self.rect.size)
+      self.next_layer = layer
+    else:
+      self.next_layer = Layer(self.rect.size) 
+    return self.next_layer
+  
+  def removeLayer(self,layer:"Layer",and_all_after:bool = False) -> bool:
+    if self.next_layer is not layer:
+      if self.next_layer:
+        return self.next_layer.removeLayer(layer,and_all_after)
+      else:
+        return False
+    else:
+      if and_all_after:
+        self.next_layer = None
+      else:
+        self.next_layer = layer.next_layer
+      return True
+
+class Space:
+  order_in_layer = 0
+  def __init__(self,rect:Rect):
+    self.rect = rect
+    self.to_update:list[SupportsUpdate] = []
+    self.to_draw:list[SupportsDraw] = []
+    self.sub_spaces:list[Space] = []
+    self.splits:list[tuple[int,int]] = []
+    
+    self.is_container = False
+    self.container_copies:dict[str,tuple[list[SupportsUpdate],list[SupportsDraw]]] = {}
+    self.active_container:str = ''
+    
+  def makeContainer(self,ui_elements:dict[str,list[SupportsDraw|SupportsUpdate]],active:str,shared_elements:list[SupportsDraw|SupportsUpdate] = []):
+    if self.to_draw or self.to_update: raise RuntimeError("Cannot Make Space that already contains elements into Container")
+    assert active in ui_elements, '<active> must be a key in the dict <container_copies>'
+    self.is_container = True
+    for key,l in ui_elements.items():
+      self.to_update,self.to_draw = [],[]
+      self.addObjects(*l)
+      self.addObjects(*shared_elements)
+      self.container_copies[key] = (self.to_update,self.to_draw)
+    self.setActive(active)
+    return self
+
+  def copyEmptyShallow(self):
+    '''Returns a new Space with the same size with no sub_spaces or UIElements and not as a container'''
+    return Space(self.rect.copy())
+  
+  def addObject(self,obj:T) -> T:
+    '''Will add a UI element to the Space, if this Space is a Container, it adds the element to the currently loaded element list
+    Returns UI element'''
+    if hasattr(obj,'update'):
+      self.to_update.append(obj)#type: ignore
+    if hasattr(obj,'draw'):
+      self.to_draw.append(obj) #type: ignore
+      self.to_draw.sort(key=lambda d:d.order_in_layer)
+      if hasattr(obj,'onResize'):
+        obj.onResize(self.rect.size) #type: ignore
+    return obj
+  def removeObject(self,obj:SupportsUpdate|SupportsDraw):
+    if self.is_container:
+      for u,d in self.container_copies.values():
+        if obj in u:
+          u.remove(obj)#type: ignore
+        if obj in d:
+          d.remove(obj)
+    else:
+      if hasattr(obj,'update'):
+        self.to_update.remove(obj)#type: ignore
+      if hasattr(obj,'draw'):
+        self.to_draw.remove(obj) #type: ignore
+
+  def clear(self):
+    if self.is_container:
+      for u,d in self.container_copies.values():
+        u.clear()
+        d.clear()
+    else:
+      self.to_update.clear()
+      self.to_draw.clear()
+    
+    
+
+  def addObjects(self,*objs:SupportsUpdate|SupportsDraw):
+    '''Add UIElements in bulk, for more info read addObject docstring'''
+    for obj in objs:
+      self.addObject(obj)
+
+  def setActive(self,key:str):
+    if not self.is_container: raise RuntimeError("Active Key only applies for Container's")
+    self.to_update, self.to_draw = self.container_copies[key]
+    self.active_container = key
+
+  def getActive(self) -> str:
+    if not self.is_container: raise RuntimeError("Active Key only applies for Container's")
+    return self.active_container
+
+  def resized(self,space:"Space"):
+    '''
+    This function is a little confusing, but its main purpose is to take in a blank <Space> object and partition it
+    exactly how itself is, however the blank <Space> object may be of different size than this object
+    '''
+    for (direction,amount),sub in zip(self.splits,self.sub_spaces):
+      f = [space.cutTopSpace,space.cutBottomSpace,space.cutLeftSpace,space.cutRightSpace][direction]
+      sub.resized(f(amount))
+    if self.is_container:
+      space.container_copies = self.container_copies
+      space.is_container = True
+      space.to_update = self.to_update
+      space.to_draw = self.to_draw
+      space.active_container = self.active_container
+      for _u,draw in self.container_copies.values():
+        for d in draw: #type: ignore
+          if hasattr(d,'onResize'):
+            d:SupportsResize
+            d.onResize(space.rect.size)
+    else:
+      space.to_update = self.to_update
+      space.to_draw = self.to_draw
+      for d in self.to_draw: #type: ignore
+        if hasattr(d,'onResize'):
+          d:SupportsResize
+          d.onResize(space.rect.size) 
+
+  def update(self,input:Input):
+    l,t = self.rect.topleft #store topleft just in case it changes from updates
+    input.mousex -= l
+    input.mousey -= t
+    for u in self.to_update:
+      u.update(input)
+    input.mousex += l
+    input.mousey += t
+
+    for s in self.sub_spaces:
+      s.update(input)
+  
+  def draw(self,surf:Surface):
+    s= surf.subsurface(self.rect)
+    for d in self.to_draw:
+      d.draw(s)
+
+    for s in self.sub_spaces:
+      s.draw(surf)
 
 
-def tick() -> int:
-  global fps, dt 
-  dt = clock.tick(fps)
-  return dt
+  def cutTopSpace(self,amount:int) -> "Space":
+    new = Space(Rect(self.rect.left,self.rect.top,self.rect.width,amount))
+    self.rect.height -= amount
+    self.rect.top += amount
+    self.splits.append((0,amount)) 
+    self.sub_spaces.append(new)
+    return new
+  
+  def cutBottomSpace(self,amount:int) -> "Space":
+    new = Space(Rect(self.rect.left,self.rect.bottom-amount,self.rect.width,amount))
+    self.rect.height -= amount
+    self.splits.append((1,amount)) 
+    self.sub_spaces.append(new)
+    return new
+  
+  def cutLeftSpace(self,amount:int) -> "Space":
+    new = Space(Rect(self.rect.left,self.rect.top,amount,self.rect.height))
+    self.rect.left += amount
+    self.rect.width -= amount
+    self.splits.append((2,amount)) 
+    self.sub_spaces.append(new)
+    return new
+  
+  def cutRightSpace(self,amount:int) -> "Space":
+    self.rect.width -= amount
+    new = Space(Rect(self.rect.right,self.rect.top,amount,self.rect.height))
+    self.splits.append((3,amount)) 
+    self.sub_spaces.append(new)
+    return new
 
-def get_screen_size() -> tuple[int,int]:
-  return display.get_window_size()
 
-def pre_init() -> None:
-    '''Sets Variables _HEIGHT and _WIDTH'''
-    global screenInfo, _WIDTH,_HEIGHT,preInitiated
-    if not preInitiated:
-      pginit()
-      screenInfo = display.Info()
-      _WIDTH,_HEIGHT = screenInfo.current_w,screenInfo.current_h
-      del screenInfo
-      preInitiated = 1
+base_layer = Layer((0,0))
 
-def radians_to_degrees(x:float):
-  return x * 180 / pi
+def minimize(): '''Minimize screen'''; return display.iconify()
 
-def iconify():
-  '''Minimize screen'''
-  display.iconify()
-
-minimize = iconify
-
-def init(screenSize:tuple,flags = 0,name:str = '',**kwargs) -> None:
+def init(size:tuple,name:str = 'pygame window',flags = 0,**kwargs) -> Surface:
   #nerf miner
-  global saved_flags,saved_name,clock
-  saved_flags = flags
-  saved_name = name
-  if not preInitiated:
-    pre_init()
-  global screen, running,WIDTH,HEIGHT
-  if screenSize == (0,0):
-    screenSize = (_WIDTH,_HEIGHT)
-  screen = display.set_mode(screenSize,flags,**kwargs)
-  scrap.init()
-  WIDTH,HEIGHT = screenSize
-  if name:
+  global saved_flags
+  curr = pygame.display.get_surface()
+  if curr is None:
+
+    saved_flags = flags
+    if size[0] == 0: size = (MONITOR_WIDTH,size[1])
+    if size[1] == 0: size = (size[0],MONITOR_HEIGHT)
+    screen = display.set_mode(size,flags,**kwargs)
     display.set_caption(name)
-  running = 1
-  clock = pg_time.Clock()
+  scrap.init()
+  return screen
 
-def setSurface(surf:Surface):
-  global screen,WIDTH,HEIGHT,clock
-  pre_init()  
-  WIDTH,HEIGHT = surf.get_size()
-  screen = surf
-  clock = pg_time.Clock()
-
-def getSurface():
-  global screen,WIDTH,HEIGHT,clock
-  pre_init()  
-  WIDTH,HEIGHT = get_screen_size()
-  screen = display.get_surface()
-  clock = pg_time.Clock()
-
-def rename(name:str) -> None:
-  display.set_caption(name)
-
-def MinScreenSize(x:int,y:int) -> None:
+def setMinScreenSize(x:int,y:int) -> None:
   global minScreenX,minScreenY
   minScreenX = x
   minScreenY = y
 
-def getFonts() -> list[str]:
-  return font.get_fonts()
-
-def makeFont(FontName,FontSize,Bold:bool = False,Italic:bool = False):
-  return font.SysFont(FontName,FontSize,Bold,Italic)
-
-def findAllFiles(ending:str,addedPath:str = '',strip:bool = True) -> list[str]:
-    '''Find all files with a specific extension like .png or .txt'''
-    from os import walk
-    all_songs = []
-    path = dirname(realpath(__file__)) 
-    for _root, _dirs, files in walk(path+'/'+addedPath): 
-        for file in files:
-            if file.endswith(ending):
-              if strip:
-                all_songs.append(str('.'.join(file.split('.')[:-1])))
-              else:
-                all_songs.append(str(file))
-    return all_songs
-
-def loadSound(_FileName:str = '',usePath:bool = True) -> None:
-  global currentSoundName
-  FileName = '\\'.join([PATH,_FileName]) if usePath else _FileName
-  mixer.music.unload()
-  if _FileName:
-    if _FileName.endswith('.ogg'):
-      mixer.music.load(FileName)
-      currentSoundName = _FileName[:-4]
-    else:
-      mixer.music.load(FileName+'.ogg')
-      currentSoundName = _FileName
-  else:
-    currentSoundName = ''
-  onSoundLoad()
-
-def playSound(loops:int = 0,start:int = 0,fade_ms:int = 0) -> None:
-  #utmily
-  mixer.music.play(loops,start,fade_ms)
-  onSoundPlay()
-
-def stopSound() -> None:
-  mixer.music.stop()
-
-def pauseSound() -> None:
-  mixer.music.paused = 1 #type: ignore
-  mixer.music.pause()
-
-def unpauseSound() -> None:
-  mixer.music.paused = 0 #type: ignore
-  mixer.music.unpause()
-
-def PauseUnPauseSound() -> None:
-  if mixer.music.paused: #type: ignore
-    unpauseSound()
-  elif not mixer.music.paused: #type: ignore
-    pauseSound()
-  else:
-    raise IndexError(f"Value mixer.music.paused is not a bool instead it is a {type(mixer.music.paused)}: {mixer.music.paused}") #type: ignore
-
-def SetSoundVolume(newVal:float) -> None:
-  if not isinstance(newVal,float):
-    raise TypeError(f"Volume is not correct data type! '{type(newVal)}")
-  elif newVal > 1:
-    newVal = 1
-  elif newVal < 0:
-    newVal = 0
-  mixer.music.set_volume(newVal)
-
-def setSoundPos(newPos:float) -> None:
-  try:
-    mixer.music.set_pos(newPos)
-  except PygameEngineError:
-    if mixer.music.get_busy():
-      raise SoundError('Cannot Set Position of Sound currently')
-    else:
-      raise SoundError('Cannot Set position of sound currently, it looks like you dont have a sound loaded, maybe that is the problem')
-
-def onSoundLoad():
-  pass
-
-def onSoundPlay():
-  pass
-
-def setOnSoundLoad(func:Callable) -> None:
-  global onSoundLoad
-  onSoundLoad = func
-
-def setOnSoundPlay(func:Callable) -> None:
-  global onSoundPlay
-  onSoundPlay = func
-
-def setSoundEndEvent(func:Callable):
-  global endEventFunction
-  endEventFunction = func
-
-def endEventFunction():
-  pass
-
-def getSoundVolume() -> float:
-  return mixer.music.get_volume()
-
-def getSoundPos() -> int:
-  return mixer.music.get_pos()
-
-def getSoundPause() -> bool:
-  return mixer.music.paused  #type: ignore
+def findAllFiles(ending:str,addedPath:str = ''):
+  '''Find all files with a specific extension like .png or .txt'''
+  from os import walk
+  for _root, _dirs, files in walk('./'+addedPath): 
+    for file in files:
+      if file.endswith(ending):
+        yield str(file)
 
 def setWindowIcon(surf:Surface) -> None:
   display.set_icon(surf)
 
-def loadImg(FileName:str,useAlpha:bool = False,usePath:bool = True) -> Surface:
+def loadImg(path:str,useAlpha:bool = False) -> Surface:
   '''Returns a pygame Surface of image provided with FileName\n
-  Use Alpha for Images that should have a transparent background'''
-  global PATH
-  fullFilePath = '/'.join([PATH,FileName]) if usePath else FileName
+  Use Alpha for Images that should have a transparent background''' 
   if useAlpha:
-    return image.load(fullFilePath).convert_alpha()
+    return image.load(path).convert_alpha()
   else:
-    return image.load(fullFilePath).convert()
+    return image.load(path).convert()
 
-def flipSurface(surface:Surface,x:bool,y:bool) -> Surface:
-  return transform.flip(surface,x,y) 
 
-def resizeSurface(surface:Surface,newSize:tuple,dest_surf:Surface|None = None) -> Surface:
-  if dest_surf == None:
-    return transform.scale(surface,newSize)
-  else:
-    return transform.scale(surface,newSize,dest_surf)
-  
-def resizeSurfaceSmooth(surface:Surface,newSize:tuple,dest_surf:Surface|None = None) -> Surface:
-  if dest_surf is None:
-    return transform.smoothscale(surface,newSize)
-  else:
-    return transform.smoothscale(surface,newSize,dest_surf)
+def aaarc(source:Surface,color:tuple[int,int,int]|str,center:tuple[float,float],radius:float,start_angle:float,end_angle:float,resolution:int = 0):
+  #if end_angle < start_angle: end_angle += 2*3.141592653589
+  from math import cos,sin
+  #if start_angle > end_angle: return
+  if start_angle==end_angle: return
+  points = [center]
+  dif = end_angle-start_angle
+  resolution = max(int(dif*10),1) if resolution <= 0 else resolution
+  for i in range(resolution+1):
+    a = start_angle + i*dif/resolution
+    points.append((center[0] + cos(a)*radius,center[1]-sin(a)*radius))
+  gfxdraw.aapolygon(source,points,color)
+  gfxdraw.filled_polygon(source,points,color)
 
-def rotateSurface(surface:Surface,angle:float) -> Surface:
-  return transform.rotate(surface,angle)
 
-def isValidScreenSize(screenSize:tuple) -> bool:
-  global minScreenX,minScreenY
-  if screenSize[0] < minScreenX:
-    return False
-  if screenSize[1] < minScreenY:
-    return False
-  return True
+@Input_.onEvent(const.VIDEORESIZE)
+def onVIDEORESIZE(i:Input,e:Input_.event.Event):
+  w,h = display.get_window_size()
+  if (h < minScreenY or w < minScreenX):
+    display.set_mode((max(w,minScreenX),max(h,minScreenY)),saved_flags)
 
-def get_clipboard(raw:bool = False) -> str | bytes|None:
-  for _type in scrap.get_types():
-    if SCRAP_TEXT in _type:
-      if raw:
-        return scrap.get(SCRAP_TEXT)
-      else:
-        s = scrap.get(SCRAP_TEXT)
-        if s:
-          return s.decode('utf-8')
-        return s
-  return ''
-def resizeToBecomeValid(screenSize:tuple) -> tuple[int,int]:
-  global minScreenX,minScreenY,WIDTH,HEIGHT
-  WIDTH,HEIGHT = (max(screenSize[0],minScreenX),max(screenSize[1],minScreenY))
-  return (WIDTH,HEIGHT)
-
-def rawInput() -> list[events.Event]:
-  return events.get()
-
-set_allowed_events = events.set_allowed
-get_blocked_events = events.get_blocked
-set_blocked_events = events.set_blocked
-events_wait = events.wait
-
-def getAllInput() -> Input:
-  """Returns MouseState and KeyDownQueue, if quit event triggered, returns tuple (False,False)"""
-  keyDownQueue,keyUpQueue,mbd,mbu  = [],[],[0,0,0],[0,0,0]
-  scrollDown,scrollUp = 0,0
-  flagsRaised = []
-  for event in events.get():
-    if event.type == QUIT:
-      return Input(False,False,False,False)
-    elif event.type == KEYDOWN:
-      keyDownQueue.append(event.unicode)
-      if event.unicode == paste_unicode:
-        for letter in get_clipboard(): #type: ignore
-          keyDownQueue.append(letter)
-    elif event.type == KEYUP:
-      keyUpQueue.append(event.unicode)  
-    elif event.type == MOUSEBUTTONDOWN:
-      if event.button == 4:
-        scrollDown = 1
-      elif event.button == 5:
-        scrollUp = 1
-      elif event.button < 4:
-        mbd[event.button-1] = 1
-    elif event.type == MOUSEBUTTONUP:
-      if event.button < 4: 
-        mbu[event.button-1] = 1
-    elif event.type == MUSIC_END:
-      endEventFunction()
-    elif event.type == VIDEORESIZE:
-      global WIDTH,HEIGHT
-      WIDTH,HEIGHT = display.get_window_size()
-      if not isValidScreenSize((WIDTH,HEIGHT)):
-        display.set_mode((resizeToBecomeValid((WIDTH,HEIGHT))),saved_flags)
-    flagsRaised.append(event.type)
-  return Input((mouse.get_pos(),mouse.get_pressed(),scrollUp-scrollDown,mbd,mbu),(keyDownQueue,keyUpQueue),flagsRaised,dt)
 #hola lola
-

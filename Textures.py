@@ -2,7 +2,7 @@ from Constants import BLOCK_SIZE,PARTICLE_SIZE,ITEM_SIZE
 from os import walk,scandir
 from time import sleep
 from pygame import Surface
-from Constants.Misc import TEXTURE_FANCY_IMPORT, DEBUG
+from Constants.Misc import TEXTURE_FANCY_IMPORT, DEBUG, GAME_PATH
 if TEXTURE_FANCY_IMPORT:
 	from pygame.image import load as _load
 	### INNER VARIABLES ###
@@ -21,7 +21,7 @@ if TEXTURE_FANCY_IMPORT:
 else: 
 	from pygame.image import load
 from pygame.transform import scale,flip,rotate
-from game_math import GAME_PATH
+
 from Game_Typing import PATH_DICT_TYPE
 
 __all__ = [
@@ -70,15 +70,15 @@ user_interface:PATH_DICT_TYPE
 
 ### HELPER FUNCTIONS ###
 def getFolders(path:str):
-	for f in scandir(GAME_PATH+path):
+	for f in scandir(path):
 		if f.is_dir():
 			yield f.path.split('\\')[-1]
 def getFiles(path:str):
-	for f in scandir(GAME_PATH+path):
+	for f in scandir(path):
 		if f.is_file():
 			yield f.path.split('\\')[-1]
 def isImage(path:str):
-	return path.split('.')[-1] in {'png','jpg','jpeg','bmp'}
+	return path.rsplit('.',1)[-1] in {'png','jpg','jpeg','bmp'}
 ### END HELPER FUNCTIONS ###
 
 
@@ -87,7 +87,7 @@ def isImage(path:str):
 ##############################
 
 def importTexture(path:str,alpha = True,size:None|tuple[int,int] = None):
-	full_path = GAME_PATH + path
+	full_path = "./"+ path
 	image_surf = load(full_path)
 	## Handle image conversion
 	image_surf = image_surf.convert_alpha() if alpha else image_surf.convert()
@@ -98,7 +98,8 @@ def importTexture(path:str,alpha = True,size:None|tuple[int,int] = None):
 
 def importFolders(path:str,alpha=True,size:None|tuple[int,int] = None):
 	surfs:dict[str,Surface] = {}
-	for _root,_dirs,img_files in walk(GAME_PATH + path):
+	for _root,_dirs,img_files in walk('./'+path):
+		print(img_files)
 		for image in filter(isImage ,img_files):
 			full_path = _root + '\\' + image
 			image_surf = load(full_path)
@@ -111,7 +112,6 @@ def importFolders(path:str,alpha=True,size:None|tuple[int,int] = None):
 				image_surf = scale(image_surf,size)
 			assert image not in surfs, 'duplicate fount in files: '  + image
 			surfs[image] = image_surf
-
 	assert len(surfs),'Empty Texture Path: '+path
 	return surfs
 

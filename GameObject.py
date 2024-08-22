@@ -1,7 +1,7 @@
-from game_math import Vector2
+from Utils.Math.Vector import Vector2
 from Camera import CSurface
 import Camera
-from Appearance import Appearance
+from GameScreen.Appearance import Appearance
 from sys import intern
 class GameObject:
     '''This class is the base class of which every single diagetic object in the game MUST derive from.'''

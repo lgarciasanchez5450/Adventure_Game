@@ -6,31 +6,29 @@ if __name__ == "__main__":
 import Camera
 from Constants import HEIGHT, WIDTH
 import Time
-from game_math import Vector2, Collider,ones,deque, Vector2Int
-import Input
+from Utils.Math.Vector import Vector2,ones
+from Utils.Math.Collider import Collider
+from Utils.Math.game_math import Vector2Int
+from framework import ObjectValue
+import Window
+import InputGame as Input
 from Textures import NULL_COLOR
 from Game_Typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from Items import Item
     from general_manager import AliveEntity
-tex_location = 1
 
 class UI:
     __slots__ = 'tex_location','center','size','surface','surface_size','tex','program','render_object','topleft','collider','thingy','relative_mouse_position_normalized','rel_mouse_pos'
     def __init__(self,surface_size:tuple|list = (WIDTH,HEIGHT),screen_offset:tuple|list = (0,0),screen_size = (1,1)):
-        global tex_location
-        
-        self.tex_location = tex_location
         self.center = Vector2(*screen_offset)
         self.size = Vector2(*screen_size)
         self.surface = pygame.Surface(surface_size)
         self.surface_size = Vector2(*surface_size)
-        self.tex = Camera.surf_to_texture(self.surface)
-        self.program,self.render_object = Camera.create_new_render_object('shaders/everything.vert','shaders/ui.frag',screen_size,screen_offset)
+        self.tex = Window.window.makeTexture(self.surface.get_size(),(Window.moderngl.BLEND,Window.moderngl.BLEND))
+        self.program,self.render_object = Window.window.getShader('shaders/everything.vert','shaders/ui.frag',screen_size,screen_offset)
         self.topleft = Vector2(screen_offset[0] - screen_size[0],screen_offset[1]-screen_size[1])
-        self.tex.use(tex_location)
-        self.program['tex'] = tex_location
-        tex_location += 1
+        self.program['tex'] = Window.window.getTextureLocation(self.tex)
         self.collider = Collider(self.topleft.x,self.topleft.y,screen_size[0]*2,screen_size[1]*2)
         self.thingy = Vector2(*screen_size).inverse
 
@@ -42,8 +40,8 @@ class UI:
 
     def update(self):
         self.surface.fill('grey')
-        self.relative_mouse_position_normalized = (Input.m_pos_normalized - self.center).vector_mul(self.thingy)
-        self.rel_mouse_pos = (self.relative_mouse_position_normalized+ones).vector_mul(self.surface_size/2)
+        self.relative_mouse_position_normalized = (Input.m_pos_normalized - self.center) @ (self.thingy)
+        self.rel_mouse_pos = (self.relative_mouse_position_normalized+ones) @(self.surface_size/2)
         #if self.collider.collide_point_inclusive(Input.m_pos_normalized.tuple): 
     
     def draw(self):
@@ -60,14 +58,14 @@ class InScreenUI:
     def __init__(self, center:Vector2Int,size:tuple[int,int]):
         self.size = Vector2Int(*size)
         #normal screen units
-        self.topleft = center - Vector2Int.new_from_tuple(size)//2
+        self.topleft = center - Vector2Int.newFromTuple(size)//2
         self.surface = pygame.Surface(size)
-        self.surface_size = Vector2.new_from_tuple(size)
+        self.surface_size = Vector2.newFromTuple(size)
         #normalized units
         self.center = Vector2(center.x/WIDTH,center.y/HEIGHT)
-        normalized_topleft = center - Vector2Int(HALFWIDTH,HALFHEIGHT) - Vector2Int.new_from_tuple(size)#center is in pixels
+        normalized_topleft = center - Vector2Int(HALFWIDTH,HALFHEIGHT) - Vector2Int.newFromTuple(size)#center is in pixels
         normalized_topleft = Vector2(normalized_topleft.x/WIDTH, normalized_topleft.y/HEIGHT)
-        normalized_size = Vector2.new_from_tuple(size) # size is in pixels
+        normalized_size = Vector2.newFromTuple(size) # size is in pixels
         normalized_size.x /= WIDTH
         normalized_size.y /= HEIGHT
         self.collider = Collider(normalized_topleft.x,normalized_topleft.y,normalized_size.x,normalized_size.y)
@@ -76,8 +74,8 @@ class InScreenUI:
     def update(self):
         self.surface.fill('grey')
         if self.collider.collide_point_inclusive(Input.m_pos_normalized.tuple): 
-            self.relative_mouse_position_normalized = (Input.m_pos_normalized - self.center).vector_mul(self.thingy)
-            self.rel_mouse_pos = (self.relative_mouse_position_normalized+ones).vector_mul(self.surface_size/2)
+            self.relative_mouse_position_normalized = (Input.m_pos_normalized - self.center) @ (self.thingy)
+            self.rel_mouse_pos = (self.relative_mouse_position_normalized+ones) @ (self.surface_size/2)
 
 
     def draw(self,surface:pygame.Surface):
@@ -155,70 +153,6 @@ class ItemDescriptionUI:
         if self.item is None: return
         surface.blit(self.surf,pos.tuple)
 
-class HealthBar:
-    PRIMARY_COLOR = (255,255,255)
-    OUTLINE_COLOR = (255,255,255)
-    OUTLINE_WIDTH = 1
-    BAR_WIDTH = 3 # in pixels
-    BAR_HEIGHT = 7 # in pixels
-    BAR_SPACING = 1
-    def __init__(self,entity:"AliveEntity",percents:tuple[float,...] = (0.10,0.40,0.60,0.75)):
-        assert percents == tuple(sorted(percents)), f'percents must be sorted {percents} vs {tuple(sorted(percents))}'
-        self.entity = entity
-        self.offset = Vector2(0,-.7)
-        
-        self.bars = len(percents)
-        self.percents = percents
-
-        width = self.BAR_SPACING + (self.BAR_WIDTH + self.BAR_SPACING) * self.bars + 2 * self.OUTLINE_WIDTH
-        height = self.BAR_HEIGHT + 2 * (self.OUTLINE_WIDTH + self.BAR_SPACING)
-        self.csurf = Camera.CSurface.inferOffset(Camera.Surface((width,height)),self.entity.pos + self.offset)
-        self.csurf.surf.set_colorkey(NULL_COLOR)
-        self.current_bars = self.calculate_bars()
-        self._draw_surface()
-        Camera.ui_draw_method(self,-1)
-
-    def calculate_bars(self) -> int:
-        assert self.entity is not None
-        percent_health = self.entity.health / self.entity.total_health
-        for i,percent in enumerate(self.percents):
-            if percent_health < percent:
-                return i
-        return self.bars
-            
-
-    def _draw_surface(self):
-        self.csurf.surf.fill(NULL_COLOR)
-        #draw the outlines
-        for i in range(self.OUTLINE_WIDTH): # we draw smaller 1 pixel outlines until we get the desired width
-            pygame.draw.lines(self.csurf.surf,self.OUTLINE_COLOR,True,([i,i],[self.csurf.surf.get_width()-i-1,i],[self.csurf.surf.get_width()-i-1,self.csurf.surf.get_height()-1-i],[i,self.csurf.surf.get_height()-i-1]))
-
-        top = self.OUTLINE_WIDTH + self.BAR_SPACING
-        width = self.OUTLINE_WIDTH + self.BAR_SPACING
-        for _ in range(self.current_bars):
-            pygame.draw.rect(self.csurf.surf,self.PRIMARY_COLOR,(width,top,self.BAR_WIDTH,self.BAR_HEIGHT))
-            width += self.BAR_WIDTH + self.BAR_SPACING
-
-    def update(self):
-        if self.entity is None: return
-        self.csurf.pos = self.entity.pos + self.offset
-        if self.current_bars != (bars := self.calculate_bars()):
-            self.current_bars = bars
-            self._draw_surface()
-        if self.entity.dead:
-            self.entity = None
-            Camera.ui_draw_method_remove(self)
-    
-    def draw(self):
-        if self.entity is None or self.entity.dead:
-            self.entity = None
-            try:
-                Camera.ui_draw_method_remove(self)
-            except ValueError as err:
-                print(err)
-
-        Camera.blit_csurface(self.csurf)
-
 itemDescriptor = ItemDescriptionUI()
 
 class EmtpyUI(UI):
@@ -241,6 +175,6 @@ class DebugUI(UI):
 
 Null = EmtpyUI()
 
-showingUIs:deque[UI] = deque([Null],maxlen=1)
-inScreenUI:deque[InScreenUI] = deque([Null],maxlen=1) #type: ignore
+showingUIs:ObjectValue[UI] = ObjectValue(Null)
+inScreenUI:ObjectValue[InScreenUI] = ObjectValue(Null)#type:ignore
 

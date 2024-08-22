@@ -93,7 +93,8 @@ GROUND_NAME_BY_NUMBER = {
     GROUND_DIRT:  'Dirt',
     GROUND_GRASS: 'grass!',
     GROUND_WATER: 'agua!',
-    GROUND_STONE: 'hard rock'
+    GROUND_STONE: 'hard rock',
+    GROUND_SAND: 'Sand',
 }
 GROUND_TEXTURE_BY_ID = {
     GROUND_INVALID: 'null',
@@ -101,7 +102,8 @@ GROUND_TEXTURE_BY_ID = {
     GROUND_DIRT:  'Dirt',
     GROUND_GRASS: 'Grass',
     GROUND_WATER: 'Water',
-    GROUND_STONE: 'Stone'
+    GROUND_STONE: 'Stone',
+    GROUND_SAND: 'Sand'
 }
 if TYPE_CHECKING:
     from general_manager import Entity
@@ -117,7 +119,7 @@ ITEM_BASE_NAME_FROM_TAG = {
     ITAG_WOODEN_SWORD: 'Wooden Sword'
 }
 
-# If the item doesn't exist in this dictionary, the game will probably assume a stack of 64
+# If the item doesn't exist in this dictionary, the game will assume a stack of 64
 STACK_COUNT_BY_TAG = {
     ITAG_WOODEN_SWORD:64,
     ITAG_BOW:1,
@@ -129,7 +131,7 @@ STACK_COUNT_BY_TAG = {
 #Variables that can change
 RenderDistance = 3
  
-GenerationDistance = 10 # Should be larger than RenderDistance
+GenerationDistance = 4 # Should be larger than RenderDistance
 
 ITEM_DESCRIPTION_USES_MOUSE = True
 

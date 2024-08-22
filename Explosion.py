@@ -1,4 +1,4 @@
-from game_math import Vector2, Counter
+from Utils.Math.Vector import Vector2
 import numpy as np
 #from Game_Typing import TYPE_CHECKING
 from GameObject import GameObject
@@ -167,11 +167,12 @@ class __Dynamic(GameObject):
         self.vel = vel
 
 def prediction(x:float):
+    return 20* np.sqrt(10*x)
     return 4.1 * (10 * np.log2(x)) ** 0.56
 
 
 ###MODULE INITIALIZATION###
-e = Explosion(Vector2.zero,10.0)
+e = Explosion(Vector2.zero(),10.0)
 e.setEntities((__Dynamic(Vector2(100,0),Vector2.zero),),(__Dynamic(Vector2(-100,0),Vector2(1,0)),)) #type: ignore
 e.update()
 
@@ -186,7 +187,7 @@ if __name__ == '__main__':
     iters = []
     start = 5
     #end = 1_000
-    end = 11
+    end = 100
     xs = []
     try:
         for x in range(start,end,1): 
@@ -206,7 +207,7 @@ if __name__ == '__main__':
             #print(x,a)
             #iters.append(x)
     except:
-        print('energy to loow')
+        print('energy too low')
     #print(a)
     pyplot.plot(xs,prediction(np.array(xs)),color='green') #type: ignore
 
@@ -234,19 +235,19 @@ if __name__ == '__main__':
                 explosions.pop(a) 
             else:
                 a+=1 
-    while 1:
-        s.fill('black')
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                quit()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                explosions.append(Explosion(Vector2.new_from_tuple(pygame.mouse.get_pos())-Vector2(250,250),5))
-        update_explosions()
-        draw_explosions()
-        pygame.display.flip()
+    # while 1:
+    #     s.fill('black')
+    #     for event in pygame.event.get():
+    #         if event.type == pygame.QUIT:
+    #             pygame.quit()
+    #             quit()
+    #         elif event.type == pygame.MOUSEBUTTONDOWN:
+    #             explosions.append(Explosion(Vector2.newFromTuple(pygame.mouse.get_pos())-Vector2(250,250),5))
+    #     update_explosions()
+    #     draw_explosions()
+    #     pygame.display.flip()
         
-    #e.update()
+    # #e.update()
 
 
 

@@ -4,18 +4,16 @@ Made by ??? (found on reddit, search for supersimplex noise)
 Ported by Hithere32123
 
 '''
-import Perlin
-from array import array
+
 import numpy
-from math import floor
 try:
-    from numba import njit,prange
+    from numba import njit
 except ImportError:
     def njit(*args, **kwargs):
         def wrapper(func):
             return func
         return wrapper  
-    prange = range
+    
     
 
 PRIME_X = 0x5205402B9270C86F
@@ -82,8 +80,8 @@ def noise2_UnskewedBase(seed:int, xs:float, ys:float):
     global PRIME_X,PRIME_Y,UNSKEW_2D,RSQUARED_2D, TWICE_UNSKEW_ONE
     # Get base points and offsets.
     
-    xsb:int = floor(xs)
-    ysb:int = floor(ys)
+    xsb:int = xs.__floor__()
+    ysb:int = ys.__floor__()
     xi:float = xs - xsb
     yi:float = ys - ysb
 

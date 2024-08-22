@@ -1,21 +1,22 @@
-import Animation
+import GameScreen.Animation as Animation
 import Camera
-import Input
-from game_math import Collider,Vector2
+import InputGame as Input
+from Utils.Math.Vector import Vector2
+from Utils.Math.Collider import Collider
 from typing import Callable, Literal
 from pygame import Surface, draw,Font
 from Time import Stopwatch
 from Constants.Generation import BLOCK_SIZE,HALF_BLOCK_SIZE
 
-class Button:
+class Button: 
     def __init__(self,center:Vector2,size:Vector2):
         self.center = center.copy()
         self.size = size.copy()
         self.OnPressFunc:Callable[[],None] = lambda : None
         self.OnReleaseFunc:Callable[[],None] = lambda : None
-        self.inner_csurf = Camera.CSurface(Surface((self.size * BLOCK_SIZE).tupled_ints),Vector2.zero,(0,0))
+        self.inner_csurf = Camera.CSurface(Surface((self.size * BLOCK_SIZE).tuple_ints),Vector2.zero(),(0,0))
         self.inner_csurf.surf.fill('red')
-        self.csurf = Camera.CSurface(Surface((self.size * BLOCK_SIZE).tupled_ints),self.center,(-self.size * HALF_BLOCK_SIZE).tupled_ints)
+        self.csurf = Camera.CSurface(Surface((self.size * BLOCK_SIZE).tuple_ints),self.center,(-self.size * HALF_BLOCK_SIZE).tuple_ints)
         self.animation:Animation.SimpleAnimation = Animation.SimpleAnimation(self.inner_csurf,0,self.inner_csurf.surf)
         self.state:Literal['up','down','idle'] = 'up'
 
@@ -25,7 +26,7 @@ class Button:
         
         # Private variables
         self.onLoad()
-        self.gray_surface = Surface((self.size * BLOCK_SIZE).tupled_ints)
+        self.gray_surface = Surface((self.size * BLOCK_SIZE).tuple_ints)
         self.gray_surface.set_alpha(180)
         self.gray_surface.fill((100,100,100))
 
@@ -67,7 +68,7 @@ class Picture:
     def __init__(self,center:Vector2,size:Vector2):
         self.center = center.copy()
         self.size = size.copy()
-        self.csurf = Camera.CSurface(Surface((self.size).tupled_ints),self.center,(-self.size//2).tupled_ints)
+        self.csurf = Camera.CSurface(Surface((self.size).tuple_ints),self.center,(-self.size//2).tuple_ints)
         self.animation:Animation.SimpleAnimation = Animation.SimpleAnimation(self.csurf,0,self.csurf.surf)
         self.state:Literal['up','down','idle'] = 'up'
 
@@ -90,7 +91,7 @@ class LoadingBar:
     def __init__(self,center:Vector2,size:Vector2):
         self.center = center.copy()
         self.size = size.copy()
-        self.csurf = Camera.CSurface(Surface((self.size).tupled_ints),self.center,(-self.size//2).tupled_ints)
+        self.csurf = Camera.CSurface(Surface((self.size).tuple_ints),self.center,(-self.size//2).tuple_ints)
         #self.animation:Animation.SimpleAnimation = Animation.SimpleAnimation(self.csurf,0,[self.csurf.surf])
         self.max:int = 100
         self.partsDone:int = 1
@@ -156,5 +157,3 @@ class Textbox:
     
     def onLeave(self):
         Camera.remove(self.csurf)
-    
-   

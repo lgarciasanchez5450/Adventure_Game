@@ -7,5 +7,6 @@
         "cmath": "c"
     },
     "python.analysis.typeCheckingMode": "basic",
-    "flake8.severity": { }
+    
+
 }

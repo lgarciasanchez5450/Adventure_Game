@@ -1,166 +1,210 @@
 import pygame
-import game_math
-from typing import Literal
-import Music
-from pygame.constants import *
+from Utils.Math.Vector import Vector2
 from Constants.Display import HALFWIDTH,HALFHEIGHT,WINDOW_WIDTH,WINDOW_HEIGHT, FORCE_ASPECT_RATIO
-import Settings
 
 from Events import call_OnResize,add_OnResize
-HALF_SCREEN = game_math.Vector2(HALFWIDTH,HALFHEIGHT)
+HALF_SCREEN = Vector2(HALFWIDTH,HALFHEIGHT)
 s_width,s_height = WINDOW_WIDTH,WINDOW_HEIGHT
 _width_multiplier,_height_multiplier = 2/(s_width-1),2/(s_height-1)
+normalize_mult = Vector2(_width_multiplier,_height_multiplier)
 def onResize(width,height):
     global s_width,s_height, HALF_SCREEN,_width_multiplier,_height_multiplier
     s_width = width
     s_height = height
-    HALF_SCREEN = game_math.Vector2(s_width//2,s_height//2)
+    HALF_SCREEN = Vector2(s_width//2,s_height//2)
     _width_multiplier = 2/(s_width-1)
     _height_multiplier = 2/(s_height-1)
 add_OnResize(onResize)
-Binary = Literal[0,1]
-#Mouse
-wheel:Literal[-1,0,1] # wheel is a special case
-m_1:Binary
-'''Mouse Button 1'''
-m_2:Binary
-'''Mouse Button 2'''
-m_3:Binary
-'''Mouse Button 3'''
 
-m_d1:Binary
-m_u1:Binary
-m_d2:Binary
-m_u2:Binary
-m_d3:Binary
-m_u3:Binary
-m_x:Binary
-m_y:Binary 
-m_pos:game_math.Vector2 = game_math.Vector2.zero
-m_pos_from_middle:game_math.Vector2 = game_math.Vector2.zero
-m_pos_normalized:game_math.Vector2 = game_math.Vector2.zero
-m_rel:game_math.Vector2 = game_math.Vector2.zero
+from pygame import event
+from pygame import constants as const
+from pygame import mouse
+from Utils.unicode_constants import PASTE
+from typing import Callable
 
-def _update_mouse():
-    global wheel,m_1,m_2,m_3,m_x,m_y,m_pos,m_pos_normalized, _width_multiplier, _height_multiplier
-    m_1,m_2,m_3 = pygame.mouse.get_pressed() #type: ignore
-    m_pos.x,m_pos.y = pygame.mouse.get_pos()
-    m_rel.x,m_rel.y = pygame.mouse.get_rel()
-    m_x,m_y = m_pos #type: ignore
-    m_pos_from_middle.set_to(m_pos-HALF_SCREEN)
-    m_pos_normalized.x = m_pos.x*_width_multiplier - 1
-    m_pos_normalized.y = m_pos.y*_height_multiplier - 1
+__all__ = [
+    'Input',
+    'getInput'
+]
 
+class Input:
+    '''
+    A way to dump all the input gathered by getAllInput() so that it can be directly put into
+    update methods so that they can pick what they need to update things.
+    '''
+    w:int = 0
+    a:int = 0
+    s:int = 0
+    d:int = 0
+    space:int = 0
+    mousex:int
+    mousey:int
+    mb1:bool
+    mb2:bool
+    mb3:bool
+    lctrl:bool = False
+    lalt:bool = False
+    lshift:bool = False
+    rctrl:bool = False
+    ralt:bool = False
+    rshift:bool = False
 
+    def __init__(self):
+        self.Events  = set() 
+        self.KDQueue = []
+        self.KUQueue = []
+        self.dt = 0
+        self.wheel:int = 0
+        self.quitEvent = False
+        self.mb1d:bool = False
+        self.mb2d:bool = False
+        self.mb3d:bool = False
+        self.mb1u:bool = False
+        self.mb2u:bool = False
+        self.mb3u:bool = False
 
-#Keyboard
-w:Binary = 0
-a:Binary = 0
-s:Binary = 0
-d:Binary = 0
+    @property
+    def mpos(self): return self.mousex,self.mousey
+    @classmethod
+    def m_pos(cls):
+        return Vector2(cls.mousex,cls.mousey)
+    @classmethod
+    def m_pos_normalized(cls):
+        return cls.m_pos() @ normalize_mult
 
-space:Binary = 0
-space_d:Binary = 0
-
-
-lshift:Binary = 0
-rshift:Binary = 0
-
-lctrl:Binary = 0
-rctrl:Binary = 0
-
-alt = 0
-
-KDQueue = []
-
-def update():
-    _update_mouse()
-    KDQueue.clear()
-    global wheel,w,a,s,d,lshift,rshift,lctrl,rctrl,m_d1,m_d2,m_d3,pressed,space,space_d,m_u1,m_u2,m_u3
-    wheel = 0
-    pressed = pygame.key.get_pressed()
-
-    m_d1,m_d2,m_d3,space_d,m_u1,m_u2,m_u3 = 0,0,0,0,0,0,0
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            quit()
-        elif event.type == pygame.KEYDOWN:
-            KDQueue.append(event.unicode)
-            if event.key == pygame.K_w:
-                w = 1
-            elif event.key == pygame.K_a:
-                a = 1
-            elif event.key == pygame.K_s:
-                s = 1
-            elif event.key == pygame.K_d:
-                d = 1
-            elif event.key == pygame.K_LSHIFT:
-                lshift = 1
-            elif event.key == pygame.K_RSHIFT:
-                rshift = 1
-            elif event.key == pygame.K_LCTRL:
-                lctrl = 1
-            elif event.key == pygame.K_RCTRL:
-                rctrl = 1
-            elif event.key == pygame.K_SPACE:
-                space = 1
-                space_d = 1
-            elif event.key == pygame.K_ESCAPE:
-                Settings.game_state = Settings.SETTINGS
-        elif event.type == pygame.KEYUP:
-            if event.key == pygame.K_w:
-                w = 0
-            elif event.key == pygame.K_a:
-                a = 0
-            elif event.key == pygame.K_s:
-                s = 0
-            elif event.key == pygame.K_d:
-                d = 0  
-            elif event.key == pygame.K_LSHIFT:
-                lshift = 0
-            elif event.key == pygame.K_RSHIFT:
-                rshift = 0
-            elif event.key == pygame.K_LCTRL:
-                lctrl = 0
-            elif event.key == pygame.K_RCTRL:
-                rctrl = 0      
-            elif event.key == pygame.K_SPACE:
-                space = 0
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
-                m_d1 = 1
-            elif event.button == 2:
-                m_d2 = 1
-            elif event.button == 3:
-                m_d3 = 1
-        elif event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 1:
-                m_u1 = 1
-            elif event.button == 2:
-                m_u2 = 1
-            elif event.button == 3:
-                m_u3 = 1        
-        elif event.type == pygame.MOUSEWHEEL:
-            wheel = event.y
-        elif event.type == pygame.MUSICEND: # type: ignore
-            Music.onMusicEnd()
-        elif event.type == pygame.VIDEORESIZE:
-            #check if we need to force another change
-            if FORCE_ASPECT_RATIO is not None: #BUG when you fullscreen it sometimes it gets caught in a loop to force ascpect ratio
-                #get the aspect that changed
-                change_on_x = s_width != event.w
-                change_on_y = s_height != event.h
-                if change_on_x:#prioritize changes on x
-                    event.h = FORCE_ASPECT_RATIO[1] * event.w // FORCE_ASPECT_RATIO[0]
-                elif change_on_y:
-                    event.w = FORCE_ASPECT_RATIO[0] * event.h // FORCE_ASPECT_RATIO[1]
-                
-                if change_on_x or change_on_y:
-                    call_OnResize(event.w,event.h)
-                    pygame.display.set_mode((event.w,event.h),pygame.OPENGL|pygame.RESIZABLE|pygame.DOUBLEBUF)
-            else:
-                pass
-                call_OnResize(event.w,event.h)
+    def clearALL(self):
+        self.clearMouse()
+        self.clearKeys()
+        self.__init__()
         
-        
+
+    def clearMouse(self):
+        self.mb1d = self.mb2d = self.mb3d = self.mb1u = self.mb2u = self.mb3u = self.mb1 = self.mb2 = self.mb3 = False
+        self.mousex = self.mousey = -999
+
+    def clearKeys(self):
+        self.KUQueue.clear()
+        self.KDQueue.clear()
+        self.lctrl = self.lalt = self.lshift = self.rctrl = self.ralt = self.rshift = False
+        self.w = self.a = self.s = self.d = 0
+
+event_dispatch:dict[int,Callable[[Input,event.Event],None]] = {}
+
+def onEvent(e):
+    def decorator(func:Callable[[Input,event.Event],None]):
+        event_dispatch[e] = func
+    return decorator
+
+key_aliases = {const.K_LEFT:'left_arrow',const.K_RIGHT:'right_arrow',const.K_UP:'up_arrow',const.K_DOWN:'down_arrow'}
+
+@onEvent(const.VIDEORESIZE)
+def onVIDEORESIZE(input:Input,event:event.Event):
+    if FORCE_ASPECT_RATIO is not None: #BUG when you fullscreen it sometimes it gets caught in a loop to force aspect ratio
+        #get the aspect that changed
+        change_on_x = s_width != event.w
+        change_on_y = s_height != event.h
+        if change_on_x:#prioritize changes on x
+            event.h = FORCE_ASPECT_RATIO[1] * event.w // FORCE_ASPECT_RATIO[0]
+        elif change_on_y:
+            event.w = FORCE_ASPECT_RATIO[0] * event.h // FORCE_ASPECT_RATIO[1]
+        if change_on_x or change_on_y:
+            call_OnResize(event.w,event.h)
+            pygame.display.set_mode((event.w,event.h),pygame.OPENGL|pygame.RESIZABLE|pygame.DOUBLEBUF)
+    else:
+        pass
+        call_OnResize(event.w,event.h)
+
+@onEvent(const.KEYDOWN)    
+def onKEYDOWN(input:Input,event:event.Event):
+    from pygame.scrap import get
+    global key_aliases
+    input.KDQueue.append(key_aliases.get(event.key,event.unicode))
+    if event.unicode == PASTE:
+        scrap = (get(const.SCRAP_TEXT) or b'').decode()
+        for letter in scrap:
+            input.KDQueue.append(letter)
+    elif event.key == const.K_LCTRL:
+        Input.lctrl = True
+    elif event.key == const.K_LALT:
+        Input.lalt = True
+    elif event.key == const.K_RCTRL:
+        Input.rctrl = True
+    elif event.key == const.K_RALT:
+        Input.ralt = True
+    elif event.key == const.K_w:
+        Input.w = 1
+    elif event.key == const.K_a:
+        Input.a = 1
+    elif event.key == const.K_s:
+        Input.s = 1
+    elif event.key == const.K_d:
+        Input.d = 1
+    elif event.key == const.K_SPACE:
+        Input.space = 1
+    elif event.key == const.K_LSHIFT:
+        Input.lshift = True
+    elif event.key == const.K_RSHIFT:
+        Input.rshift = True
+
+@onEvent(const.KEYUP)
+def onKEYUP(input:Input,event:event.Event):
+    input.KUQueue.append(event.unicode)
+    if event.key == const.K_LCTRL:
+        Input.lctrl = False
+    elif event.key == const.K_LALT:
+        Input.lalt = False
+    elif event.key == const.K_RCTRL:
+        Input.rctrl = False
+    elif event.key == const.K_RALT:
+        Input.ralt = False
+    elif event.key == const.K_w:
+        Input.w = 0
+    elif event.key == const.K_a:
+        Input.a = 0
+    elif event.key == const.K_s:
+        Input.s = 0
+    elif event.key == const.K_d:
+        Input.d = 0
+    elif event.key == const.K_SPACE:
+        Input.space = 0
+    elif event.key == const.K_LSHIFT:
+        Input.lshift = False
+    elif event.key == const.K_RSHIFT:
+        Input.rshift = False
+onEvent(const.QUIT)(lambda i,e: setattr(i,'quitEvent',True))
+
+@onEvent(const.MOUSEBUTTONDOWN)
+def onMOUSEBUTTONDOWN(i:Input,e:event.Event):
+    if e.button == 1:
+        i.mb1d = True
+    elif e.button == 2:
+        i.mb2d = True
+    elif e.button == 3:
+        i.mb3d = True
+    elif e.button == 4:
+        i.wheel -= 1
+    elif e.button == 5:
+        i.wheel += 1
+
+@onEvent(const.MOUSEBUTTONUP)
+def onMOUSEBUTTONUP(i:Input,e:event.Event):
+    if e.button ==1:
+        i.mb1u = True
+    elif e.button == 2:
+        i.mb2u = True
+    elif e.button == 3:
+        i.mb3u = True
+
+def getInput() -> Input:
+    global input
+    input = Input()
+    Input.mousex,Input.mousey = mouse.get_pos()
+    input.mb1,input.mb2,input.mb3 = mouse.get_pressed()
+    for e in event.get():
+        input.Events.add(e.type)
+        if f:=event_dispatch.get(e.type):
+            f(input,e)
+    return input
+
+
+input = Input()

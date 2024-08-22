@@ -3,10 +3,9 @@ CHUNK_SIZE = 8
 from typing import TYPE_CHECKING
 #from .utils import paste
 if TYPE_CHECKING:
-    from ..general_manager import Chunk
+    from ...general_manager import Chunk
 
 class GenPass:
-    
     def processChunk(self,chunk:'Chunk'): ...
 
 

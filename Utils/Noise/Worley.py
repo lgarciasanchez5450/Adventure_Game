@@ -11,7 +11,7 @@ from math import floor,hypot, sqrt
 import numpy
 import random
 try:
-    from .WorleyUtils import *
+    from .WorleyUtils import modifier,getAt,getArr,getArr2
 except:
     from WorleyUtils import *
 

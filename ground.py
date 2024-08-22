@@ -7,7 +7,7 @@ from Game_Typing import abstractmethod,T
 class Ground:
     __insts:dict[str,'Ground'] = {}
     id:int = -1
-    __slots__ = ('is_solid','surface_friction')
+    __slots__ = 'is_solid','surface_friction'
     @abstractmethod
     @staticmethod
     def __custom_init__(inst:T) -> T: '''Initialization on the basic shared instance of the ground''';...
@@ -35,7 +35,7 @@ class Ground:
         return f"Ground: {self.name}"
  
 class SolidGround(Ground):
-    __slots__ = tuple()
+    __slots__ = ()
     def __init_subclass__(cls) -> None:   
         initial = cls.__custom_init__
         def wrapper(inst:"Ground") -> "Ground":
@@ -85,6 +85,14 @@ class Grass(SolidGround):
     @staticmethod
     def __custom_init__(inst: "Ground") -> "Ground":
         inst.surface_friction = 9
+        return inst
+    
+class Sand(SolidGround):
+    id = GROUND_SAND
+    __slots__ = ()
+    @staticmethod
+    def __custom_init__(inst: "Ground") -> "Ground":
+        inst.surface_friction = 7
         return inst
     
 #sleep(10)

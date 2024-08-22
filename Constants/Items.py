@@ -1,6 +1,6 @@
-ITEM_COUNTER_SIZE = 13
 DEFAULT_ITEM_MAX_STACK = 64
 ITEM_MAX_LIFESPAN = 1 * 60 #seconds
+ITEM_SIZE = 32
 
 
 '''All Items Tags''' #this is the tag that the engine will use to look up the item's texture in-game

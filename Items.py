@@ -6,16 +6,16 @@ if __name__=='__main__':
 
     #Textures.initInThreadSimple()
 import Camera
-from game_math import Vector2, tanh, randomNudge
-
-from game_random import generate_point_from
-import Animation
-from Game_Typing import Optional, Surface, final, warn, TYPE_CHECKING, abstractmethod
+from Utils.Math.Vector import Vector2
+from Utils.Math.game_math import randomNudge
+import InputGame as Input
+import GameScreen.Animation as Animation
+from Game_Typing import Optional, Surface, final, TYPE_CHECKING, abstractmethod
 from Inventory import UniversalInventory
 import Settings
 import Time
+from math import tanh
 from typing import Callable,TypeVar
-import Input
 from EntityEffects import *
 _DEBUG_ = DEBUG
 if TYPE_CHECKING:
@@ -97,7 +97,7 @@ class Item:
         else:
             self.frames:tuple[pygame.Surface,...]  = Textures.items.get(self.tag,(Textures.NULL,))# at most 60 frames 
         self.inventory:UniversalInventory
-        self.animation = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero,(0,0)),self.fps,self.frames)
+        self.animation = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero(),(0,0)),self.fps,self.frames)
 
     @property
     def max_stack_count(self):
@@ -139,7 +139,7 @@ class Item:
         return self.tag is other.tag and self.name == other.name
     
     def __repr__(self) -> str:
-        if _DEBUG_: warn('This should not be called!!')
+        if _DEBUG_: print('This should not be called!!')
         return self.__class__.__name__ + ": " + self.tag +": " + self.name
 
     def __eq__(self,other):
@@ -205,7 +205,7 @@ class DrinkableItem(Item):
 
 class StrengthPotion(DrinkableItem):
     def __init__(self):
-        drinkAnim = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero,(0,0)),2,Textures.items['drinkingstrengthpotion'])
+        drinkAnim = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero(),(0,0)),2,Textures.items['drinkingstrengthpotion'])
         super().__init__(ITAG_STR_POTION, drinkAnim)
         pass
 
@@ -215,7 +215,7 @@ class StrengthPotion(DrinkableItem):
 
 class SpeedPotion(DrinkableItem):
     def __init__(self):
-        drinkAnim = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero,(0,0)),2,Textures.items['drinkingstrengthpotion'])
+        drinkAnim = Animation.SimpleAnimation(Camera.CSurface(Textures.NULL,Vector2.zero(),(0,0)),2,Textures.items['drinkingstrengthpotion'])
         super().__init__(ITAG_SPD_POTION, drinkAnim)
         pass
 
@@ -295,7 +295,7 @@ class BowBase(Item):
         time = min(Time.time - self.startTime,self.max_pull_time)
         speed_modifier = self.getArrowSpeedFromTime(time)
         direction = (Camera.world_position_from_normalized(Input.m_pos_normalized) - inventory.entity.pos).normalized
-        direction.from_tuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
+        direction.fromTuple(randomNudge(direction.x,direction.y,self.getArrowInstability(time)))
         inventory.entity.spawn_entity(self.loaded_item(inventory.entity.pos + direction/2,direction * speed_modifier,inventory.entity)) #type: ignore
         self.loaded_item = None
         self.startTime = None
