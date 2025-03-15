@@ -3,8 +3,7 @@ from .gpass import GenPass
 import numpy as np
 from numpy import typing as nptyping
 from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from ...general_manager import Chunk
+from .types import ChunkType
 
 class Gen:
     def __init__(self):
@@ -12,7 +11,7 @@ class Gen:
             
         ]
 
-    def processChunk(self, chunk:'Chunk'): 
+    def processChunk(self, chunk:ChunkType): 
         # assert chunk.data
 
         for pass_ in self.passes:

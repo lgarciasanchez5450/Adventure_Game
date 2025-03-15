@@ -471,7 +471,7 @@ class SpacedObject:
     self._perm = _init(seed)
     self._perm2 = _init(scramble(seed))
     self.spacing = spacing
-    self.diagonal_spacing = spacing * sqrt(2)/2
+    self.diagonal_spacing = spacing * (sqrt(2)/2)
     self.seed = seed
     self.to_check = [(x,y) for y in range(-2,3,1) for x in range(-2,3,1)]
     self.dot_difficulty = dot_difficulty

@@ -6,14 +6,9 @@ Ported by Hithere32123
 '''
 
 import numpy
-try:
-    from numba import njit
-except ImportError:
-    def njit(*args, **kwargs):
-        def wrapper(func):
-            return func
-        return wrapper  
-    
+
+from ..Math.Fast import njit
+
     
 
 PRIME_X = 0x5205402B9270C86F
@@ -284,11 +279,12 @@ def run_tests():
     print("Starting Stress Test. Rating Goal: 500")
     cycles = 1_000
     import multiprocessing
-    cache = [(x,y) for x in range(cycles) for y in range(cycles)]
-    with multiprocessing.Pool() as pool:
-        start = perf_counter()
-        pool.starmap(noise2,[(x,y) for x in range(cycles) for y in range(cycles)])
-        #[noise2(x,y) for x in range(cycles) for y in range(cycles)]
+    cache = ((x,y) for x in range(cycles) for y in range(cycles))
+    start = perf_counter()
+    # with multiprocessing.Pool() as pool:
+
+        # pool.starmap(noise2,[(x,y) for x in range(cycles) for y in range(cycles)])
+    [noise2(x,y) for x,y in cache]
     time = perf_counter()-start
     cycles_per_second = cycles*cycles / time
     print("Rating:",cycles_per_second.__trunc__()/1000)

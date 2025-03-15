@@ -12,14 +12,7 @@ __all__ = [
     'prange'
 ]
 
-try:
-    from numba import njit,prange
-except ImportError:
-    def njit(*args, **kwargs):
-        def wrapper(func):
-            return func
-        return wrapper  
-    prange = range
+from ..Math.Fast import njit, prange
     
 ### BEWARE ###
 # There be dragons in the depths below

@@ -2,11 +2,11 @@ import numpy as np
 CHUNK_SIZE = 8
 from typing import TYPE_CHECKING
 #from .utils import paste
-if TYPE_CHECKING:
-    from ...general_manager import Chunk
+from .types import ChunkType
+
 
 class GenPass:
-    def processChunk(self,chunk:'Chunk'): ...
+    def processChunk(self,chunk:ChunkType): ...
 
 
 
@@ -15,10 +15,10 @@ class Village(GenPass):
     blocksize = chunk_size * CHUNK_SIZE
     generated:dict[tuple[int,int],list[list[str]]] = {}
 
-    def processChunk(self,chunk:'Chunk'):
+    def processChunk(self,chunk:ChunkType):
         
-        own_cx = chunk.chunk_pos[0] // self.chunk_size
-        own_cy = chunk.chunk_pos[1] // self.chunk_size
+        own_cx = chunk.pos[0] // self.chunk_size
+        own_cy = chunk.pos[1] // self.chunk_size
         own_top = own_cy * self.chunk_size
         own_left = own_cx * self.chunk_size
         print('passing it')

@@ -1,151 +1,124 @@
 from .Vector import Vector2
 from numba import njit
-
+import glm
 class Collider:
-	__slots__ = 'x','y','width','height','bottom','top','left','right'
-	def __init__(self,x:float,y:float,w:float,h:float) -> None:
-		self.width:float = w
-		self.height:float = h
-		self.bottom:float = y+h
-		self.top:float = y
-		self.left:float = x
-		self.right:float = x+w
-
-	@classmethod
-	def SpawnOnBlockCenter(cls,x:int,y:int,w:float,h:float):
-		assert isinstance(x,int) and isinstance(y,int), 'x and y must be integers!'
-		xPos = x+.5  - w/2
-		yPos = y + .5 - h/2
-		return Collider(xPos,yPos,w,h)
-	
-	@classmethod
-	def spawnFromCenter(cls,x,y,w,h):
-		xPos = x - w/2
-		yPos = y - h/2
-		return Collider(xPos,yPos,w,h)
+	__slots__ = 'c','s'
+	def __init__(self,position:glm.vec3,size:tuple[float,float,float]|glm.vec3) -> None:
+		self.c = position
+		self.s = glm.vec3(size)
+		
 	
 	def move_x(self,x:float):
-		self.left += x
-		self.right = self.left + self.width
-
+		self.c.x += x
 	def move_y(self,y:float):
-		self.top += y
-		self.bottom = self.top + self.height
-
-	def move(self,displacement:Vector2):
-		self.move_x(displacement.x)
-		self.move_y(displacement.y)
+		self.c.y += y
+	def move_z(self,z:float):
+		self.c.z += z
+	def move(self,displacement:glm.vec3):
+		self.c += displacement
 
 	def setCenterX(self,x):
-		self.left -= self.left + self.width/2  -  x
-		self.right = self.left+self.width
-
+		self.c.x = x
 	def setCenterY(self,y):
-		self.top -= self.top + self.height/2  -  y
-		self.bottom = self.top+self.height
-
-	def setCenter(self,x:float,y:float):
-		self.setCenterX(x)
-		self.setCenterY(y)
+		self.c.y = y
+	def setCenterZ(self,z):
+		self.c.z = z
+	def setCenter(self,x:float,y:float,z:float):
+		self.c.xyz = x,y,z
 	
-	def setRight(self,right:float):
-		self.right = right
-		self.left = right-self.width
-	
-	def setLeft(self,left:float):
-		self.left = left
-		self.right = left + self.width
-
-	def setBottom(self,bottom:float):
-		self.bottom = bottom
-		self.top = bottom-self.height
-		self.top = self.top
-
-
-	def setTop(self,top:float):
-		self.top = top
-		self.bottom = top + self.height
+	def setXPositive(self,right:float):
+		self.c.x = right - self.s.x/2
+	def setXNegative(self,left:float):
+		self.c.x = left + self.s.x/2
+	def setYPositive(self,bottom:float):
+		self.c.y = bottom - self.s.y/2
+	def setYNegative(self,top:float):
+		self.c.y = top + self.s.y/2
+	def setZPositive(self,z:float):
+		self.c.z = z - self.s.z/2
+	def setZNegative(self,z:float):
+		self.c.z = z + self.s.z/2
 
 	@property
-	def size(self) -> tuple[float,float]:
-		return self.width,self.height
+	def x_positive(self):
+		return self.c.x + self.s.x/2
+	@property
+	def x_negative(self):
+		assert self.s.x > 0
+		return self.c.x - self.s.x/2
+	@property
+	def y_positive(self):
+		return self.c.y + self.s.y/2
+	@property
+	def y_negative(self):
+		assert self.s.y > 0
+		return self.c.y - self.s.y/2
+	@property
+	def z_positive(self):
+		return self.c.z + self.s.z/2
+	@property
+	def z_negative(self):
+		assert self.s.z > 0
+
+		return self.c.z - self.s.z/2
+
 	
-	def get_size(self) -> Vector2:
-		return Vector2(self.width,self.height)
+	@property
+	def size(self):
+		return self.s.to_tuple()
 
 	@property
 	def centerx(self) -> float:
-		return self.left + self.width/2
+		return self.c.x
 	
 	@property
 	def centery(self) -> float:
-		return self.top + self.height/2
+		return self.c.y
 	
 	@property
-	def center(self) -> tuple[float,float]:
-		return (self.centerx,self.centery)
-
-	@property
-	def topleft(self):
-		return (self.left,self.top)
-
-	@property
-	def topright(self):
-		return (self.right,self.top)
+	def centerz(self) -> float:
+		return self.c.z
 	
 	@property
-	def bottomleft(self):
-		return (self.left,self.bottom)
-
-	@property
-	def bottomright(self):
-		return (self.right,self.bottom)
+	def center(self) -> tuple[float,float,float]:
+		return self.c.to_tuple()
 
 	@centerx.setter
 	def centerx(self,newVal:float): 
-		self.left = newVal - self.width/2
-		self.right = self.left + self.width
+		self.setCenterX(newVal)
 
 	@centery.setter
 	def centery(self,newVal:float): 
-		self.top =  newVal - self.height/2
-		self.bottom = self.top + self.height
+		self.setCenterY(newVal)
+
+	@centerz.setter
+	def centerz(self,newVal:float): 
+		self.setCenterZ(newVal)
 
 	@center.setter
-	def center(self,newVal:tuple[float,float]):
-		self.centerx = newVal[0]
-		self.centery = newVal[1]
+	def center(self,newVal:tuple[float,float,float]|glm.vec3):
+		self.setCenter(*newVal)
 		 
-	@topleft.setter
-	def topleft(self,newVal): raise SyntaxError('This Value cannot be set!')
-	
-	@topright.setter
-	def topright(self,newVal): raise SyntaxError('This Value cannot be set!')
-	
-	@bottomleft.setter
-	def bottomleft(self,newVal): raise SyntaxError('This Value cannot be set!')
-	
-	@bottomright.setter
-	def bottomright(self,newVal): raise SyntaxError('This Value cannot be set!')
-	
+
 
 	def collide_collider(self,c:'Collider'):
-		return _rect_overlap(self.left,self.top,self.right,self.bottom,c.left,c.top,c.right,c.bottom)
+		dist = self.c-c.c
+		size = self.s + c.s
+		return (-size.x < dist.x < size.x) and (-size.y < dist.y < size.y) and (-size.z < dist.z < size.z)
 
-	def collide_point_inclusive(self,point:tuple[float,float]|Vector2):
-		x,y = point
-		return self.left <= x <= self.right and self.top <= y <= self.bottom
+	def collide_point_inclusive(self,point:tuple[float,float,float]|glm.vec3):
+		dist = self.c-point
+		size = self.s
+		return (-size.x < dist.x < size.x) and (-size.y < dist.y < size.y) and (-size.z < dist.z < size.z)
 
-	def collide_point_exclusive(self,point:tuple[float,float]):
-		x,y = point
-		return self.left < x < self.right and self.top < y < self.bottom
+	def collide_point_exclusive(self,point:tuple[float,float,float]|glm.vec3):
+		dist = self.c-point
+		size = self.s
+		return (-size.x <= dist.x <= size.x) and (-size.y <= dist.y <= size.y) and (-size.z < dist.z < size.z)
 		
 	def __str__(self):
-		return f'Collider(x: {self.left:.3f}, y: {self.top:.3f}, w: {self.width:.3f}, h: {self.height:.3f})'
+		return f'Collider(c:{self.c.to_tuple()},s:{self.s.to_tuple()})'
 
 
-## Speedups ##
-
-@njit
-def _rect_overlap(x1:float,x2:float,x3:float,x4:float,y1:float,y2:float,y3:float,y4:float):
-    return (min(x3, y3) > max(x1, y1)) and (min(x4, y4) > max(x2, y2))
+	def copy(self):
+		return Collider(glm.vec3(self.c),self.s)

@@ -20,14 +20,17 @@ __all__ = [
 
 try:
     from .Worley import WorleyNoise, WorleyNoiseSimple,WorleyNoiseSmooth
-except Exception as err:
+except Exception:
     from Worley import WorleyNoise, WorleyNoiseSimple,WorleyNoiseSmooth #if we are running from this script
 
 try:
     from Perlin import noise2,noise2_array,set_seed #type: ignore
-except ImportError as err:
+except ImportError:
     print("Custom C Module Has not been built, defaulting back to pure python suport, this will slow down Noise creation significantly")
-    from Noise.perlin2 import noise2,noise2_array,set_seed
+    try:
+        from .perlin2 import noise2,noise2_array,set_seed
+    except ImportError:
+        from Noise.perlin2 import noise2,noise2_array,set_seed
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:

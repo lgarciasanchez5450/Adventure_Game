@@ -1,26 +1,70 @@
 from typing import final,Callable,Any,Generic,Generator,Iterable, Callable,TypeVar
 from .Fast import njit
-from math import cos, sin,pi,hypot,sqrt,atan2,floor,log2,ceil,acos,tanh
+from math import cos, sin,pi,hypot,sqrt,atan2,floor,log2,ceil,acos,tanh,exp
 from random import random,randint
 from collections import deque
 import numpy as np
-
+T = TypeVar('T')
 DEBUG = True
 #define inclusive_range
 def inclusive_range(start:int,stop:int,step:int) -> Generator[int,None,None]: #type: ignore
 	yield from range(start,stop,step)
 	yield stop
+
 try:
-	import entity_manager
-	inclusive_range:Callable[[int,int,int],Generator[int,None,None]] = entity_manager.inclusive_range
+	import entity_manager2  #type: ignore
+	inclusive_range:Callable[[int,int,int],Generator[int,None,None]] = entity_manager2.inclusive_range
+
 except:
-	pass
+	print('Entity Manager Module has not been compiled, defaulting back to pure python, this will slow down physics.')
+def collide_chunks(x1:float,y1:float,z1:float,x2:float,y2:float,z2:float,chunk_size:int): # type: ignore[same-name]
+	cx1 = (round(x1,5) / chunk_size).__floor__()
+	cy1 = (round(y1,5) / chunk_size).__floor__()
+	cz1 = (round(z1,5) / chunk_size).__floor__()
+	cx2 = (round(x2,5) / chunk_size).__ceil__()
+	cy2 = (round(y2,5) / chunk_size).__ceil__()
+	cz2 = (round(z2,5) / chunk_size).__ceil__()
+	return[(x,y,z) for x in range(cx1,cx2,1) for z in range(cz1,cz2,1) for y in range(cy1,cy2,1)]
+try:
+	raise ModuleNotFoundError()
+	import entity_manager2 #type: ignore
+	collide_chunks:Callable[[float,float,float,float,float,float,int],tuple[tuple[int,int,int],...]] = entity_manager2.collide_chunks #type: ignore
+except (ModuleNotFoundError or ImportError) as err:
+	print('Error Importing entity_manager2')
+
+	
+
+def expDecay(a:T,b:T,decay:float,dt:float) -> T:
+	'''Has the unique property that repeated calls in the pattern of 
+	 >>> a = 0
+	 >>> b = 100
+	 >>> decay = 1 #Number representing after one second what a would be 
+	 >>> for _ in range(10):
+	 >>>   a = expDecay(a,b,decay,0.1)
+	 >>> a
+	 >>> 63.212055882855786
+	 >>> a = 0
+	 >>> for _ in range(20):
+	 >>>   a = expDecay(a,b,decay,0.05)
+	 >>> a
+	 >>> 63.212055882855786 #same as previously
+	This makes this function usefull for lerp smooth following with framerate independance
+	'''
+	return 	b+(a-b)*exp(-decay*dt) #type: ignore
+
+
+def smoothFollow(a:float,b:float,decay:float,dt:float,close_threshold:float) -> float:
+	if abs(a-b) < close_threshold:
+		return b
+	return expDecay(a,b,decay,dt)
+
+
+
 
 half_sqrt_2 = (2**(1/2))/2
 TO_RADIANS = pi / 180
 TO_DEGREES = 180 / pi
 TWO_PI = 2*pi
-
 
 T = TypeVar("T")
 
@@ -50,116 +94,17 @@ def randomNudge(x:float,y:float,nudgeMag:float): #this random nudge prefers smal
 	return  set_mag(x,y,mag)
 	
 
-def getMostSigBits(x:int,bits:int) -> int:
-	return x >> max(0,x.bit_length() - bits)
+def getMostSigBits(x:int,n:int) -> int:
+	'''Get n most significant bits of x '''
+	return x >> max(0,x.bit_length() - n)
 
 def serialIter(*iters:Iterable):
 	for iter in iters:
 		yield from iter
 
-
-
-class Vector2Int:
-	__slots__  = 'x','y'
-	def __init__(self,x:int,y:int):
-		self.x = x
-		self.y = y
-
-	@final
-	@classmethod
-	def zero(cls):
-		return Vector2Int(0,0)
-	
-	def __eq__(self,__object: "Vector2Int"):
-		return self.x == __object.x and self.y == __object.y
-	
-	def __add__(self,__object: "Vector2Int"):
-		return Vector2Int(self.x + __object.x,self.y + __object.y)
-	
-	def __sub__(self,__object: "Vector2Int"):
-		return Vector2Int(self.x - __object.x,self.y - __object.y)
-	
-	def __mul__(self,__object:int):
-		return Vector2Int(self.x *__object,self.y * __object)
-	
-	def __rmul__(self,__object:int):
-		return Vector2Int(self.x *__object,self.y * __object)
-	
-	def __itruediv__(self,__object:int):
-		self.x /= __object
-		self.y /= __object
-		return self
-
-	def __floordiv__(self,__object:int):
-		return Vector2Int(self.x // __object, self.y // __object)
-	
-	def moved_by(self,x:int,y:int):
-		return Vector2Int(self.x + x, self.y + y)
-	
-	def __matmul__(self,__object: "Vector2Int"):
-		return Vector2Int(self.x*__object.x,self.y*__object.y)
-	
-	def __getitem__(self,__index:int) -> int:
-		return [self.x,self.y][__index]
-	
-	def __iadd__(self,__object: "Vector2Int"):
-		self.x += __object.x
-		self.y += __object.y
-		return self
-
-	def __isub__(self,__object: "Vector2Int"):
-		self.x -= __object.x
-		self.y -= __object.y
-		return self
-
-	def __imul__(self,__object:int):
-		self.x *= __object
-		self.y *= __object
-		return self
-
-	def __str__(self) -> str:
-		return f"Vec2Int(x:{self.x}, y:{self.y})"	
-	
-	def __neg__(self):
-		return Vector2Int(-self.x,-self.y)
-
-	
-	def magnitude_squared(self):
-		return self.x*self.x+self.y*self.y
-	
-	def magnitude(self):
-		return sqrt(self.x*self.x + self.y * self.y)
-	
-	def reset(self):
-		'''Reset each axis to 0'''
-		self.x = 0
-		self.y = 0
-
-	def __bool__(self):
-		return (self.x or self.y).__bool__()
-	
-	def __iter__(self):
-		yield self.x
-		yield self.y
-	
-	def set_to(self,__object:'Vector2Int'):
-		self.x = __object.x
-		self.y = __object.y
-
-	@classmethod
-	def newFromTuple(cls,tup:tuple[int,int]):
-		return Vector2Int(tup[0],tup[1])
-	def from_tuple(self,tup:tuple[int,int]):
-		self.x = tup[0]
-		self.y = tup[1]
-
-	@property
-	def tuple(self):
-		return (self.x,self.y)
-
-	def copy(self):
-		return Vector2Int(self.x,self.y)
-
+@njit
+def manhattan_distance(x1,y1,x2,y2):
+	return abs(x1-x2)+abs(y1-y2)
 
 
 class Array(list,Generic[T]):
@@ -223,10 +168,9 @@ class Counter(Generic[T]):
 		assert __index in (0,1), 'Counter only supports 0 and 1 as indexes'
 		return self.b if __index else self.a
 
-
 def make2dlist(x:int,y:int|None = None) -> tuple[list[None],...]:
 	y = x if y is None else y
-	return tuple([None]*x for _ in range(y))
+	return tuple([[None]*x for _ in range(y)])
 
 @njit(cache = True)
 def normalize(x,y) -> tuple[float,float]:
@@ -240,62 +184,4 @@ def set_mag(x,y,mag:int|float) -> tuple[float,float]:
 	ux,uy = normalize(x,y)
 
 	return  (ux*mag,uy*mag)
-
-
-
-
-@njit
-def rgb_to_hsv(r,g,b): 
-	M = max(r, g, b)
-	m = min(r, g, b)
-
-	#And then V and S are defined by the equations
-
-	V = M/255
-	S = 1 - m/M  if M > 0 else 0
-
-	#As in the HSI and HSL color schemes, the hue H is defined by the equations
-	d = sqrt(r*r+g*g+b*b-r*g-r*b-g*b)
-	H = acos((r - g/2 - b/2)/d)  if g >= b else pi - acos( (r - g/2 - b/2)/d)  
-	return H/pi,S,V
-
-@njit
-def hsv_to_rgb(h,s,v): 
-	h *= 360
-	M = 255*v
-	m = M*(1-s)
-	#Now compute another number, z, defined by the equation
-	z = (M-m)*(1-abs((h/60)%2-1))
-	#Now you can compute R, G, and B according to the angle measure of H. There are six cases. 
-	R,G,B = 0,0,0
-	if 0 <= h < 60:
-		R = M
-		G = z + m
-		B = m
-
-	elif 60 <= h < 120:
-		R = z + m
-		G = M
-		B = m
-
-	elif 120 <= h < 180:
-		R = m
-		G = M
-		B = z + m
-
-	elif 180 <= h < 240:
-		R = m
-		G = z + m
-		B = M
-
-	elif 240 <= h < 300:
-		R = z + m
-		G = m
-		B = M
-
-	elif 300 <= h <= 360:
-		R = M
-		G = m
-		B = z + m
-	return R,G,B
 

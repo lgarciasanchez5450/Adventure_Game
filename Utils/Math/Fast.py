@@ -1,12 +1,23 @@
 from typing import Callable,Callable,ParamSpec,TypeVar
+__all__ = [
+	'njit',
+	'prange',
+	'cache',
+	'literal_unroll'
+]
+
+
 try:
-	from numba import njit,prange
+	from numba import njit,prange,literal_unroll
 except ImportError:
+	print('Numba module not found, this can affect performance greatly.')
 	def njit (*args,**kwargs):
 		def wrapper(func):
 			return func
 		return wrapper
 	prange = range
+	def literal_unroll(container): 
+		return container
 
 P = ParamSpec("P")
 T = TypeVar("T")

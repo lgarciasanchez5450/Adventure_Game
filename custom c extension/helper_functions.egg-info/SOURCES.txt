@@ -1,6 +1,0 @@
-build_helper_functions.py
-helper_functions.c
-helper_functions.egg-info/PKG-INFO
-helper_functions.egg-info/SOURCES.txt
-helper_functions.egg-info/dependency_links.txt
-helper_functions.egg-info/top_level.txt

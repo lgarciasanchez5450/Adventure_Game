@@ -13,20 +13,20 @@ class Vector2:
 	@final
 	@classmethod
 	def zero(cls):
-		return Vector2(0.0,0.0)
+		return cls(0.0,0.0)
 	
 	@final
 	@classmethod
 	def random(cls):
 		'''A random Vector2 with a random distribution from [-1,1] on both x and y axis'''
-		return Vector2(random()*2-1,random()*2-1)
+		return cls(random()*2-1,random()*2-1)
 		
 	@final
 	@classmethod
 	def randdir(cls):
 		'''Random Unit Vector'''
 		angle = 2*pi*random()
-		return Vector2(cos(angle),sin(angle))
+		return cls(cos(angle),sin(angle))
 	
 
 
@@ -34,19 +34,19 @@ class Vector2:
 		return self.x == __object.x and self.y == __object.y
 	
 	def __add__(self,__object: "Vector2"):
-		return Vector2(self.x + __object.x,self.y + __object.y)
+		return self.__class__(self.x + __object.x,self.y + __object.y)
 	
 	def __sub__(self,__object: "Vector2"):
-		return Vector2(self.x - __object.x,self.y - __object.y)
+		return self.__class__(self.x - __object.x,self.y - __object.y)
 	
 	def __mul__(self,__object: float):
-		return Vector2(self.x *__object,self.y * __object)
+		return self.__class__(self.x *__object,self.y * __object)
 	
 	def __rmul__(self,__object:float):
-		return Vector2(self.x *__object,self.y * __object)
+		return self.__class__(self.x *__object,self.y * __object)
 
 	def __truediv__(self,__object:float):
-		return Vector2(self.x / __object, self.y / __object)
+		return self.__class__(self.x / __object, self.y / __object)
 	
 	def __itruediv__(self,__object:float):
 		self.x /= __object
@@ -54,16 +54,16 @@ class Vector2:
 		return self
 
 	def __floordiv__(self,__object:float):
-		return Vector2(self.x // __object, self.y // __object)
+		return self.__class__(self.x // __object, self.y // __object)
 	
 	def moved_by(self,x:float,y:float):
-		return Vector2(self.x + x, self.y + y)
+		return self.__class__(self.x + x, self.y + y)
 
 	def dot(self,__object: "Vector2"):
 		return self.x*__object.x + self.y*__object.y
 	
 	def __matmul__(self,__object: "Vector2"):
-		return Vector2(self.x*__object.x,self.y*__object.y)
+		return self.__class__(self.x*__object.x,self.y*__object.y)
 	
 	def __imatmul__(self,__object: "Vector2"):
 		self.x *= __object.x
@@ -92,17 +92,17 @@ class Vector2:
 		return f"Vec2(x:{self.x}, y:{self.y})"	
 	
 	def __neg__(self):
-		return Vector2(-self.x,-self.y)
+		return self.__class__(-self.x,-self.y)
 	
 	@property
 	def inverse(self):
-		return Vector2(1/self.x,1/self.y)
+		return self.__class__(1/self.x,1/self.y)
 	
 	@property
 	def normalized(self):
-		if not (self.x or self.y): return Vector2.zero()
+		if not (self.x or self.y): return self.__class__.zero()
 		m = self.magnitude()
-		return Vector2(self.x/m,self.y/m)
+		return self.__class__(self.x/m,self.y/m)
 	
 	def magnitude_squared(self):
 		return self.x*self.x+self.y*self.y
@@ -129,7 +129,7 @@ class Vector2:
 
 	@classmethod
 	def newFromTuple(cls,tup:tuple[float,float]):
-		return Vector2(tup[0],tup[1])
+		return cls(tup[0],tup[1])
 
 	def fromTuple(self,tup:tuple[float,float]):
 		self.x = tup[0]
@@ -144,7 +144,7 @@ class Vector2:
 		return (self.x.__trunc__(),self.y.__trunc__())
 
 	def copy(self):
-		return Vector2(self.x,self.y)
+		return self.__class__(self.x,self.y)
 	
 	def rotate(self,theta:float):
 		cs = cos(theta)
@@ -155,7 +155,7 @@ class Vector2:
 		self.y = py
 
 	def floored(self):
-		return Vector2(self.x.__floor__(),self.y.__floor__())
+		return self.__class__(self.x.__floor__(),self.y.__floor__())
 
 	def angle(self) -> float:
 		return atan2(self.y,self.x)
@@ -173,7 +173,7 @@ class Vector2:
 		
 	def asMagnitudeOf(self,other:float) -> 'Vector2':
 		m = self.magnitude()
-		return Vector2(self.x * other/m, self.y * other/m)
+		return self.__class__(self.x * other/m, self.y * other/m)
 	
 	def setMagnitude(self,other:float):
 		m = self.magnitude()

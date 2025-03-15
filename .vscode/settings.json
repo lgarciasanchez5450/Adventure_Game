@@ -4,7 +4,9 @@
         "string.h": "c",
         "stdlib.h": "c",
         "arrayobject.h": "c",
-        "cmath": "c"
+        "cmath": "c",
+        "functional": "c",
+        "tupleobject.h": "c"
     },
     "python.analysis.typeCheckingMode": "basic",
     

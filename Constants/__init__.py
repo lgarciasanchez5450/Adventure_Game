@@ -4,10 +4,10 @@ to a more modular, smaller, specific constants
 By Hithere32123
 '''
 
-from Constants.ArmourTypes import * 
-from Constants.DamageTypes import *
-from Constants.Generation import * 
-from Constants.Display import *
-from Constants.Items import *
-from Constants.Music import *
-from Constants.Misc import *
+from .ArmourTypes import * 
+from .Damage import *
+from .Generation import * 
+from .Display import *
+from .Items import *
+from .Music import *
+from .Misc import *
