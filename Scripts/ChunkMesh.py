@@ -6,12 +6,11 @@ from Scripts.Chunk import Chunk,ChunkStatus
 import glm
 from Utils.Math.Fast import njit,literal_unroll
 if typing.TYPE_CHECKING:
-    from Scene import RasterScene
+    from Scene import Scene
 
 class ChunkMesh:
     __slots__ = 'ctx','model_uniform','program','vao','vbo','dirty','chunk','lod'
     def __init__(self,ctx:mgl.Context,program:mgl.Program,chunk:Chunk) -> None:
-        
         self.ctx = ctx
         self.model_uniform = program['m_model']
         self.program = program
@@ -25,8 +24,12 @@ class ChunkMesh:
         
     def buildMesh(self):
         if self.chunk.status != ChunkStatus.GENERATED: return False
-        if self.chunk.blocks is None: return True
-        if not np.any(self.chunk.blocks): 
+        if self.chunk.blocks is None or not np.any(self.chunk.blocks):
+            # if there are no blocks make sure that is reflected in vao and vbo
+            if self.vbo is not None: self.vbo.release()
+            if self.vao is not None: self.vao.release() 
+            self.vao = None
+            self.vbo = None   
             return True
         if self.vbo is not None: self.vbo.release()
         if self.vao is not None: self.vao.release()
@@ -42,9 +45,10 @@ class ChunkMesh:
         return True
 
     def render(self):
-        if self.vao is None: return
+        if self.vao is None: return False
         self.model_uniform.write(glm.translate(glm.vec3(self.chunk.pos) * Chunk.SIZE)) #type: ignore
         self.vao.render()
+        return True
         
 
     def release(self):
@@ -93,46 +97,46 @@ def _build_mesh(b:np.ndarray,chunk_size):
             for z in range(chunk_size):
                 if b[x,y,z] == 0: continue
                 block_id  = b[x,y,z]
-                #top
-                if is_air(b,x,y+1,z):
-                    index = add_data(data,index,
-                                    x,y+1,z,0,block_id,
-                                    x,y+1,z+1,0,block_id,
-                                    x+1,y+1,z+1,0,block_id,
-                                    x,y+1,z,0,block_id,
-                                    x+1,y+1,z+1,0,block_id,
-                                    x+1,y+1,z,0,block_id,
-                                    )
-                #bottom
-                if is_air(b,x,y-1,z):
-                    index = add_data(data,index,
-                                    x,y,z,1,block_id,
-                                    x+1,y,z+1,1,block_id,
-                                    x,y,z+1,1,block_id,
-                                    x,y,z,1,block_id,
-                                    x+1,y,z,1,block_id,
-                                    x+1,y,z+1,1,block_id,
-                                    )
                 #x+
                 if is_air(b,x+1,y,z):
                     index = add_data(data,index,
-                                    x+1,y+1,z+1,2,block_id,
-                                    x+1,y,z+1,2,block_id,
-                                    x+1,y,z,2,block_id,
-                                    x+1,y+1,z+1,2,block_id,
-                                    x+1,y,z,2,block_id,
-                                    x+1,y+1,z,2,block_id,
+                                    x+1,y+1,z+1,0,block_id,
+                                    x+1,y,z+1,0,block_id,
+                                    x+1,y,z,0,block_id,
+                                    x+1,y+1,z+1,0,block_id,
+                                    x+1,y,z,0,block_id,
+                                    x+1,y+1,z,0,block_id,
                                 )
                 #x-
                 if is_air(b,x-1,y,z):
                     index = add_data(data,index,
-                                    x,y+1,z,3,block_id,
-                                    x,y,z,3,block_id,
-                                    x,y,z+1,3,block_id,
-                                    x,y+1,z,3,block_id,
-                                    x,y,z+1,3,block_id,
-                                    x,y+1,z+1,3,block_id,
+                                    x,y+1,z,1,block_id,
+                                    x,y,z,1,block_id,
+                                    x,y,z+1,1,block_id,
+                                    x,y+1,z,1,block_id,
+                                    x,y,z+1,1,block_id,
+                                    x,y+1,z+1,1,block_id,
                                 )
+                #top
+                if is_air(b,x,y+1,z):
+                    index = add_data(data,index,
+                                    x,y+1,z,2,block_id,
+                                    x,y+1,z+1,2,block_id,
+                                    x+1,y+1,z+1,2,block_id,
+                                    x,y+1,z,2,block_id,
+                                    x+1,y+1,z+1,2,block_id,
+                                    x+1,y+1,z,2,block_id,
+                                    )
+                #bottom
+                if is_air(b,x,y-1,z):
+                    index = add_data(data,index,
+                                    x+1,y,z+1,3,block_id,
+                                    x,y,z+1,3,block_id,
+                                    x,y,z,3,block_id,
+                                    x+1,y,z+1,3,block_id,
+                                    x,y,z,3,block_id,
+                                    x+1,y,z,3,block_id,
+                                    )
                 #z+
                 if is_air(b,x,y,z+1):
                     index = add_data(data,index,
@@ -153,7 +157,6 @@ def _build_mesh(b:np.ndarray,chunk_size):
                                     x,y,z,5,block_id,
                                     x,y+1,z,5,block_id,
                                 )
-
     return data[:index]
  
 

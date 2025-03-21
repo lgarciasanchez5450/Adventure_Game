@@ -1,27 +1,15 @@
+from numpy import typing as nptyping
+
+from Utils import Pipeline
+from Utils.Noise.OpenSimplexLayered import LayeredOpenSimplex,OpenSimplex
+
+
+from Scripts.Chunk import Chunk
 from Scripts import Biome, Block
-from Scripts.Chunk import Chunk #type: ignore
-import typing
 from collections import deque
-if typing.TYPE_CHECKING:
-    from Scripts.ChunkManager import ChunkManager
 
 
-
-class PipelineNode[I,O]:
-    def __init__(self,out:deque[O]):
-        self.queued:deque[I] = deque()
-        self.out:deque[O] = out
-
-    def queueChunks(self,chunks:typing.Iterable[I]):
-        self.queued.extend(chunks)
-    
-    def queueChunk(self,chunk:I):
-        self.queued.append(chunk)
-
-    def update(self):
-        pass
-
-class StructureNode(PipelineNode[Chunk,Chunk]):
+class StructureNode(Pipeline.Node[Chunk,Chunk]):
     def __init__(self, out: deque[Chunk]):
         super().__init__(out)
 
@@ -36,29 +24,7 @@ class StructureNode(PipelineNode[Chunk,Chunk]):
             chunk.blocks[2:4,:,2:4] = 1
         self.out.append(chunk)
 
-# A = typing.TypeVar('A')
-T_ = typing.TypeVar('T_')
-T_2 = typing.TypeVar('T_2')
-# B = typing.TypeVar('B')
-class Pipeline[A,B]:
-    def __init__(self,first:list[PipelineNode[A,T_]],nodes:list[PipelineNode],lasts:list[PipelineNode[T_2,B]]):
-        self.firsts = first
-        self.lasts = lasts
-        self.nodes = nodes
-
-    def queueChunk(self,chunk:A):
-        for first in self.firsts:
-            first.queueChunk(chunk)
-    
-    def update(self):
-        for first in self.firsts:
-            first.update()
-        for node in self.nodes:
-            node.update()
-        for last in self.lasts:
-            last.update()
-
-class TerrainNode(PipelineNode[Chunk,Chunk]):
+class TerrainNode(Pipeline.Node[Chunk,Chunk]):
     def __init__(self, out: deque[Chunk]):
         super().__init__(out)
         self.dimension_heights = np.array([float('-inf'),-5000, -1000, -500, 1000,float('inf')],dtype=np.float32)
@@ -69,25 +35,6 @@ class TerrainNode(PipelineNode[Chunk,Chunk]):
         self.out.append(generate(self.queued.popleft(),self.dimension_heights))
 
 
-# class TerrainGenerator:
-#     MAX_CHUNKS_GEN_PER_FRAME = 150
-
-#     def __init__(self,chunkmanager:"ChunkManager"):
-#         self.chunk_manager = chunkmanager
-#         #                                                   nether   |  overworld
-#         self.queued:deque[Chunk] = deque()
-
-#     def queueChunk(self,chunk:Chunk):
-#         self.queued.append(chunk)
-
-#     def update(self) -> None:
-#         queue = self.queued
-#         i = 0
-#         while queue and i < self.MAX_CHUNKS_GEN_PER_FRAME:
-#             self.chunk_manager.dirty_chunks.add(generate(queue.popleft(),self.dimension_heights).pos)
-#             i+=1
-
-from Utils.Noise.OpenSimplexLayered import LayeredOpenSimplex,OpenSimplex
 overworld = {
     "height": LayeredOpenSimplex(0.01,8,2,0.5),
     "temperature": LayeredOpenSimplex(0.01,3,2,0.5, lambda o : list(range(10,o+10,1))),
@@ -158,7 +105,6 @@ def generate(chunk:Chunk,dim_heights:np.ndarray):
     chunk.status = ChunkStatus.GENERATED
     return chunk
 
-from numpy import typing as nptyping
 
 
 def getChunkDimensionality(dim_heights:nptyping.NDArray[np.float32],y:float):

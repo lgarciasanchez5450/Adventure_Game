@@ -1,20 +1,22 @@
 import typing
 import glm
-from Scripts.LivingEntity import AliveEntity
-from pygame import constants as const
-from Scripts.Chunk import Chunk
+from Entities.AliveEntity import AliveEntity
+from Scripts.Inventory import Hotbar
 if typing.TYPE_CHECKING:
-    from Scene import RasterScene
+    from Scene import Scene
+
+
 class Player(AliveEntity):
     species ='human'
-    __slots__ = 'cx','cy','can_move','attacking','state','showingInventory','hotbar','ui','hbui','walking_particle'
-    def __init__(self,scene:"RasterScene",position:tuple[int,int,int],size:tuple[float,float,float]|glm.vec3,health:float,max_health:float):
-        super().__init__(scene,position,size,health,max_health)
+    __slots__ = 'can_move','attacking','state','showingInventory','hotbar','ui','hbui','walking_particle'
+    def __init__(self,scene:"Scene",position:tuple[int,int,int],size:tuple[float,float,float]|glm.vec3,inventory_size:int,health:float,max_health:float):
+        super().__init__(scene,position,size,inventory_size,health,max_health)
         self.set_up_animation()
         self.time = scene.engine.time
         self.engine = scene.engine
         self.speed = 4
         self.cx = position
+        self.hotbar = Hotbar(self.inventory,10)
 
         # stats
         # self.exp = 5000 #dont make attribute points (overused). make exp have another purpose. attribute points can lead to severely op setups and the player getting exactly what they want. 
@@ -23,7 +25,6 @@ class Player(AliveEntity):
         self.attacking = False
         self.states = ['relaxed','focused']
         self.state = None
-        self.showingInventory = False
         
         #humans have 27 inventory spots and 9 hotbar spots
         # self.hotbar = Hotbar(self.inventory,27,28,29,30,31,32,33,34,35) # the numbers at the end mean the inventory slots that the hotbar should use in order
@@ -117,23 +118,6 @@ class Player(AliveEntity):
         # if Input.m_2 and Time.frameCount%21 == 0:
         #     Particles.spawn_smoke_particle(Camera.world_position_from_normalized(Input.m_pos_normalized),Vector2.randdir(),(Vector2.random().x*100).__trunc__())
 
-    def get_movement(self):
-        xz_movement = self.right * (self.engine.keys[const.K_d] - self.engine.keys[const.K_a]) + self.forward * (self.engine.keys[const.K_w] - self.engine.keys[const.K_s])
-
-        if glm.length(xz_movement):
-            xz_movement = glm.normalize(xz_movement)
-        out= xz_movement * self.speed
-        if self.engine.active_scene.physics.isGrounded(self) and self.engine.keys[const.K_SPACE]:
-            out += glm.vec3(0,8.44084934277,0)
-            
-        # print(out)
-        # print(xz_movement, glm.vec3(0,1,0) * (self.engine.keys[const.K_SPACE] - self.engine.keys[const.K_LSHIFT]))
-        return out
-   
-    def in_chunk(self,cx,cy):
-        '''accepts coords in world chunk position'''
-        return (cx == self.cx) and (cy == self.cy)
-
     def on_animate_done(self):
         # if self.animation.state == 'attack':
         #     if self.vel:
@@ -168,8 +152,9 @@ class Player(AliveEntity):
     #                 item.onDeath()
 
     def update(self):
-        #Camera.program['danger'] = 1-(self.health / self.total_health)
-        self.input()
-        self.vel += self.get_movement()
+        # #Camera.program['danger'] = 1-(self.health / self.total_health)
+        # self.input()
+        # self.vel += self.get_movement()
         # print(self.vel)
         # self.animate()
+        pass

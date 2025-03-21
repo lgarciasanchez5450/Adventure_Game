@@ -2,18 +2,7 @@ import typing
 from Utils.Async.AsyncManager import AsyncManager,read_async
 from Scripts.Chunk import Chunk 
 from zlib import compress, decompress
-
-if typing.TYPE_CHECKING:
-    from Scripts.ChunkManager import ChunkManager
 import os
-
-# def read_async(read:list[str],read_out:list[tuple[str,bytes]]):
-#     import time
-#     while True:
-#         for r in read:
-#             with open(r,'rb') as file:
-#                 read_out.append((r,file.read()))
-        
 
 def read_and_decompress(path:str):
     with open(path,'rb') as file:

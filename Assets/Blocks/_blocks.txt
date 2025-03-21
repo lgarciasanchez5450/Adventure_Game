@@ -1,0 +1,4 @@
+# This is a comment
+# BlockID       X+               X-             Y+         Y-          Z+           Z-
+1        grass_side.png       1.X+      grass_top.png dirt.png      1.X+         1.X+
+

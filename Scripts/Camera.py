@@ -5,7 +5,7 @@ import glm
 NEAR = .1
 FAR = 1024
 
-class RasterCamera:
+class Camera:
     def __init__(self,position) -> None:
         self.position = glm.vec3(position)
         self.yaw = 0.0
@@ -16,6 +16,8 @@ class RasterCamera:
         self.real_fov:float = 90
         self.target_fov:float = 90 #allows for smoothly transitioning between fovs
         self.up = glm.vec3(0,0,1)
+        self.view_matrix = self.get_view_matrix()
+        self.proj_matrix = self.get_projection_matrix()
 
 
     def get_view_matrix(self):

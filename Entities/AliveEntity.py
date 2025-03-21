@@ -1,23 +1,20 @@
 
 import glm
-from Scripts.Entity import Entity
+from Entities.Entity import Entity
+from Scripts.Inventory import Inventory
 from Constants import Damage
 
 class AliveEntity(Entity):
-    abstract = True
     # __slots__ = 'actions','pickup_range','inventory','armour_inventory','stats','exp','max_speed','total_health','defense','regen_multiplier','health','strength','max_energy', \
     # 'energy','attack_speed','time_between_attacks','time_to_attack','time_to_regen','regen_time','vision_collider','vision_squared','states','ground','invulnerability_time', \
     # 'time_til_vulnerable','direction','extra_speed','extra_speed_sum','extra_total_health','extra_total_health_sum','extra_regen','extra_regen_sum','extra_strength' ,\
     # 'extra_strength_sum','extra_energy','extra_energy_sum','extra_defense','extra_defense_sum','effects','state','healthbar'
     
-    def __init__(self,scene,position:tuple[int,int,int],size:tuple[float,float,float]|glm.vec3,health:float,max_health:float):
+    def __init__(self,scene,position:tuple[int,int,int],size:tuple[float,float,float]|glm.vec3,inventory_size:int,health:float,max_health:float):
         super().__init__(scene,position,size)
         self.health = health
         self.max_health = max_health
-        self.face_dir = glm.vec3(0,0,0)
-        self.forward = glm.vec3(0,0,0)
-        self.right = glm.vec3(0,0,0)
-        self.up = glm.vec3(0,1,0)
+        self.inventory = Inventory(inventory_size)
         
         # self.pickup_range = max(*Settings.HITBOX_SIZE[self.species]) * half_sqrt_2 # just a shortcut for finding the length to the corner of a box from the middle when you only know a side length
         # self.inventory = UniversalInventory(Settings.INVENTORY_SPACES_BY_SPECIES[self.species],self)
@@ -47,10 +44,6 @@ class AliveEntity(Entity):
         # self.vision_squared = Settings.VISION_BY_SPECIES[self.species] ** 2
         # self.states = []
         # self.ground:ground.Ground = ground.Invalid()
-        # damage timer
-        self.invulnerability_time = 0.5
-        self.time_til_vulnerable = 0.0
-
         self.direction = 'right'
         
         # self.extra_speed:dict[str,float] = {}; self.extra_speed_sum = 0.0
@@ -65,11 +58,10 @@ class AliveEntity(Entity):
 
 
     def takeDamage(self,damage:float,type:Damage.DamageType):
-        if self.time_til_vulnerable < 0 or type is Damage.INTERNAL_DAMAGE: 
-            self.health -= damage
-            if self.health <= 0:
-                self.dead = True
-                self.health = 0        
+        self.health -= damage
+        if self.health <= 0:
+            self.dead = True
+            self.health = 0        
 
     ### SET STATS ###
     

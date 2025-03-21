@@ -1,24 +1,24 @@
 import typing
 import glm
-import moderngl as mgl
-from Scripts.Chunk import Chunk,ChunkStatus
-from Scripts.Entity import Entity
-import numpy as np
+
 if typing.TYPE_CHECKING:
-    from Scene import RasterScene
+    from Scene import Scene
 from time import perf_counter
 from Utils.debug import profile
+from Utils.Pipeline import Pipeline
 from collections import deque
 
+from Scripts.Chunk import Chunk
 from Scripts.ChunkMesh import ChunkMesh
-from Scripts.TerrainGeneration import Pipeline,TerrainNode,StructureNode
 from Scripts.ChunkSaver import ChunkSaver
+from Scripts.TerrainGeneration import TerrainNode,StructureNode
+
 RENDER_DISTANCE = 5
-SIMULATION_DISTANCE = 3
+SIMULATION_DISTANCE = 1
 LOD_1 = 7
 LOD_2 = 11
 class ChunkManager:
-    def __init__(self,scene:"RasterScene") -> None:
+    def __init__(self,scene:"Scene") -> None:
         self.scene = scene
         self.chunk_saver = ChunkSaver('Temp')
         self.ctx = scene.ctx
@@ -35,23 +35,12 @@ class ChunkManager:
         self.dirty_chunks:set[tuple[int,int,int]] = set()
         self.to_offload = set()
 
-    def addEntity(self,entity:Entity):
-        cpos = glm.ivec3(entity.pos//Chunk.SIZE).to_tuple()
-        if cpos not in self.chunks: raise RuntimeError()
-        self.chunks[cpos].addEntity(entity)
-
     def update(self):
         for _ in range(10):
             if not self.dirty_chunks: break
             cpos = self.dirty_chunks.pop()
             if self.chunkmeshes[cpos].buildMesh() is False:
                 self.dirty_chunks.add(cpos) #mesh build failed
-        # print(len(self.dirty_chunks))
-        # entities_moved:list[tuple[Entity,tuple[int,int,int]]] = []
-        # for cpos in self.active_chunks:
-        #     self.chunks[cpos].update(entities_moved)
-        # for entity,chunk in entities_moved:
-        #     self.chunks[chunk].addEntity(entity)
         for _ in range(20):
             self.worldgen_pipeline.update()
         for out in self.out:
@@ -102,7 +91,6 @@ class ChunkManager:
     def loadChunk(self,cpos:tuple[int,int,int]):
         return self.loadChunks({cpos})
    
-
     def loadChunks(self,chunks:set[tuple[int,int,int]]):
         new_chunks = chunks.difference(self.render_chunks)
         for cpos in new_chunks:
@@ -146,6 +134,19 @@ class ChunkManager:
         #         cm = self.chunkmeshes[cpos] = ChunkMesh(self.ctx,self.scene.program,c)
 
         # self.render_chunks = new_render
+
+    def placeBlock(self,block:glm.ivec3,block_id:int):
+        cpos = block//Chunk.SIZE
+        c = self.chunks.get(cpos.to_tuple())
+        if c is None: return False
+        blocks = c.blocks
+        if blocks is None: return False
+        block = block%Chunk.SIZE
+        blocks[block.x,block.y,block.z] = block_id
+        self.dirty_chunks.add(cpos.to_tuple())
+        return True
+
+
 
 # def chunk():
 #     return np.zeros((4,4,4),dtype=np.uint32)
@@ -197,10 +198,10 @@ class ChunkManager:
 
 
 from Utils.Math.Fast import cache
-def getAround(x:int,y:int,z:int):
-    xzr = 16
-    yr = 5
-    return [(dx+x,dy+y,dz+z) for dx,dy,dz in  getDeltas(xzr,yr)]
+# def getAround(x:int,y:int,z:int):
+#     xzr = 16
+#     yr = 5
+#     return [(dx+x,dy+y,dz+z) for dx,dy,dz in  getDeltas(xzr,yr)]
   
 def getAroundRenderDistance(x:int,y:int,z:int):
     return {(dx+x,dy+y,dz+z) for dx,dy,dz in getDeltas(RENDER_DISTANCE,RENDER_DISTANCE)}
@@ -210,7 +211,7 @@ def getAroundLOD(x:int,y:int,z:int,LOD:int):
 
 
 def getAroundSimulationDistance(x:int,y:int,z:int):
-    return {(dx+x,dy+y,dz+z) for dx,dy,dz in getDeltas(SIMULATION_DISTANCE,5)}
+    return {(dx+x,dy+y,dz+z) for dx,dy,dz in getDeltas(SIMULATION_DISTANCE,SIMULATION_DISTANCE)}
 @cache
 def getDeltas(xzr:int,yr:int):
     deltas:list[tuple[int,int,int]] = []

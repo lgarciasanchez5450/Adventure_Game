@@ -100,7 +100,6 @@ class Collider:
 		self.setCenter(*newVal)
 		 
 
-
 	def collide_collider(self,c:'Collider'):
 		dist = self.c-c.c
 		size = self.s + c.s

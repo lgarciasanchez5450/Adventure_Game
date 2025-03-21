@@ -5,9 +5,10 @@ from pygame import Window
 from pygame.time import Clock
 import pygame.constants as const
 pygame.font.init()
-from Scene import RasterScene
+from Scene import Scene
 from Scripts.ProgramManager import ProgramManager
 from Utils.debug import Tracer
+
 
 class Engine:
     def __init__(self,window:Window) -> None:
@@ -26,8 +27,8 @@ class Engine:
         self.running = False
 
     def Init(self):
-        self.scenes:dict[str,RasterScene] = {'scene1':RasterScene(self,self.window)}
-        self.active_scene:RasterScene = list(self.scenes.values())[0]
+        self.scenes:dict[str,Scene] = {'scene1':Scene(self,self.window)}
+        self.active_scene:Scene = list(self.scenes.values())[0]
 
     def start(self):
         self.window.get_surface()
@@ -54,7 +55,7 @@ class Engine:
             self.active_scene.update()
             self.active_scene.draw()
             self.window.flip()
-            self.clock.tick(120)
+            self.clock.tick(60)
         self.tracer.show()
 
 
@@ -89,12 +90,52 @@ class Time:
 
 class GameApp: 
     def __init__(self) -> None:
-        self.window = pygame.Window('hello',(800,600),opengl=True,resizable=True)
+        self.window = Window('hello',(800,600),opengl=True,resizable=True)
         self.engine = Engine(self.window)  
     
     def run(self):
         return self.engine.start()
    
+if False:
+    from pygame import display
+    class Window:
+        def __init__(self,name:str,size:tuple[int,int],*,  fullscreen: bool = False,opengl: bool = False,resizable: bool = False):
+            display.set_mode(size,(const.OPENGL*opengl)|(const.RESIZABLE*resizable)|(const.FULLSCREEN*fullscreen)|(const.DOUBLEBUF*opengl))
+            self.title = name
+
+        def get_surface(self):
+            return display.get_surface()
         
+        @property
+        def size(self):
+            return display.get_window_size()
+        
+        def flip(self):
+            display.flip()
+
+        @property
+        def title(self):
+            return display.get_caption()
+        
+        @title.setter
+        def title(self,newVal:str):
+            display.set_caption(newVal)
+
+        @property
+        def mouse_grabbed(self):
+            return pygame.event.get_grab()
+        
+        @mouse_grabbed.setter
+        def mouse_grabbed(self,newVal:bool):
+            return pygame.event.set_grab(newVal)
+        @property
+        def grab_mouse(self):
+            return pygame.event.get_grab()
+        
+        @grab_mouse.setter
+        def grab_mouse(self,newVal:bool):
+            return pygame.event.set_grab(newVal)
+            
+
 if __name__ == '__main__':
     GameApp().run()

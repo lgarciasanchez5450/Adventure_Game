@@ -4,7 +4,7 @@ from numpy import typing as np_typing
 from Utils.Math.game_math import *
 from Chunk import Chunk
 if typing.TYPE_CHECKING:
-    from Scripts.ChunkManager import ChunkManager
+    from Systems.ChunkManager import ChunkManager
 class LightManager:
     def __init__(self,chunkmanager:"ChunkManager"):
         self.chunkmanager = chunkmanager

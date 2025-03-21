@@ -21,9 +21,9 @@ const vec3 global_light_color = vec3(1,1,1); // Pure white color
 
 
 const vec3 normals_from_face[6] = vec3[6](
-    vec3(0,1,0), vec3(0,-1,0), // Top Bottom
-    vec3(1,0,0), vec3(-1,0,0), // X+  X-
-    vec3(0,0,1), vec3(0,0,-1)  // Z+  Z-
+    vec3(1,0,0), vec3(-1,0,0), // X+ X-
+    vec3(0,1,0), vec3(0,-1,0), // Y+ Y-
+    vec3(0,0,1), vec3(0,0,-1)  // Z+ Z-
 );
 
 void main() { // This function is called per-vertex
@@ -31,12 +31,12 @@ void main() { // This function is called per-vertex
     int uv_index = gl_VertexID % 6; 
     uv = vec3(uv_coords[uv_index], texture_indices[(in_block_id-1)*6 + in_face]);
 
-    //Certain Faces should get different shadings w.r.t. global illumination color
 
+    //Certain Faces should get different shadings w.r.t. global illumination color
     vec3 face_normal = normals_from_face[in_face];
     float gi_strength = max(.2,dot(-face_normal,global_light_dir));
-    light = gi_strength*global_light_color;
     
+    light = gi_strength*global_light_color;
 
     gl_Position = m_proj * m_view * m_model * vec4(in_position,1.0);
 }
