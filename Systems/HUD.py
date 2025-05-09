@@ -3,7 +3,7 @@ import pygame
 import pygame.constants as const
 
 if typing.TYPE_CHECKING:
-    from Scene import Scene
+    from _Legacy.Scene import Scene
 
 class HUD:
     def __init__(self,scene:"Scene") -> None:

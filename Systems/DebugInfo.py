@@ -5,7 +5,7 @@ import pygame.constants as const
 from Scripts.Chunk import Chunk
 
 if typing.TYPE_CHECKING:
-    from Scene import Scene
+    from _Legacy.Scene import Scene
 
 
 class DebugInfo:

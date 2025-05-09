@@ -6,7 +6,6 @@ class Collider:
 	def __init__(self,position:glm.vec3,size:tuple[float,float,float]|glm.vec3) -> None:
 		self.c = position
 		self.s = glm.vec3(size)
-		
 	
 	def move_x(self,x:float):
 		self.c.x += x
@@ -59,9 +58,7 @@ class Collider:
 	@property
 	def z_negative(self):
 		assert self.s.z > 0
-
 		return self.c.z - self.s.z/2
-
 	
 	@property
 	def size(self):

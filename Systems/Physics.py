@@ -5,7 +5,7 @@ from Scripts.Chunk import Chunk
 from Utils.Math.game_math import *
 from Entities.Entity import Entity
 if typing.TYPE_CHECKING:
-    from Scene import Scene
+    from _Legacy.Scene import Scene
 class Physics:
     def __init__(self,scene:"Scene"):
         self.entities:list[Entity] = []

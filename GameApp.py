@@ -1,101 +1,139 @@
+import os
 import time
 import pygame
 import moderngl as mgl
 from pygame import Window
+from pygame import Event
+from pygame import Surface
 from pygame.time import Clock
-import pygame.constants as const
-pygame.font.init()
-from Scene import Scene
+from pygame import constants as const
+from GLScene import GLScene
 from Scripts.ProgramManager import ProgramManager
-from Utils.debug import Tracer
+from FBO import FBO
+
+class Input:
+    _iterating_i:int
+    mx:int
+    my:int
+
+    events:list[Event]
+    __slots__ = '_iterating_i','mx','my','events'
+    def __init__(self):
+        self._iterating_i = -1
+
+    def gather(self,eventtype = None,pump: bool = True, exclude = None):
+        self.events.extend(pygame.event.get(eventtype,pump,exclude))
+
+    def __iter__(self):
+        i = 0
+        j = 0        
+        ev = self.events
+        for i in range(len(ev)):
+            n = yield ev[i]
+            
+    @property
+    def mpos(self): return self.mx,self.my
+
+# class Engine:
+#     def __init__(self,output:Surface) -> None:
+#         # MGL context
+#         self.screen = output
+#         self.ctx = mgl.create_context()
+#         self.ctx.enable(mgl.CULL_FACE|mgl.DEPTH_TEST)
+#         # Time variables
+#         self.clock = Clock()
+#         self.time = Time()
+#         self.t_last_update = 0
+
+#         self.program_manager = ProgramManager(self.ctx)
+#         self.running = False
+
+#     def start(self): 
+#         self.running = True
+#         self.t_last_update = time.perf_counter()
+
+#     def update(self,events:list[Event]): 
+#         assert self.running
+#         t_cur = time.perf_counter()
+#         self.dt = t_cur = self.t_last_update
+#         self.t_last_update = t_cur
 
 
-class Engine:
-    def __init__(self,window:Window) -> None:
+#     def draw(self): 
+#         assert self.running
+
+#     def stop(self):
+#         self.running = False
+
+
+class GLEngine:
+    def __init__(self,output:mgl.Framebuffer) -> None:
         # MGL context
-        self.window = window
-        self.ctx = mgl.create_context()
+        self.screen = output
+        self.ctx = mgl.get_context()
         self.ctx.enable(mgl.CULL_FACE|mgl.DEPTH_TEST)
         # Time variables
         self.clock = Clock()
-        self.time = Time()
-        self.tracer = Tracer()
+        self.t_last_update = 0
 
-        # Project handler
         self.program_manager = ProgramManager(self.ctx)
-        
         self.running = False
 
-    def Init(self):
-        self.scenes:dict[str,Scene] = {'scene1':Scene(self,self.window)}
-        self.active_scene:Scene = list(self.scenes.values())[0]
+        self.scenes:dict[str,GLScene] = {}
+        for filename in os.listdir('./Scenes'):
+            if filename.endswith('.scene'):
+                name = filename.removesuffix('.scene')
+                if name in self.scenes:
+                    raise NameError(f'Error Loading Scenes: There are two scenes with the name: {name}')
+                fqn = os.path.abspath(os.path.join('./Scenes',filename))
+                self.scenes[name] = GLScene.load(fqn,self.ctx.screen)
 
     def start(self):
-        self.window.get_surface()
-        self.Init()
-        # rss_base = psutil.Process().memory_info().rss #memory(rss from psutil) used by python only importing python and moderngl
+        self.running = True
+        self.t_last_update = time.perf_counter()
+        self.scene = self.scenes['test']
 
-        # pygame.display.set_caption(f'{self.active_scene.get_memory()/1_000_000:.2f} MB')
-        # pygame.display.set_caption(f'{(psutil.Process().memory_info().rss-rss_base)/1_000_000} MB')
-        self.running = True 
-        self.time.start()
-        self.active_scene.start()
-        while self.running:
-            for event in pygame.event.get():
-                if event.type == const.WINDOWCLOSE:
-                    self.running = False
-                elif event.type== const.KEYDOWN:
-                    if event.key == const.K_p:
-                        self.tracer.running = True
-                elif event.type== const.KEYUP:
-                    if event.key == const.K_p:
-                        self.tracer.running = False
-            self.keys = pygame.key.get_pressed()
-            self.time.update()
-            self.active_scene.update()
-            self.active_scene.draw()
-            self.window.flip()
-            self.clock.tick(60)
-        self.tracer.show()
+    def update(self,events:list[Event]): 
+        assert self.running
+        t_cur = time.perf_counter()
+        self.dt = t_cur = self.t_last_update
+        self.t_last_update = t_cur
+        self.scene.update(events)
 
+    def draw(self):
+        assert self.running
+        self.scene.draw(self.ctx)
 
-        
-class Time:
-    __slots__ = 'dt','fixedDt','_prevTime','time','timeScale','realTime','_startTime','unscaledDeltaTime','frame'
-    def __init__(self) -> None:
-        self.dt = 0
-        self.timeScale = 1
-        self.fixedDt = 0.1
+    def stop(self):
+        self.running = False
 
-
-    def start(self):
-        self.time = 0
-        self.realTime = 0
-        self.unscaledDeltaTime = 0
-        self.frame = 0
-        self._prevTime = self._startTime = time.perf_counter()
-
-    
-    def update(self):
-        t = time.perf_counter()
-        u = self.unscaledDeltaTime = (t - self._prevTime)
-        self.dt = u * self.timeScale
-        self.time += self.dt
-        self._prevTime = t
-        self.realTime = t - self._startTime
-        self.frame += 1
-
-    def getFPS(self):
-        return 1 / self.unscaledDeltaTime if self.unscaledDeltaTime else 0
 
 class GameApp: 
     def __init__(self) -> None:
-        self.window = Window('hello',(800,600),opengl=True,resizable=True)
-        self.engine = Engine(self.window)  
+        self.window = Window('hello',(1,1),fullscreen_desktop=True,opengl=True,resizable=True)
+        self.ctx = mgl.create_context()
+        self.engine = GLEngine(self.ctx.screen)  
+
     
     def run(self):
-        return self.engine.start()
-   
+        self.engine.start()
+        self.running = True
+        while self.running:
+            events = pygame.event.get()
+            for event in events:
+                if event.type == pygame.QUIT:
+                    self.running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_c:
+                        if event.mod&pygame.K_LCTRL:
+                            self.running = False
+
+            if self.engine.running:
+                self.engine.update(events)
+                self.engine.draw()
+
+            self.window.flip()
+    
 if False:
     from pygame import display
     class Window:
@@ -138,4 +176,5 @@ if False:
             
 
 if __name__ == '__main__':
+    pygame.init()
     GameApp().run()

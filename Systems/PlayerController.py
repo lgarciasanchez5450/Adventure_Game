@@ -9,7 +9,7 @@ from Entities.IAliveEntity import IAliveEntity
 from Utils.Math.game_math import smoothFollow
 
 if typing.TYPE_CHECKING:
-    from Scene import Scene
+    from _Legacy.Scene import Scene
 
 class PlayerController:
     __slots__ = 'scene','player','camera','last_wd_time','sprinting','sprint_speed_increase','jump_strength','reach','player_selected_block','player_speed'
@@ -31,7 +31,7 @@ class PlayerController:
         camera.view_matrix = camera.get_view_matrix()
         camera.proj_matrix = camera.get_projection_matrix()
         rel_x, rel_y = pygame.mouse.get_rel()
-        if self.scene.window.mouse_grabbed: 
+        if self.scene.output.mouse_grabbed: 
             camera.yaw += rel_x * 0.05
             camera.pitch -= rel_y * 0.05
             camera.yaw = camera.yaw % 360
@@ -53,7 +53,7 @@ class PlayerController:
         player.right = camera.right
 
         #move player
-        if self.scene.window.mouse_grabbed:
+        if self.scene.output.mouse_grabbed:
             keys = pygame.key.get_pressed()
             keysd = pygame.key.get_just_pressed()
 
@@ -83,7 +83,7 @@ class PlayerController:
         camera.target_fov = 90 + self.sprinting*33*self.sprint_speed_increase
         camera.real_fov = smoothFollow(camera.real_fov,camera.target_fov,8,0.016,0.001)
        
-        if self.scene.window.mouse_grabbed:
+        if self.scene.output.mouse_grabbed:
             mouse_keys = pygame.mouse.get_just_pressed()
             self.player_selected_block = self.scene.s_physics.RayCast(self.camera.position,self.camera.forward,self.reach)
             if self.player_selected_block is not None:

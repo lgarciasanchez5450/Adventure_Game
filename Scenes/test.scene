@@ -1,0 +1,13 @@
+{
+    "gameObjects":[
+        {
+            "name":"Name",
+            "pos":[0,0,0],
+            "size":[1,1,1]
+        }
+    ],
+    "behaviours":[
+        
+    ],
+    "background_color":[1,0,0]
+}

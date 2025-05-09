@@ -3,7 +3,7 @@ import glm
 from Entities.AliveEntity import AliveEntity
 from Scripts.Inventory import Hotbar
 if typing.TYPE_CHECKING:
-    from Scene import Scene
+    from _Legacy.Scene import Scene
 
 
 class Player(AliveEntity):

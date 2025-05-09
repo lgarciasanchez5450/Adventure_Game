@@ -3,7 +3,7 @@ import typing
 from Utils.Math.Collider import Collider
 
 if typing.TYPE_CHECKING:
-    from Scene import Scene
+    from _Legacy.Scene import Scene
     
 class Entity:
     __slots__ = 'scene','pos','vel','collider','mass','dead','dir','forward','up','right'
